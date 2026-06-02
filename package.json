@@ -1,11 +1,11 @@
 {
-  "name": "luxe-ecommerce-root",
+  "name": "trendy",
   "version": "1.0.0",
-  "description": "Root package for running LUXE E-commerce MERN application",
+  "description": "Root package for running Trendy E-Commerce application",
   "scripts": {
-    "install:all": "npm install --prefix client && npm install --prefix server",
-    "dev:server": "npm run dev --prefix server",
-    "dev:client": "npm run dev --prefix client",
+    "install:all": "npm install --prefix frontend && npm install --prefix backend",
+    "dev:server": "npm run dev --prefix backend",
+    "dev:client": "npm run dev --prefix frontend",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\""
   },
   "devDependencies": {
