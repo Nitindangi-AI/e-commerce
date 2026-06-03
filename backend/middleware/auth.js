@@ -42,6 +42,17 @@ exports.protect = async (req, res, next) => {
   }
 };
 
+// Admin middleware
+exports.requireAdmin = (req, res, next) => {
+  if (req.user && req.user.role === 'admin') {
+    return next();
+  }
+  return res.status(403).json({
+    success: false,
+    message: 'Admin role required',
+  });
+};
+
 // Authorize by role
 exports.authorize = (...roles) => {
   return (req, res, next) => {

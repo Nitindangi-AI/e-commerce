@@ -3,7 +3,9 @@ const Order = require("../models/Order");
 const Product = require("../models/Product");
 const User = require("../models/User");
 const generateOrderId = require("../utils/generateOrderId");
-
+const Shipment = require("../models/Shipment");
+const ShipmentEvent = require("../models/ShipmentEvent");
+const DeliverySlot = require("../models/DeliverySlot");
 // @desc    Create new order
 // @route   POST /api/v1/orders
 // @access  Private
@@ -128,9 +130,32 @@ exports.createOrder = asyncHandler(async (req, res) => {
     ],
   });
 
+  // Auto-create a Shipment record for this order
+  const trackingNumber = `TRK-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+  const shipment = await Shipment.create({
+    order: order._id,
+    tracking_number: trackingNumber,
+    carrier: "Trendy Express",
+    status: "pending",
+    estimated_delivery: estimatedDelivery,
+  });
+
+  // Create initial shipment event
+  await ShipmentEvent.create({
+    shipment: shipment._id,
+    status: "Order Placed",
+    location: shippingAddress?.city || "Warehouse",
+    description: "Order placed successfully and awaiting pickup",
+  });
+
   res.status(201).json({
     success: true,
     order,
+    shipment: {
+      _id: shipment._id,
+      tracking_number: trackingNumber,
+      status: shipment.status,
+    },
   });
 });
 
@@ -438,8 +463,103 @@ exports.updateOrderStatus = asyncHandler(async (req, res) => {
 
   await order.save();
 
+  // Sync shipment status with order status
+  const shipment = await Shipment.findOne({ order: order._id });
+  if (shipment) {
+    let shipmentStatus = shipment.status;
+    let eventStatus = "";
+    const shipmentNote = note || "";
+    switch (status) {
+      case "Confirmed":
+        shipmentStatus = "pickup_scheduled";
+        eventStatus = "Pickup Scheduled";
+        break;
+      case "Shipped":
+        shipmentStatus = "in_transit";
+        eventStatus = "In Transit";
+        break;
+      case "Out for Delivery":
+        shipmentStatus = "out_for_delivery";
+        eventStatus = "Out for Delivery";
+        break;
+      case "Delivered":
+        shipmentStatus = "delivered";
+        eventStatus = "Delivered";
+        await Shipment.updateOne({ _id: shipment._id }, { actual_delivery: new Date() });
+        break;
+      case "Cancelled":
+        shipmentStatus = "failed";
+        eventStatus = "Cancelled";
+        break;
+      default:
+        // no change
+        break;
+    }
+    if (eventStatus) {
+      await Shipment.updateOne({ _id: shipment._id }, { status: shipmentStatus, updated_at: new Date() });
+      await ShipmentEvent.create({
+        shipment: shipment._id,
+        status: eventStatus,
+        location: "",
+        description: shipmentNote,
+      });
+    }
+  }
+
   res.status(200).json({
     success: true,
     order,
   });
+});
+
+// New shipment and delivery slot handlers
+exports.getShipmentByOrderId = asyncHandler(async (req, res) => {
+  const shipment = await Shipment.findOne({ order: req.params.id }).populate('order');
+  if (!shipment) {
+    return res.status(404).json({ success: false, message: 'Shipment not found' });
+  }
+  const events = await ShipmentEvent.find({ shipment: shipment._id }).sort({ timestamp: 1 });
+  res.status(200).json({ success: true, shipment, events });
+});
+
+exports.updateShipment = asyncHandler(async (req, res) => {
+  const { status, location, estimatedDelivery, actualDelivery } = req.body;
+  const shipment = await Shipment.findById(req.params.id);
+  if (!shipment) {
+    return res.status(404).json({ success: false, message: 'Shipment not found' });
+  }
+  const update = {};
+  if (status) update.status = status;
+  if (location) update.current_location = location;
+  if (estimatedDelivery) update.estimated_delivery = estimatedDelivery;
+  if (actualDelivery) update.actual_delivery = actualDelivery;
+  update.updated_at = new Date();
+  const updated = await Shipment.findByIdAndUpdate(shipment._id, update, { new: true });
+  await ShipmentEvent.create({ shipment: updated._id, status: status || shipment.status, location: location || shipment.current_location, description: 'Status updated by admin' });
+  res.status(200).json({ success: true, shipment: updated });
+});
+
+exports.trackByNumber = asyncHandler(async (req, res) => {
+  const shipment = await Shipment.findOne({ tracking_number: req.params.trackingNumber });
+  if (!shipment) {
+    return res.status(404).json({ success: false, message: 'Shipment not found' });
+  }
+  // Return full shipment details
+  res.status(200).json({ success: true, shipment });
+});
+
+exports.createDeliverySlot = asyncHandler(async (req, res) => {
+  const { slot_time } = req.body;
+  const orderId = req.params.id;
+  const order = await Order.findById(orderId);
+  if (!order) {
+    return res.status(404).json({ success: false, message: 'Order not found' });
+  }
+  const slot = await DeliverySlot.create({ order: order._id, slot_time, is_reserved: true });
+  res.status(201).json({ success: true, slot });
+});
+
+exports.getDeliverySlots = asyncHandler(async (req, res) => {
+  const slots = await DeliverySlot.find({ order: req.params.id }).sort({ slot_time: 1 });
+  res.status(200).json({ success: true, slots });
 });
