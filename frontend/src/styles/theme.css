@@ -1,0 +1,46 @@
+/* src/styles/theme.css */
+:root {
+  --theme-gold: #C9A84C;
+  --theme-gold-hover: #B5963F;
+  --theme-gold-bg: rgba(201, 168, 76, 0.1);
+  --theme-gold-border: rgba(201, 168, 76, 0.2);
+}
+
+/* Custom CSS Modal Classes */
+.theme-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(6px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.theme-modal-container {
+  background-color: #111111;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1.25rem;
+  padding: 1.5rem;
+  max-width: 28rem;
+  width: 100%;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+  color: #ffffff;
+  animation: theme-modal-fade-in 0.25s ease-out;
+}
+
+@keyframes theme-modal-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

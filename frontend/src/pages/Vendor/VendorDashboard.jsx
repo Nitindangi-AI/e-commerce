@@ -144,10 +144,18 @@ export default function VendorDashboard() {
   const [loadingLogistics, setLoadingLogistics] = useState(false);
   const [selectedActiveShipment, setSelectedActiveShipment] = useState(null);
   
-  // Transit Simulation state
   const [simTransitStatus, setSimTransitStatus] = useState("");
   const [simTransitLocation, setSimTransitLocation] = useState("");
   const [deliveryOtpInput, setDeliveryOtpInput] = useState("");
+
+  const [shipmentSearch, setShipmentSearch] = useState("");
+  const [shipmentStatusFilter, setShipmentStatusFilter] = useState("all");
+  const [showEventModal, setShowEventModal] = useState(false);
+  const [editingShipment, setEditingShipment] = useState(null);
+  const [newEventStatus, setNewEventStatus] = useState("");
+  const [newEventLocation, setNewEventLocation] = useState("");
+  const [newEventNote, setNewEventNote] = useState("");
+  const [loadingEvents, setLoadingEvents] = useState(false);
 
   // Payout Transaction State
   const [withdrawalAmount, setWithdrawalAmount] = useState("");
@@ -338,13 +346,18 @@ export default function VendorDashboard() {
       const commDeducted = (totalDeliveredRevenue * commRate) / 100;
       const net = totalDeliveredRevenue - commDeducted;
 
-      // 5. Fetch Active Shipments
-      const { data: shipmentsData } = await insforge.database
-        .from("shipments")
-        .select("*, contractors(*), vehicles(*)")
-        .eq("vendor_id", user.id)
-        .order("created_at", { ascending: false });
-      setActiveShipments(shipmentsData || []);
+      // 5. Fetch Active Shipments associated with vendor's orders
+      const vendorOrderIds = Array.from(new Set((sortedItems || []).map(item => item.order_id)));
+      let shipmentsData = [];
+      if (vendorOrderIds.length > 0) {
+        const { data: ships } = await insforge.database
+          .from("shipments")
+          .select("*, contractors(*), vehicles(*)")
+          .in("order_id", vendorOrderIds)
+          .order("created_at", { ascending: false });
+        shipmentsData = ships || [];
+      }
+      setActiveShipments(shipmentsData);
 
       // 6. Fetch contractors & vehicles list
       const { data: contrs } = await insforge.database.from("contractors").select("*");
@@ -957,6 +970,43 @@ export default function VendorDashboard() {
     }
   };
 
+  const getOrderEarnings = (orderId) => {
+    const items = orderItems.filter(item => item.order_id === orderId);
+    const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const commRate = parseFloat(vendorData?.commission_rate || 10.00);
+    const commDeducted = (total * commRate) / 100;
+    return total - commDeducted;
+  };
+
+  const handleAppendShipmentEvent = async (e) => {
+    e.preventDefault();
+    if (!editingShipment) return;
+    if (!newEventNote.trim()) {
+      toast.error("Please enter an event description note.");
+      return;
+    }
+    setLoadingEvents(true);
+    try {
+      await logisticsAPI.addShipmentEvent({
+        shipmentId: editingShipment.id,
+        status: newEventStatus || editingShipment.status || "Updated",
+        location: newEventLocation || editingShipment.current_location || "In Transit",
+        note: newEventNote
+      });
+      toast.success("Shipment event update logged successfully!");
+      setShowEventModal(false);
+      setEditingShipment(null);
+      setNewEventNote("");
+      setNewEventLocation("");
+      setNewEventStatus("");
+      await loadDashboardData();
+    } catch (err) {
+      toast.error(err.message || "Failed to add shipment event");
+    } finally {
+      setLoadingEvents(false);
+    }
+  };
+
   // Store Settings Submit
   const handleSettingsSubmit = async (e) => {
     e.preventDefault();
@@ -1223,7 +1273,7 @@ export default function VendorDashboard() {
             { id: "add-product", label: "Upload Listings", icon: PlusCircle },
             { id: "orders", label: "Fulfill Orders", icon: ShoppingBag },
             { id: "returns", label: "Returns Manager", icon: RotateCcw },
-            { id: "logistics", label: "Logistics Control", icon: Truck },
+            { id: "shipments", label: "My Shipments", icon: Truck },
             { id: "analytics", label: "Sales Analytics", icon: TrendingUp },
             { id: "inventory", label: "Inventory Stock", icon: Boxes },
             { id: "coupons", label: "Promo Coupons", icon: Percent },
@@ -1978,241 +2028,310 @@ export default function VendorDashboard() {
           </div>
         )}
 
-        {/* ─── TAB: LOGISTICS CONTROL ─── */}
-        {activeTab === "logistics" && (
-          <div className="space-y-6 animate-fade-in text-xs">
-            <div>
-              <h2 className={`display text-3xl font-black mb-1 ${textTitle}`}>Logistics Control Center</h2>
-              <p className={`text-xs ${textSubtle}`}>Oversee and simulate the multi-stage global fulfillment network in real-time.</p>
+        {/* ─── TAB: SHIPMENTS ─── */}
+        {activeTab === "shipments" && (
+          <div className="space-y-6 animate-fade-in text-xs font-semibold">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className={`display text-3xl font-black mb-1 ${textTitle}`}>My Shipments</h2>
+                <p className={`text-xs ${textSubtle}`}>Monitor delivery progress, track net earnings per delivered order, and log custom events.</p>
+              </div>
             </div>
 
             {/* Quick Metrics */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {[
-                { title: "Total Shipments", val: activeShipments.length, color: "text-white" },
-                { title: "In Transit Hubs", val: activeShipments.filter(s => s.status !== "Delivered" && s.status !== "Shipment Request").length, color: "text-blue-400" },
-                { title: "Out for Delivery", val: activeShipments.filter(s => s.status === "Last Mile Delivery").length, color: "text-pink-400" },
-                { title: "Successfully Delivered", val: activeShipments.filter(s => s.status === "Delivered").length, color: "text-green-400" },
-              ].map((stat, i) => (
-                <div key={i} className={`p-4 border rounded-2xl ${cardBg}`}>
-                  <p className={`text-[9px] uppercase tracking-widest font-bold ${textSubtle}`}>{stat.title}</p>
-                  <p className={`text-xl font-black mt-1 ${stat.color}`}>{stat.val}</p>
+            {(() => {
+              const today = new Date().toDateString();
+              const todayDeliveries = activeShipments.filter(s => {
+                const status = (s.status || "").toLowerCase();
+                if (status !== 'delivered') return false;
+                const deliveryDate = s.actual_delivery ? new Date(s.actual_delivery).toDateString() : null;
+                return deliveryDate === today;
+              }).length;
+
+              const inTransitCount = activeShipments.filter(s => 
+                ['pickup_scheduled', 'picked_up', 'in_transit', 'out_for_delivery'].includes(s.status)
+              ).length;
+
+              const failedCount = activeShipments.filter(s => 
+                (s.status || "").toLowerCase() === 'failed'
+              ).length;
+
+              const deliveredShipments = activeShipments.filter(s => 
+                (s.status || "").toLowerCase() === 'delivered'
+              );
+
+              const totalEarnings = deliveredShipments.reduce((sum, s) => {
+                return sum + getOrderEarnings(s.order_id);
+              }, 0);
+
+              const pendingCount = activeShipments.filter(s => 
+                !['delivered', 'failed'].includes((s.status || "").toLowerCase())
+              ).length;
+
+              return (
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  {[
+                    { label: "Today's Deliveries", val: todayDeliveries, color: "text-green-400" },
+                    { label: "In Transit", val: inTransitCount, color: "text-blue-400" },
+                    { label: "Total Net Earnings", val: `₹${totalEarnings.toLocaleString('en-IN')}`, color: "text-green-400" },
+                    { label: "Pending Shipments", val: pendingCount, color: "text-yellow-400" }
+                  ].map((sys, idx) => (
+                    <div key={idx} className={`p-4 border rounded-2xl ${cardBg}`}>
+                      <span className={`text-[8.5px] uppercase tracking-widest font-black ${textSubtle}`}>{sys.label}</span>
+                      <h4 className={`text-xl font-black mt-1 ${sys.color}`}>{sys.val}</h4>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              );
+            })()}
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Left Column: Active Shipments List */}
-              <div className={`border rounded-2xl p-5 shadow-xl lg:col-span-1 space-y-4 h-fit ${cardBg}`}>
-                <h3 className={`font-bold text-xs uppercase tracking-wider ${textTitle}`}>Active Consignments</h3>
+            {/* Filter and Search row */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-black/10 p-4 rounded-xl border border-white/5">
+              <div className="flex items-center gap-3 flex-wrap">
+                <input
+                  type="text"
+                  placeholder="Search by Tracking/Order ID..."
+                  value={shipmentSearch}
+                  onChange={e => setShipmentSearch(e.target.value)}
+                  className={`px-4 py-2 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-yellow-500/40 w-48 sm:w-64 ${inputBg}`}
+                />
                 
-                {activeShipments.length === 0 ? (
-                  <p className={`py-10 text-center ${textSubtle}`}>No active shipments generated yet. Fulfill an order to start routing!</p>
-                ) : (
-                  <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
-                    {activeShipments.map(s => {
-                      const isSel = selectedActiveShipment?.id === s.id;
-                      return (
-                        <div 
-                          key={s.id} 
-                          onClick={async () => {
-                            const full = await logisticsAPI.getShipmentByOrderId(s.order_id);
-                            setSelectedActiveShipment(full.shipment);
-                          }}
-                          className={`p-3 border rounded-xl cursor-pointer transition-all ${
-                            isSel ? 'bg-yellow-500/10 border-yellow-500/30 gold font-bold' : 'bg-black/25 border-white/5 hover:border-white/10 text-white/70'
-                          }`}
-                        >
-                          <div className="flex justify-between items-start mb-1.5">
-                            <span className="font-mono font-bold text-[10px]">{s.shipment_id}</span>
-                            <span className={`text-[8px] uppercase px-1.5 py-0.5 rounded font-black tracking-widest ${
-                              s.status === 'Delivered' ? 'bg-green-500/10 text-green-400' : 'bg-blue-500/10 text-blue-400'
-                            }`}>{s.status}</span>
-                          </div>
-                          <p className="font-semibold text-white/90 truncate">{s.destination?.name}</p>
-                          <p className={`text-[9px] mt-0.5 ${textSubtle}`}>{s.destination?.city}, {s.destination?.state}</p>
-                          <div className="flex items-center gap-1.5 mt-2 text-[9px] uppercase tracking-wider text-white/60">
-                            <span>🚚 {s.contractors?.name ? s.contractors.name.split(" ")[0] : "Courier"}</span>
-                            <span>·</span>
-                            <span className="capitalize">{s.delivery_mode} Mode</span>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Right Column: Selected Shipment Detail & Stage Simulator */}
-              <div className={`border rounded-2xl p-6 shadow-xl lg:col-span-2 space-y-6 ${cardBg}`}>
-                {selectedActiveShipment ? (
-                  <div className="space-y-6">
-                    {/* Header */}
-                    <div className="border-b border-white/5 pb-4 flex flex-wrap justify-between items-start gap-4">
-                      <div>
-                        <h4 className={`font-black text-sm uppercase tracking-wider ${textTitle}`}>Consignment Detail</h4>
-                        <p className={`text-[10px] mt-0.5 font-mono ${textSubtle}`}>{selectedActiveShipment.shipment_id}</p>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-[9px] uppercase tracking-widest bg-yellow-500/10 border border-yellow-500/25 gold px-2.5 py-1 rounded-full font-black">
-                          {selectedActiveShipment.delivery_mode} routing
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Path Origins & Destinations */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-black/35 border border-white/5 p-4 rounded-xl">
-                      <div>
-                        <span className="text-white/40 block text-[8px] uppercase tracking-widest font-black">Origin Warehouse</span>
-                        <p className="font-bold text-white mt-1 text-[11px]">{selectedActiveShipment.origin?.name}</p>
-                        <p className={`text-[10px] ${textSubtle}`}>{selectedActiveShipment.origin?.city}, {selectedActiveShipment.origin?.state}</p>
-                      </div>
-                      <div>
-                        <span className="text-white/40 block text-[8px] uppercase tracking-widest font-black">Destination Hub Address</span>
-                        <p className="font-bold text-white mt-1 text-[11px]">{selectedActiveShipment.destination?.name}</p>
-                        <p className={`text-[10px] ${textSubtle}`}>{selectedActiveShipment.destination?.line1}, {selectedActiveShipment.destination?.area}, {selectedActiveShipment.destination?.city} ({selectedActiveShipment.destination?.pincode})</p>
-                      </div>
-                    </div>
-
-                    {/* Vertical Multi-Stage Sequence Route Path */}
-                    <div className="space-y-4">
-                      <span className="text-white/40 block text-[9px] uppercase tracking-widest font-black">Fulfillment Nodes Route Map</span>
-                      <div className="border border-white/5 bg-black/20 p-4 rounded-xl space-y-4 relative">
-                        {/* Connecting line */}
-                        <div className="absolute top-8 bottom-8 left-6 w-[2px] bg-white/5" />
-                        
-                        {selectedActiveShipment.routes?.map((route, idx) => {
-                          const statuses = [
-                            'Shipment Request', 'Pickup Scheduled', 'International Shipping',
-                            'Country Hub', 'State Hub', 'District Hub', 'Last Mile Delivery', 'Delivered'
-                          ];
-                          
-                          const currIdx = statuses.indexOf(selectedActiveShipment.status);
-                          const isCompleted = idx < currIdx || selectedActiveShipment.status === 'Delivered';
-                          const isActiveNode = idx === currIdx && selectedActiveShipment.status !== 'Delivered';
-                          
-                          return (
-                            <div key={route.id} className="flex gap-4 items-start relative z-10">
-                              <div className={`w-4 h-4 rounded-full border flex items-center justify-center text-[8px] font-black ${
-                                isCompleted ? 'bg-green-500 border-green-500 text-black' : isActiveNode ? 'bg-gold border-gold text-black shadow-[0_0_12px_rgba(212,175,55,0.4)]' : 'bg-neutral-900 border-white/20 text-white/30'
-                              }`}>
-                                {isCompleted ? '✓' : idx + 1}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex justify-between items-start gap-2 flex-wrap">
-                                  <p className={`font-bold text-[11px] ${isActiveNode ? 'text-gold' : isCompleted ? 'text-white' : 'text-white/40'}`}>
-                                    {route.from_location} → {route.to_location}
-                                  </p>
-                                  <span className={`text-[8px] tracking-widest uppercase font-black ${isActiveNode ? 'text-gold' : 'text-white/30'}`}>
-                                    {route.transport_type}
-                                  </span>
-                                </div>
-                                <p className={`text-[9px] mt-0.5 ${textSubtle}`}>Est. Transit: {route.estimated_days} day(s) · Sequence Priority #{route.sequence_order}</p>
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Driver details */}
-                    {selectedActiveShipment.vehicles && (
-                      <div className="bg-black/35 border border-white/5 p-4 rounded-xl flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-gold/10 border border-gold/20 flex items-center justify-center font-bold text-gold text-sm">
-                          👨‍✈️
-                        </div>
-                        <div>
-                          <span className="text-white/40 block text-[8px] uppercase tracking-widest font-black">Assigned Fleet Driver</span>
-                          <p className="font-bold text-white text-[11px]">{selectedActiveShipment.vehicles.driver_name}</p>
-                          <p className={`text-[10px] ${textSubtle}`}>Plate ID: {selectedActiveShipment.vehicles.vehicle_id} · Phone: {selectedActiveShipment.vehicles.driver_phone}</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* OTP Handoff Form */}
-                    {selectedActiveShipment.status === 'Last Mile Delivery' && (
-                      <div className="bg-yellow-500/[0.02] border border-yellow-500/20 p-5 rounded-xl space-y-3">
-                        <h5 className="font-black text-xs gold uppercase tracking-wider flex items-center gap-1.5">
-                          🔑 Last-Mile Verification
-                        </h5>
-                        <p className="text-[10px] text-white/50 leading-relaxed">
-                          The cargo has arrived at the destination. Request the customer's secure delivery verification OTP code (available on their order page) to complete handoff.
-                        </p>
-                        <div className="flex gap-2">
-                          <input 
-                            type="text" 
-                            placeholder="Enter 6-digit OTP code (e.g. OTP-123456)..."
-                            value={deliveryOtpInput}
-                            onChange={e => setDeliveryOtpInput(e.target.value)}
-                            className="input-field px-4 py-2.5 rounded-xl text-xs flex-1 bg-black/45"
-                          />
-                          <button 
-                            onClick={() => handleVerifyOtpDelivery(selectedActiveShipment.id)}
-                            className="btn-gold px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest"
-                          >
-                            Verify & Deliver
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Dynamic Transit Stage Simulator Console */}
-                    {selectedActiveShipment.status !== 'Delivered' && (
-                      <div className="border border-white/5 bg-black/45 p-5 rounded-xl space-y-4">
-                        <h5 className="font-black text-xs uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
-                          ⚙️ Logistics Network Simulator Console
-                        </h5>
-                        <p className="text-[10px] text-white/40 leading-relaxed">
-                          Advance this consignment through the regional routing hubs and nodes automatically to test timelines and customer notification feeds.
-                        </p>
-                        
-                        <div className="flex flex-wrap gap-2 pt-1">
-                          {[
-                            { label: "1. Schedule Pickup", nextStatus: "Pickup Scheduled", loc: "Bhopal Warehouse Hub" },
-                            { label: "2. Dispatch Global", nextStatus: "International Shipping", loc: "Mumbai Cargo Port" },
-                            { label: "3. Reach India Hub", nextStatus: "Country Hub", loc: "Delhi Central Warehouse" },
-                            { label: "4. Reach State Hub", nextStatus: "State Hub", loc: `${selectedActiveShipment.destination?.state || "Madhya Pradesh"} Depot` },
-                            { label: "5. Reach District", nextStatus: "District Hub", loc: `${selectedActiveShipment.destination?.city || "Vidisha"} Hub` },
-                            { label: "6. Last-Mile Hand", nextStatus: "Last Mile Delivery", loc: selectedActiveShipment.destination?.area || "Bantinagar" }
-                          ].map((stage, idx) => {
-                            const isCurrent = selectedActiveShipment.status === stage.nextStatus;
-                            return (
-                              <button
-                                key={idx}
-                                disabled={loadingLogistics}
-                                onClick={() => handleSimulateTransit(selectedActiveShipment.id, stage.nextStatus, stage.loc)}
-                                className={`px-3 py-2 rounded-xl text-[9px] font-bold uppercase tracking-wider transition-all ${
-                                  isCurrent 
-                                    ? 'bg-blue-500 text-white font-black scale-105 shadow-[0_0_10px_rgba(59,130,246,0.3)]' 
-                                    : 'bg-white/5 border border-white/5 text-white/60 hover:text-white hover:bg-white/10'
-                                }`}
-                              >
-                                {stage.label}
-                              </button>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {selectedActiveShipment.status === 'Delivered' && (
-                      <div className="bg-green-500/[0.02] border border-green-500/20 p-5 rounded-xl text-center space-y-2">
-                        <span className="text-2xl">✅</span>
-                        <h5 className="font-black text-xs text-green-400 uppercase tracking-wider">Consignment Fully Fulfilled</h5>
-                        <p className="text-[10px] text-white/50">This shipment was successfully delivered and verified via proof of delivery OTP check.</p>
-                      </div>
-                    )}
-
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-24 text-center space-y-3">
-                    <span className="text-4xl text-white/20">📡</span>
-                    <h4 className="font-bold text-sm text-white/60">No Consignment Selected</h4>
-                    <p className={`text-xs max-w-xs ${textSubtle}`}>Select an active consignment from the left panel to inspect detailed paths, sequences, tracking histories, and run the transit simulator console.</p>
-                  </div>
-                )}
+                <select
+                  value={shipmentStatusFilter}
+                  onChange={e => setShipmentStatusFilter(e.target.value)}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold uppercase focus:outline-none focus:ring-1 focus:ring-yellow-500/40 ${inputBg}`}
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="pending">Pending</option>
+                  <option value="in_transit">In Transit</option>
+                  <option value="out_for_delivery">Out for Delivery</option>
+                  <option value="delivered">Delivered</option>
+                  <option value="failed">Failed</option>
+                </select>
               </div>
             </div>
+
+            {/* Read-only Shipments Table */}
+            <div className={`border rounded-2xl shadow-xl overflow-hidden ${cardBg}`}>
+              {(() => {
+                const filteredShipments = activeShipments.filter(s => {
+                  const matchItem = orderItems.find(item => item.order_id === s.order_id);
+                  const order = matchItem?.orders;
+                  const orderIdText = (order?.order_id || "").toLowerCase();
+                  
+                  const matchesSearch = 
+                    (s.shipment_id || "").toLowerCase().includes(shipmentSearch.toLowerCase()) ||
+                    (s.order_id || "").toLowerCase().includes(shipmentSearch.toLowerCase()) ||
+                    orderIdText.includes(shipmentSearch.toLowerCase());
+
+                  const status = (s.status || "").toLowerCase();
+                  let matchesStatus = true;
+                  if (shipmentStatusFilter !== "all") {
+                    if (shipmentStatusFilter === "in_transit") {
+                      matchesStatus = ["pickup_scheduled", "picked_up", "in_transit"].includes(status);
+                    } else if (shipmentStatusFilter === "out_for_delivery") {
+                      matchesStatus = ["out_for_delivery", "last mile delivery"].includes(status);
+                    } else {
+                      matchesStatus = status === shipmentStatusFilter;
+                    }
+                  }
+
+                  return matchesSearch && matchesStatus;
+                });
+
+                if (filteredShipments.length === 0) {
+                  return (
+                    <div className="text-center py-20">
+                      <span className="text-4xl block mb-4">📦</span>
+                      <h4 className="font-bold text-base mb-2">No Shipments Found</h4>
+                      <p className={`text-xs max-w-xs mx-auto ${textSubtle}`}>No shipment records match the search terms or filters.</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-white/10 bg-white/[0.02] text-white/50 tracking-wider uppercase font-semibold">
+                          <th className="px-6 py-4">Order ID</th>
+                          <th className="px-6 py-4">Customer Name</th>
+                          <th className="px-6 py-4">Tracking Number</th>
+                          <th className="px-6 py-4">Carrier</th>
+                          <th className="px-6 py-4">Current Status</th>
+                          <th className="px-6 py-4">Current Location</th>
+                          <th className="px-6 py-4">Estimated Delivery</th>
+                          <th className="px-6 py-4">Net Earnings</th>
+                          <th className="px-6 py-4 text-center">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {filteredShipments.map(s => {
+                          const matchItem = orderItems.find(item => item.order_id === s.order_id);
+                          const order = matchItem?.orders;
+                          
+                          let customerName = s.destination?.name || order?.shipping_address?.name || "Customer";
+                          if (!s.destination?.name && order?.shipping_address && typeof order.shipping_address === 'string') {
+                            try {
+                              const parsed = JSON.parse(order.shipping_address);
+                              customerName = parsed.name || customerName;
+                            } catch (e) {}
+                          }
+
+                          const status = s.status || "pending";
+                          const badgeColor = {
+                            "pending": "bg-neutral-500/10 text-neutral-400 border border-neutral-500/20",
+                            "pickup_scheduled": "bg-slate-500/10 text-slate-400 border border-slate-500/20",
+                            "picked_up": "bg-blue-500/10 text-blue-400 border border-blue-500/20",
+                            "in_transit": "bg-sky-500/10 text-sky-400 border border-sky-500/20",
+                            "out_for_delivery": "bg-orange-500/10 text-orange-400 border border-orange-500/20",
+                            "last mile delivery": "bg-orange-500/10 text-orange-400 border border-orange-500/20",
+                            "delivered": "bg-green-500/10 text-green-400 border border-green-500/20",
+                            "failed": "bg-red-500/10 text-red-400 border border-red-500/20",
+                            "returned": "bg-pink-500/10 text-pink-400 border border-pink-500/20",
+                          }[status.toLowerCase()] || "bg-neutral-500/10 text-neutral-400 border border-neutral-500/20";
+
+                          const isDelivered = status.toLowerCase() === 'delivered';
+                          const netEarnings = getOrderEarnings(s.order_id);
+
+                          return (
+                            <tr key={s.id} className="hover:bg-white/[0.005] transition-colors">
+                              <td className="px-6 py-4">
+                                <p className={`font-mono font-bold text-sm ${textTitle}`}>{order?.order_id || s.order_id.slice(0, 8)}</p>
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className={textTitle}>{customerName}</span>
+                              </td>
+                              <td className="px-6 py-4 font-mono font-semibold">
+                                {s.shipment_id}
+                              </td>
+                              <td className="px-6 py-4">
+                                {s.contractors?.name || s.carrier || "Carrier partner"}
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${badgeColor}`}>
+                                  {status}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4">
+                                {s.current_location || "Processing Depot"}
+                              </td>
+                              <td className="px-6 py-4">
+                                {s.estimated_delivery ? new Date(s.estimated_delivery).toLocaleDateString() : "Pending ETA"}
+                              </td>
+                              <td className="px-6 py-4 font-bold">
+                                {isDelivered ? (
+                                  <span className="text-green-400">₹{netEarnings.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                ) : (
+                                  <span className={textSubtle}>—</span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 text-center">
+                                <button
+                                  onClick={() => {
+                                    setEditingShipment(s);
+                                    setNewEventStatus(s.status || "Updated");
+                                    setNewEventLocation(s.current_location || "");
+                                    setNewEventNote("");
+                                    setShowEventModal(true);
+                                  }}
+                                  className="px-3 py-1.5 border border-white/10 hover:border-yellow-500 rounded-lg hover:bg-yellow-500/5 transition-all text-[10px] font-bold uppercase tracking-wider text-yellow-500"
+                                >
+                                  Append Event Note 📝
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* APPEND EVENT NOTE MODAL */}
+            {showEventModal && editingShipment && (
+              <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-6 backdrop-blur-sm">
+                <div 
+                  className="bg-[#111] border border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 text-xs font-semibold"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <div className="flex justify-between items-center pb-2 border-b border-white/5">
+                    <h3 className="font-bold text-sm uppercase tracking-wider text-[#d4af37]">Append Shipment Event</h3>
+                    <button 
+                      onClick={() => { setShowEventModal(false); setEditingShipment(null); }} 
+                      className="text-white/40 hover:text-white"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <p className={`text-[10px] ${textSubtle} leading-relaxed`}>
+                    Log an update onto this consignment's event timeline. This note will be visible to the customer.
+                  </p>
+
+                  <form onSubmit={handleAppendShipmentEvent} className="space-y-3">
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold tracking-widest text-white/50 mb-1">Current Status</label>
+                      <select 
+                        value={newEventStatus} 
+                        onChange={e => setNewEventStatus(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl text-xs bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-gold"
+                      >
+                        <option value={editingShipment.status}>{editingShipment.status} (Current)</option>
+                        <option value="pickup_scheduled">pickup_scheduled</option>
+                        <option value="picked_up">picked_up</option>
+                        <option value="in_transit">in_transit</option>
+                        <option value="out_for_delivery">out_for_delivery</option>
+                        <option value="delivered">delivered</option>
+                        <option value="failed">failed</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold tracking-widest text-white/50 mb-1">Location of Event</label>
+                      <input 
+                        type="text"
+                        placeholder="e.g. Mumbai Airport Hub" 
+                        value={newEventLocation}
+                        onChange={e => setNewEventLocation(e.target.value)} 
+                        className="w-full px-4 py-3 rounded-xl text-xs bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-gold" 
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold tracking-widest text-white/50 mb-1">Custom Event Description Note</label>
+                      <textarea 
+                        placeholder="e.g. Package arrived at local depot for scanning..."
+                        value={newEventNote}
+                        onChange={e => setNewEventNote(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl text-xs bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-gold resize-none h-20" 
+                        required
+                      />
+                    </div>
+
+                    <div className="flex gap-3 pt-4 border-t border-white/5">
+                      <button 
+                        type="button"
+                        onClick={() => { setShowEventModal(false); setEditingShipment(null); }} 
+                        className="px-5 py-3 rounded-xl border border-white/10 hover:bg-white/5 text-xs font-bold uppercase tracking-wider flex-1"
+                      >
+                        Cancel
+                      </button>
+                      
+                      <button 
+                        type="submit"
+                        disabled={loadingEvents}
+                        className="btn-gold flex-1 py-3 rounded-xl text-xs font-bold uppercase tracking-widest border-0 text-white bg-yellow-500 hover:bg-yellow-600 disabled:opacity-50"
+                      >
+                        {loadingEvents ? "Saving..." : "Append Note"}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

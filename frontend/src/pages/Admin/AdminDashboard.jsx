@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { insforge } from "../../lib/insforge";
+import { logisticsAPI } from "../../services/api";
 import Loader from "../../components/Loader";
 import toast from "react-hot-toast";
 import {
@@ -65,6 +66,16 @@ export default function AdminDashboard() {
   const [vehiclesList, setVehiclesList] = useState([]);
   const [selectedActiveShipment, setSelectedActiveShipment] = useState(null);
   const [loadingLogistics, setLoadingLogistics] = useState(false);
+
+  const [shipmentSearch, setShipmentSearch] = useState("");
+  const [shipmentStatusFilter, setShipmentStatusFilter] = useState("all");
+  const [selectedShipmentIds, setSelectedShipmentIds] = useState([]);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [editingShipment, setEditingShipment] = useState(null);
+  const [modalStatus, setModalStatus] = useState("");
+  const [modalLocation, setModalLocation] = useState("");
+  const [modalNote, setModalNote] = useState("");
+  const [modalEstDelivery, setModalEstDelivery] = useState("");
 
   const [analytics, setAnalytics] = useState({
     grossRevenue: 0,
@@ -472,7 +483,7 @@ export default function AdminDashboard() {
     { label: "Verify Active Sellers", action: () => { setActiveTab("vendors"); setShowCommandPalette(false); } },
     { label: "Users Shopper Manager", action: () => { setActiveTab("users"); setShowCommandPalette(false); } },
     { label: "Revoke Product Catalog Listings", action: () => { setActiveTab("products"); setShowCommandPalette(false); } },
-    { label: "Global Logistics OS Center", action: () => { setActiveTab("logistics"); setShowCommandPalette(false); } },
+    { label: "Shipments Management", action: () => { setActiveTab("shipments"); setShowCommandPalette(false); } },
     { label: "Security & Auditing Geolocation Logs", action: () => { setActiveTab("security"); setShowCommandPalette(false); } },
     { label: "Disputes Resolution Margins", action: () => { setActiveTab("disputes"); setShowCommandPalette(false); } },
     { label: "Toggle Dark / Light Console Style", action: () => { setIsDarkMode(!isDarkMode); setShowCommandPalette(false); } }
@@ -524,7 +535,7 @@ export default function AdminDashboard() {
             { id: "users", label: "Shopper Manager", icon: UsersIcon, count: profilesList.length },
             { id: "products", label: "Catalog Audit", icon: Package, count: allProducts.length },
             { id: "orders", label: "All Platform Orders", icon: ShoppingBag, count: platformOrders.length },
-            { id: "logistics", label: "Logistics OS Center", icon: Truck, count: activeShipments.filter(s => s.status !== "Delivered").length },
+            { id: "shipments", label: "Shipments", icon: Truck, count: activeShipments.filter(s => s.status !== "Delivered" && s.status !== "delivered").length },
             { id: "inventory", label: "Global Stock", icon: Boxes },
             { id: "payments", label: "Payments split", icon: CreditCard },
             { id: "payouts", label: "Payouts Settlement", icon: Banknote },
@@ -1033,236 +1044,397 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
-      {/* ─── TAB: LOGISTICS OPERATING SYSTEM ─── */}
-      {activeTab === "logistics" && (
+        {/* ─── TAB: SHIPMENTS MANAGEMENT ─── */}
+        {activeTab === "shipments" && (
           <div className="space-y-6 animate-fade-in text-xs font-semibold">
             <div>
-              <h2 className={`display text-3xl font-black mb-1 ${textTitle}`}>Logistics Control Gateway</h2>
-              <p className={`text-xs ${textSubtle}`}>Monitor the multi-stage global routing engines, audit regional contractor hubs, and track in-transit fleet drivers.</p>
+              <h2 className={`display text-3xl font-black mb-1 ${textTitle}`}>Shipments Panel Gateway</h2>
+              <p className={`text-xs ${textSubtle}`}>Monitor and update shipment logistics, dispatch items, and manage real-time delivery timelines.</p>
             </div>
 
-            {/* Quick stats panel */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {[
-                { label: "Active Consecutiveness", val: activeShipments.length, color: "text-white" },
-                { label: "In Transit Depot Hubs", val: activeShipments.filter(s => s.status !== "Delivered" && s.status !== "Shipment Request").length, color: "text-blue-400" },
-                { label: "Pending Handoff OTPs", val: activeShipments.filter(s => s.status === "Last Mile Delivery").length, color: "text-pink-400" },
-                { label: "Fulfill Rate SLA", val: "98.4%", color: "text-green-400" }
-              ].map((sys, idx) => (
-                <div key={idx} className={`p-4 border rounded-2xl ${cardBg}`}>
-                  <span className={`text-[8.5px] uppercase tracking-widest font-black ${textSubtle}`}>{sys.label}</span>
-                  <h4 className={`text-xl font-black mt-1 ${sys.color}`}>{sys.val}</h4>
+            {/* Quick stats / Delivery Analytics Card */}
+            {(() => {
+              const today = new Date().toDateString();
+              const todayDeliveries = activeShipments.filter(s => {
+                const status = (s.status || "").toLowerCase();
+                if (status !== 'delivered') return false;
+                const deliveryDate = s.actual_delivery ? new Date(s.actual_delivery).toDateString() : null;
+                return deliveryDate === today;
+              }).length;
+
+              const inTransitCount = activeShipments.filter(s => 
+                ['pickup_scheduled', 'picked_up', 'in_transit', 'out_for_delivery'].includes(s.status)
+              ).length;
+
+              const failedCount = activeShipments.filter(s => 
+                (s.status || "").toLowerCase() === 'failed'
+              ).length;
+
+              const deliveredShipments = activeShipments.filter(s => 
+                ((s.status || "").toLowerCase() === 'delivered') && s.actual_delivery
+              );
+              
+              let avgDeliveryTime = "N/A";
+              if (deliveredShipments.length > 0) {
+                const totalDays = deliveredShipments.reduce((sum, s) => {
+                  const orderItem = platformOrders.find(item => item.orders?.id === s.order_id);
+                  const orderCreated = orderItem?.orders?.created_at ? new Date(orderItem.orders.created_at) : new Date(s.created_at);
+                  const deliveryTime = new Date(s.actual_delivery) - orderCreated;
+                  const days = deliveryTime / (1000 * 60 * 60 * 24);
+                  return sum + (days > 0 ? days : 0);
+                }, 0);
+                avgDeliveryTime = `${(totalDays / deliveredShipments.length).toFixed(1)} days`;
+              }
+
+              return (
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  {[
+                    { label: "Today's Deliveries", val: todayDeliveries, color: "text-green-400" },
+                    { label: "In Transit", val: inTransitCount, color: "text-blue-400" },
+                    { label: "Failed Deliveries", val: failedCount, color: "text-red-400" },
+                    { label: "Average Delivery Time", val: avgDeliveryTime, color: "text-yellow-400" }
+                  ].map((sys, idx) => (
+                    <div key={idx} className={`p-4 border rounded-2xl ${cardBg}`}>
+                      <span className={`text-[8.5px] uppercase tracking-widest font-black ${textSubtle}`}>{sys.label}</span>
+                      <h4 className={`text-xl font-black mt-1 ${sys.color}`}>{sys.val}</h4>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              );
+            })()}
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Left Column: Shipment List */}
-              <div className={`border rounded-2xl p-5 shadow-xl lg:col-span-1 space-y-4 h-fit ${cardBg}`}>
-                <h3 className={`font-bold text-xs uppercase tracking-wider ${textTitle}`}>Active Consignments</h3>
-                {activeShipments.length === 0 ? (
-                  <p className={`text-center py-10 ${textSubtle}`}>No active shipments on platform</p>
-                ) : (
-                  <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-1">
-                    {activeShipments.map(s => {
-                      const isSel = selectedActiveShipment?.id === s.id;
-                      return (
-                        <div 
-                          key={s.id}
-                          onClick={() => handleSelectShipment(s)}
-                          className={`p-3 border rounded-xl cursor-pointer transition-all ${
-                            isSel ? 'bg-yellow-500/10 border-yellow-500/30 gold font-bold' : 'bg-black/25 border-white/5 hover:border-white/10 text-white/70'
-                          }`}
-                        >
-                          <div className="flex justify-between items-start gap-1">
-                            <span className="font-mono font-bold text-[9.5px]">{s.shipment_id}</span>
-                            <span className={`text-[8px] uppercase font-black px-1.5 py-0.5 rounded tracking-widest ${
-                              s.status === 'Delivered' ? 'bg-green-500/10 text-green-400' : 'bg-blue-500/10 text-blue-400'
-                            }`}>{s.status}</span>
-                          </div>
-                          <p className="font-bold text-white/95 mt-1 text-[11px] truncate">Dest: {s.destination?.name}</p>
-                          <p className={`text-[9px] ${textSubtle}`}>{s.destination?.city}, {s.destination?.state} ({s.destination?.pincode})</p>
-                          <div className="flex items-center gap-1.5 mt-2 text-[9px] uppercase tracking-wider text-white/60">
-                            <span>🚚 {s.contractors?.name ? s.contractors.name.split(" ")[0] : "Carrier"}</span>
-                            <span>·</span>
-                            <span className="capitalize">{s.delivery_mode} Mode</span>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
+            {/* Filter and Bulk Actions row */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-black/10 p-4 rounded-xl border border-white/5">
+              <div className="flex items-center gap-3 flex-wrap">
+                <input
+                  type="text"
+                  placeholder="Search by Tracking/Order ID..."
+                  value={shipmentSearch}
+                  onChange={e => setShipmentSearch(e.target.value)}
+                  className={`px-4 py-2 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-yellow-500/40 w-48 sm:w-64 ${inputBg}`}
+                />
+                
+                <select
+                  value={shipmentStatusFilter}
+                  onChange={e => setShipmentStatusFilter(e.target.value)}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold uppercase focus:outline-none focus:ring-1 focus:ring-yellow-500/40 ${inputBg}`}
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="pending">Pending</option>
+                  <option value="in_transit">In Transit</option>
+                  <option value="out_for_delivery">Out for Delivery</option>
+                  <option value="delivered">Delivered</option>
+                  <option value="failed">Failed</option>
+                </select>
               </div>
 
-              {/* Right Column: Path & Timelines Viewer */}
-              <div className={`border rounded-2xl p-6 shadow-xl lg:col-span-2 space-y-6 ${cardBg}`}>
-                {selectedActiveShipment ? (
-                  <div className="space-y-5">
-                    {/* Header */}
-                    <div className="border-b border-white/5 pb-4 flex flex-wrap justify-between items-start gap-4">
-                      <div>
-                        <h4 className={`font-black text-sm uppercase tracking-wider ${textTitle}`}>Consignment Detail</h4>
-                        <p className={`text-[10px] mt-0.5 font-mono ${textSubtle}`}>{selectedActiveShipment.shipment_id}</p>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-[9px] uppercase tracking-widest bg-yellow-500/10 border border-yellow-500/25 gold px-2.5 py-1 rounded-full font-black">
-                          {selectedActiveShipment.delivery_mode} routing
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Node Addresses */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-black/35 border border-white/5 p-4 rounded-xl">
-                      <div>
-                        <span className="text-white/40 block text-[8px] uppercase tracking-widest font-black">Origin Warehouse Hub</span>
-                        <p className="font-bold text-white mt-1 text-[11px]">{selectedActiveShipment.origin?.name}</p>
-                        <p className={`text-[10px] ${textSubtle}`}>{selectedActiveShipment.origin?.line1}, {selectedActiveShipment.origin?.city}</p>
-                      </div>
-                      <div>
-                        <span className="text-white/40 block text-[8px] uppercase tracking-widest font-black">Shopper Destination Address</span>
-                        <p className="font-bold text-white mt-1 text-[11px]">{selectedActiveShipment.destination?.name}</p>
-                        <p className={`text-[10px] ${textSubtle}`}>{selectedActiveShipment.destination?.line1}, {selectedActiveShipment.destination?.area}, {selectedActiveShipment.destination?.city}</p>
-                      </div>
-                    </div>
-
-                    {/* Route Sequences */}
-                    <div className="space-y-3">
-                      <span className="text-white/40 block text-[9px] uppercase tracking-widest font-black">Fulfillment Nodes Route Map</span>
-                      <div className="border border-white/5 bg-black/20 p-4 rounded-xl space-y-4 relative">
-                        {/* Connecting line */}
-                        <div className="absolute top-8 bottom-8 left-6 w-[2px] bg-white/5" />
-                        
-                        {selectedActiveShipment.routes?.map((route, idx) => {
-                          const statuses = [
-                            'Shipment Request', 'Pickup Scheduled', 'International Shipping',
-                            'Country Hub', 'State Hub', 'District Hub', 'Last Mile Delivery', 'Delivered'
-                          ];
+              {/* Bulk actions trigger */}
+              {selectedShipmentIds.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className={`text-[10px] ${textSubtle}`}>{selectedShipmentIds.length} selected</span>
+                  <button
+                    onClick={async () => {
+                      if (!window.confirm(`Mark ${selectedShipmentIds.length} shipments as Shipped?`)) return;
+                      setLoadingLogistics(true);
+                      try {
+                        for (const shipmentId of selectedShipmentIds) {
+                          const shipment = activeShipments.find(s => s.id === shipmentId);
+                          if (!shipment) continue;
                           
-                          const currIdx = statuses.indexOf(selectedActiveShipment.status);
-                          const isCompleted = idx < currIdx || selectedActiveShipment.status === 'Delivered';
-                          const isActiveNode = idx === currIdx && selectedActiveShipment.status !== 'Delivered';
+                          await logisticsAPI.updateShipmentStatus({
+                            shipmentId: shipment.id,
+                            status: "in_transit",
+                            location: shipment.origin?.city || "Warehouse",
+                            note: "Bulk marked as Shipped by Administrator"
+                          });
+                        }
+                        toast.success("Bulk dispatch successfully completed!");
+                        setSelectedShipmentIds([]);
+                        loadAdminData();
+                      } catch (err) {
+                        toast.error(err.message || "Failed to update bulk shipments");
+                      } finally {
+                        setLoadingLogistics(false);
+                      }
+                    }}
+                    className="btn-gold px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest"
+                  >
+                    Mark as Shipped 🚚
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Shipments Table Panel */}
+            <div className={`border rounded-2xl shadow-xl overflow-hidden ${cardBg}`}>
+              {(() => {
+                const filteredShipments = activeShipments.filter(s => {
+                  // Search filter
+                  const orderItem = platformOrders.find(item => item.orders?.id === s.order_id);
+                  const order = orderItem?.orders;
+                  const orderIdText = (order?.order_id || "").toLowerCase();
+                  
+                  const matchesSearch = 
+                    (s.shipment_id || "").toLowerCase().includes(shipmentSearch.toLowerCase()) ||
+                    (s.order_id || "").toLowerCase().includes(shipmentSearch.toLowerCase()) ||
+                    orderIdText.includes(shipmentSearch.toLowerCase());
+
+                  // Status filter mapping helper
+                  const status = (s.status || "").toLowerCase();
+                  let matchesStatus = true;
+                  if (shipmentStatusFilter !== "all") {
+                    if (shipmentStatusFilter === "in_transit") {
+                      matchesStatus = ["pickup_scheduled", "picked_up", "in_transit"].includes(status);
+                    } else if (shipmentStatusFilter === "out_for_delivery") {
+                      matchesStatus = ["out_for_delivery", "last mile delivery"].includes(status);
+                    } else {
+                      matchesStatus = status === shipmentStatusFilter;
+                    }
+                  }
+
+                  return matchesSearch && matchesStatus;
+                });
+
+                if (filteredShipments.length === 0) {
+                  return (
+                    <div className="text-center py-20">
+                      <span className="text-4xl block mb-4">📦</span>
+                      <h4 className="font-bold text-base mb-2">No Matching Shipments</h4>
+                      <p className={`text-xs max-w-xs mx-auto ${textSubtle}`}>No consignment records match the search terms or filters.</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-white/10 bg-white/[0.02] text-white/50 tracking-wider uppercase font-semibold">
+                          <th className="px-6 py-4 w-12 text-center">
+                            <input
+                              type="checkbox"
+                              checked={filteredShipments.length > 0 && selectedShipmentIds.length === filteredShipments.length}
+                              onChange={e => {
+                                if (e.target.checked) {
+                                  setSelectedShipmentIds(filteredShipments.map(s => s.id));
+                                } else {
+                                  setSelectedShipmentIds([]);
+                                }
+                              }}
+                              className="w-3.5 h-3.5 rounded border-gray-300 text-yellow-500 focus:ring-yellow-500 accent-yellow-500"
+                            />
+                          </th>
+                          <th className="px-6 py-4">Order ID & Client</th>
+                          <th className="px-6 py-4">Tracking Details</th>
+                          <th className="px-6 py-4">Carrier</th>
+                          <th className="px-6 py-4">Current Status</th>
+                          <th className="px-6 py-4">Last Location</th>
+                          <th className="px-6 py-4">Est. Delivery</th>
+                          <th className="px-6 py-4 text-center">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {filteredShipments.map(s => {
+                          const orderItem = platformOrders.find(item => item.orders?.id === s.order_id);
+                          const order = orderItem?.orders;
+                          const customerProfile = profilesList.find(p => p.id === order?.user_id);
                           
+                          let customerName = "Unknown Client";
+                          if (order?.shipping_address) {
+                            if (typeof order.shipping_address === 'string') {
+                              try {
+                                const parsed = JSON.parse(order.shipping_address);
+                                customerName = parsed.name || customerName;
+                              } catch (e) {}
+                            } else {
+                              customerName = order.shipping_address.name || customerName;
+                            }
+                          } else if (customerProfile) {
+                            customerName = `${customerProfile.first_name} ${customerProfile.last_name}`;
+                          }
+
+                          // Status Color badge mapping helper
+                          const status = s.status || "pending";
+                          const badgeColor = {
+                            "pending": "bg-neutral-500/10 text-neutral-400 border border-neutral-500/20",
+                            "pickup_scheduled": "bg-slate-500/10 text-slate-400 border border-slate-500/20",
+                            "picked_up": "bg-blue-500/10 text-blue-400 border border-blue-500/20",
+                            "in_transit": "bg-sky-500/10 text-sky-400 border border-sky-500/20",
+                            "out_for_delivery": "bg-orange-500/10 text-orange-400 border border-orange-500/20",
+                            "delivered": "bg-green-500/10 text-green-400 border border-green-500/20",
+                            "failed": "bg-red-500/10 text-red-400 border border-red-500/20",
+                            "returned": "bg-pink-500/10 text-pink-400 border border-pink-500/20",
+                          }[status.toLowerCase()] || "bg-neutral-500/10 text-neutral-400 border border-neutral-500/20";
+
                           return (
-                            <div key={route.id} className="flex gap-4 items-start relative z-10 text-[11px]">
-                              <div className={`w-4 h-4 rounded-full border flex items-center justify-center text-[8px] font-black ${
-                                isCompleted ? 'bg-green-500 border-green-500 text-black' : isActiveNode ? 'bg-gold border-gold text-black shadow-[0_0_12px_rgba(212,175,55,0.4)]' : 'bg-neutral-900 border-white/20 text-white/30'
-                              }`}>
-                                {isCompleted ? '✓' : idx + 1}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex justify-between items-start gap-2 flex-wrap">
-                                  <p className={`font-bold text-[11px] ${isActiveNode ? 'text-gold' : isCompleted ? 'text-white' : 'text-white/40'}`}>
-                                    {route.from_location} → {route.to_location}
-                                  </p>
-                                  <span className={`text-[8px] tracking-widest uppercase font-black ${isActiveNode ? 'text-gold' : 'text-white/30'}`}>
-                                    {route.transport_type}
-                                  </span>
-                                </div>
-                                <p className={`text-[9px] mt-0.5 ${textSubtle}`}>Est. Transit: {route.estimated_days} day(s) · Sequence Priority #{route.sequence_order}</p>
-                              </div>
-                            </div>
-                          )
+                            <tr key={s.id} className="hover:bg-white/[0.005] transition-colors">
+                              <td className="px-6 py-4 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedShipmentIds.includes(s.id)}
+                                  onChange={e => {
+                                    if (e.target.checked) {
+                                      setSelectedShipmentIds(prev => [...prev, s.id]);
+                                    } else {
+                                      setSelectedShipmentIds(prev => prev.filter(id => id !== s.id));
+                                    }
+                                  }}
+                                  className="w-3.5 h-3.5 rounded border-gray-300 text-yellow-500 focus:ring-yellow-500 accent-yellow-500"
+                                />
+                              </td>
+                              <td className="px-6 py-4">
+                                <p className={`font-mono font-bold text-sm ${textTitle}`}>{order?.order_id || s.order_id.slice(0, 8)}</p>
+                                <span className={`text-[10px] ${textSubtle}`}>{customerName}</span>
+                              </td>
+                              <td className="px-6 py-4">
+                                <p className={`font-mono font-semibold ${textTitle}`}>{s.shipment_id}</p>
+                                <span className={`text-[10px] ${textSubtle}`}>{s.delivery_mode} routing</span>
+                              </td>
+                              <td className={`px-6 py-4 font-semibold ${textTitle}`}>{s.contractors?.name || s.carrier || "Trendy Express"}</td>
+                              <td className="px-6 py-4">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${badgeColor}`}>
+                                  {status}
+                                </span>
+                              </td>
+                              <td className={`px-6 py-4 font-bold ${textTitle}`}>{s.current_location || "Depot Origin"}</td>
+                              <td className={`px-6 py-4 ${textSubtle}`}>
+                                {s.estimated_delivery ? new Date(s.estimated_delivery).toLocaleDateString() : "Pending ETA"}
+                              </td>
+                              <td className="px-6 py-4 text-center">
+                                <button
+                                  onClick={() => {
+                                    setEditingShipment(s);
+                                    setModalStatus(s.status || "pending");
+                                    setModalLocation(s.current_location || "");
+                                    setModalNote("");
+                                    setModalEstDelivery(s.estimated_delivery ? new Date(s.estimated_delivery).toISOString().slice(0, 10) : "");
+                                    setShowUpdateModal(true);
+                                  }}
+                                  className="px-3 py-1.5 border border-white/10 hover:border-yellow-500 rounded-lg hover:bg-yellow-500/5 transition-all text-[10px] font-bold uppercase tracking-wider text-yellow-500"
+                                >
+                                  Update status ✏️
+                                </button>
+                              </td>
+                            </tr>
+                          );
                         })}
-                      </div>
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* UPDATE SHIPMENT MODAL */}
+            {showUpdateModal && editingShipment && (
+              <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-6 backdrop-blur-sm">
+                <div 
+                  className="bg-[#111111] border border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 text-xs font-semibold"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <div className="flex justify-between items-center pb-2 border-b border-white/5">
+                    <h3 className="font-bold text-sm uppercase tracking-wider text-[#d4af37]">Update Shipment Parameters</h3>
+                    <button 
+                      onClick={() => { setShowUpdateModal(false); setEditingShipment(null); }} 
+                      className="text-white/40 hover:text-white"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <p className={`text-[10px] ${textSubtle} leading-relaxed`}>
+                    Updating shipment details will automatically trigger notifications in the client order timelines, and sync overall order parameters.
+                  </p>
+
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold tracking-widest text-white/50 mb-1">Fulfillment Status</label>
+                      <select 
+                        value={modalStatus} 
+                        onChange={e => setModalStatus(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl text-xs bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-gold"
+                      >
+                        <option value="pending" className="bg-[#111] text-white">pending</option>
+                        <option value="pickup_scheduled" className="bg-[#111] text-white">pickup_scheduled</option>
+                        <option value="picked_up" className="bg-[#111] text-white">picked_up</option>
+                        <option value="in_transit" className="bg-[#111] text-white">in_transit</option>
+                        <option value="out_for_delivery" className="bg-[#111] text-white">out_for_delivery</option>
+                        <option value="delivered" className="bg-[#111] text-white">delivered</option>
+                        <option value="failed" className="bg-[#111] text-white">failed</option>
+                        <option value="returned" className="bg-[#111] text-white">returned</option>
+                      </select>
                     </div>
 
-                    {/* Driver details */}
-                    {selectedActiveShipment.vehicles && (
-                      <div className="bg-black/35 border border-white/5 p-4 rounded-xl flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-gold/10 border border-gold/20 flex items-center justify-center font-bold text-gold text-sm">
-                          👨‍✈️
-                        </div>
-                        <div>
-                          <span className="text-white/40 block text-[8px] uppercase tracking-widest font-black">Assigned Fleet Driver</span>
-                          <p className="font-bold text-white text-[11px]">{selectedActiveShipment.vehicles.driver_name} (Plate: {selectedActiveShipment.vehicles.vehicle_id})</p>
-                          <p className={`text-[10px] ${textSubtle}`}>Phone: {selectedActiveShipment.vehicles.driver_phone} · Current Status: {selectedActiveShipment.vehicles.status}</p>
-                        </div>
-                      </div>
-                    )}
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold tracking-widest text-white/50 mb-1">Current Geolocation / Hub</label>
+                      <input 
+                        type="text"
+                        placeholder="e.g. Mumbai Airport Hub" 
+                        value={modalLocation}
+                        onChange={e => setModalLocation(e.target.value)} 
+                        className="w-full px-4 py-3 rounded-xl text-xs bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-gold" 
+                      />
+                    </div>
 
-                    {/* Delivery verification OTP */}
-                    {selectedActiveShipment.status !== 'Delivered' && (
-                      <div className="bg-yellow-500/[0.02] border border-yellow-500/20 p-4 rounded-xl flex items-center justify-between gap-4">
-                        <div>
-                          <span className="text-white/40 block text-[8px] uppercase tracking-widest font-black">Safe Handoff OTP Verification Key</span>
-                          <p className="text-[10px] text-white/50 leading-relaxed mt-1">This key is available on the shopper's order details view.</p>
-                        </div>
-                        <div className="bg-black border border-yellow-500/20 px-4 py-2 rounded-lg font-mono font-black text-xs gold tracking-widest select-all">
-                          {selectedActiveShipment.otp_code}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-28 text-center space-y-3">
-                    <span className="text-4xl text-white/20">📡</span>
-                    <h4 className="font-bold text-sm text-white/60">No Consignment Selected</h4>
-                    <p className={`text-xs max-w-xs ${textSubtle}`}>Select an active consignment from the left panel to inspect detailed paths, sequences, and tracking timelines.</p>
-                  </div>
-                )}
-              </div>
-            </div>
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold tracking-widest text-white/50 mb-1">Estimated Delivery Date</label>
+                      <input 
+                        type="date"
+                        value={modalEstDelivery}
+                        onChange={e => setModalEstDelivery(e.target.value)} 
+                        className="w-full px-4 py-3 rounded-xl text-xs bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-gold" 
+                      />
+                    </div>
 
-            {/* Hubs & Contractors Tables */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-              {/* Contractors Table */}
-              <div className={`border rounded-2xl p-5 space-y-4 ${cardBg}`}>
-                <h3 className={`font-bold text-xs uppercase tracking-wider ${textTitle}`}>Regional Contractors Matrix</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="border-b border-white/10 text-white/50 tracking-wider uppercase font-semibold">
-                        <th className="py-2">Partner</th>
-                        <th className="py-2">Country/Region</th>
-                        <th className="py-2">Rating</th>
-                        <th className="py-2">Pricing</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/5">
-                      {contractorsList.map(c => (
-                        <tr key={c.id} className="text-white/70">
-                          <td className="py-2.5 font-bold text-white">{c.name}</td>
-                          <td className="py-2.5 capitalize">{c.country}</td>
-                          <td className="py-2.5 gold font-bold">★ {c.rating}</td>
-                          <td className="py-2.5 font-mono">{c.pricing}x Base</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold tracking-widest text-white/50 mb-1">Custom Event Description Note</label>
+                      <textarea 
+                        placeholder="e.g. Package arrived at local depot for scanning..."
+                        value={modalNote}
+                        onChange={e => setModalNote(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl text-xs bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-gold resize-none h-16" 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-4 border-t border-white/5">
+                    <button 
+                      onClick={() => { setShowUpdateModal(false); setEditingShipment(null); }} 
+                      className="px-5 py-3 rounded-xl border border-white/10 hover:bg-white/5 text-xs font-bold uppercase tracking-wider flex-1"
+                    >
+                      Cancel
+                    </button>
+                    
+                    <button 
+                      onClick={async () => {
+                        setLoadingLogistics(true);
+                        try {
+                          await logisticsAPI.updateShipmentStatus({
+                            shipmentId: editingShipment.id,
+                            status: modalStatus,
+                            location: modalLocation,
+                            note: modalNote,
+                            estimatedDelivery: modalEstDelivery ? new Date(modalEstDelivery).toISOString() : undefined
+                          });
+                          toast.success("Shipment parameter successfully updated!");
+                          setShowUpdateModal(false);
+                          setEditingShipment(null);
+                          loadAdminData();
+                        } catch (err) {
+                          toast.error(err.message || "Failed to update shipment");
+                        } finally {
+                          setLoadingLogistics(false);
+                        }
+                      }}
+                      disabled={loadingLogistics}
+                      className="btn-gold flex-1 py-3 rounded-xl text-xs font-bold uppercase tracking-widest border-0"
+                    >
+                      {loadingLogistics ? "Saving..." : "Save details"}
+                    </button>
+                  </div>
                 </div>
               </div>
-
-              {/* Fleet Vehicles Table */}
-              <div className={`border rounded-2xl p-5 space-y-4 ${cardBg}`}>
-                <h3 className={`font-bold text-xs uppercase tracking-wider ${textTitle}`}>Active Fleet Vehicles</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="border-b border-white/10 text-white/50 tracking-wider uppercase font-semibold">
-                        <th className="py-2">Driver</th>
-                        <th className="py-2">Vehicle Type</th>
-                        <th className="py-2">Plate ID</th>
-                        <th className="py-2">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/5">
-                      {vehiclesList.map(v => (
-                        <tr key={v.id} className="text-white/70">
-                          <td className="py-2.5 font-bold text-white">{v.driver_name}</td>
-                          <td className="py-2.5">{v.type}</td>
-                          <td className="py-2.5 font-mono text-[10px] uppercase">{v.vehicle_id}</td>
-                          <td className="py-2.5">
-                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded tracking-widest ${
-                              v.status === 'Active' ? 'bg-green-500/10 text-green-400' : 'bg-yellow-500/10 text-yellow-500'
-                            }`}>{v.status}</span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         )}
 

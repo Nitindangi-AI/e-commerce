@@ -645,7 +645,7 @@ export default function AccountPage() {
                                 Cancel Order
                               </button>
                             )}
-                            {order.returnEligible && (
+                            {order.returnStatus === 'none' && order.orderStatus === 'Delivered' && order.returnDaysRemaining > 0 && (
                               <button
                                 onClick={() => setReturnModal(order._id)}
                                 className="text-[10px] font-bold uppercase tracking-widest text-orange-400 hover:underline flex items-center gap-1"
@@ -1127,8 +1127,8 @@ export default function AccountPage() {
 
       {/* ─── RETURN REQUEST MODAL OVERLAY ─── */}
       {returnModal && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-6 backdrop-blur-sm" onClick={() => setReturnModal(null)}>
-          <div className="bg-[#111] border border-white/10 rounded-2xl p-6 max-w-md w-full slide-up" onClick={e => e.stopPropagation()}>
+        <div className="theme-modal-overlay" onClick={() => setReturnModal(null)}>
+          <div className="theme-modal-container" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-2 mb-2 gold font-bold">
               <span>🔄</span> Request Free Return
             </div>

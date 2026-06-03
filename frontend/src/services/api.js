@@ -1139,33 +1139,55 @@ export const logisticsAPI = {
       .eq('shipment_id', shipment.id)
       .order('timestamp', { ascending: false });
 
+    const { data: events } = await insforge.database
+      .from('shipment_events')
+      .select('*')
+      .eq('shipment_id', shipment.id)
+      .order('timestamp', { ascending: true });
+
     return {
       success: true,
       shipment: {
         ...shipment,
         routes: routes || [],
-        tracking: tracking || []
+        tracking: tracking || [],
+        events: events || []
       }
     };
   },
 
-  updateShipmentStatus: async ({ shipmentId, status, location, note }) => {
+  updateShipmentStatus: async ({ shipmentId, status, location, note, estimatedDelivery }) => {
     // Update shipment table
+    const updateFields = {
+      updated_at: new Date().toISOString()
+    };
+    if (status) updateFields.status = status;
+    if (location !== undefined) updateFields.current_location = location;
+    if (estimatedDelivery !== undefined) updateFields.estimated_delivery = estimatedDelivery;
+    if (status === 'Delivered') {
+      updateFields.actual_delivery = new Date().toISOString();
+    }
+
     const { error: uErr } = await insforge.database
       .from('shipments')
-      .update({
-        status,
-        updated_at: new Date().toISOString()
-      })
+      .update(updateFields)
       .eq('id', shipmentId);
     if (uErr) throw new Error(uErr.message);
 
-    // Insert tracking entry
+    // Insert tracking entry (legacy)
     await insforge.database.from('tracking').insert([{
       tracking_id: `LOC-${Date.now().toString(36).toUpperCase()}`,
       shipment_id: shipmentId,
-      status,
-      location
+      status: status || 'Updated',
+      location: location || ''
+    }]);
+
+    // Insert shipment event
+    await insforge.database.from('shipment_events').insert([{
+      shipment_id: shipmentId,
+      status: status || 'Updated',
+      location: location || '',
+      description: note || `Shipment advanced to: ${status || 'Updated'}`
     }]);
 
     // Fetch shipment to get order ID and destination
@@ -1173,11 +1195,15 @@ export const logisticsAPI = {
     let smsSent = false;
     let customerPhone = null;
 
-    if (shipment) {
-      let orderStatus = 'Shipped';
-      let historyNote = note || `Shipment advanced to: ${status} in ${location}`;
+    if (shipment && status) {
+      let orderStatus = '';
+      let historyNote = note || `Shipment advanced to: ${status} in ${location || 'Transit'}`;
 
-      if (status === 'Last Mile Delivery') {
+      if (status === 'pickup_scheduled' || status === 'picked_up') {
+        orderStatus = 'Confirmed';
+      } else if (status === 'in_transit' || status === 'International Shipping' || status === 'Country Hub' || status === 'State Hub' || status === 'District Hub') {
+        orderStatus = 'Shipped';
+      } else if (status === 'Last Mile Delivery' || status === 'out_for_delivery') {
         orderStatus = 'Out for Delivery';
         const driverName = shipment.vehicles?.driver_name || 'Delivery Partner';
         const driverPhone = shipment.vehicles?.driver_phone || 'N/A';
@@ -1187,21 +1213,33 @@ export const logisticsAPI = {
         customerPhone = shipment.destination?.phone || 'registered number';
         console.log(`[SMS GATEWAY] Sending OTP ${shipment.otp_code} to ${customerPhone}`);
         smsSent = true;
-      } else if (status === 'Delivered') {
+      } else if (status === 'Delivered' || status === 'delivered') {
         orderStatus = 'Delivered';
         historyNote = `Package delivered successfully. Verification Complete.`;
+      } else if (status === 'failed') {
+        orderStatus = 'Cancelled';
+      } else if (status === 'returned') {
+        orderStatus = 'Returned';
       }
 
-      await insforge.database.from('orders').update({
-        order_status: orderStatus,
-        updated_at: new Date().toISOString()
-      }).eq('id', shipment.order_id);
+      if (orderStatus) {
+        const orderUpdates = {
+          order_status: orderStatus,
+          updated_at: new Date().toISOString()
+        };
+        if (orderStatus === 'Delivered') {
+          orderUpdates.delivered_at = new Date().toISOString();
+          orderUpdates.payment_status = 'paid';
+        }
 
-      await insforge.database.from('order_status_history').insert([{
-        order_id: shipment.order_id,
-        status: orderStatus,
-        note: historyNote
-      }]);
+        await insforge.database.from('orders').update(orderUpdates).eq('id', shipment.order_id);
+
+        await insforge.database.from('order_status_history').insert([{
+          order_id: shipment.order_id,
+          status: orderStatus,
+          note: historyNote
+        }]);
+      }
     }
 
     return { success: true, smsSent, customerPhone };
@@ -1221,6 +1259,7 @@ export const logisticsAPI = {
     // Update shipment status to Delivered
     await insforge.database.from('shipments').update({
       status: 'Delivered',
+      actual_delivery: new Date().toISOString(),
       updated_at: new Date().toISOString()
     }).eq('id', shipmentId);
 
@@ -1230,6 +1269,14 @@ export const logisticsAPI = {
       shipment_id: shipmentId,
       status: 'Delivered',
       location: shipment.destination?.city || 'Customer Address'
+    }]);
+
+    // Insert shipment event
+    await insforge.database.from('shipment_events').insert([{
+      shipment_id: shipmentId,
+      status: 'Delivered',
+      location: shipment.destination?.city || 'Customer Address',
+      description: 'Shipment delivered successfully. Proof of delivery: Customer OTP verification verified successfully.'
     }]);
 
     // Update parent order to Delivered, paid, set delivered_at
@@ -1247,6 +1294,17 @@ export const logisticsAPI = {
       note: 'Shipment delivered successfully. Proof of delivery: Customer OTP verification verified successfully.'
     }]);
 
+    return { success: true };
+  },
+
+  addShipmentEvent: async ({ shipmentId, status, location, note }) => {
+    const { error } = await insforge.database.from('shipment_events').insert([{
+      shipment_id: shipmentId,
+      status,
+      location,
+      description: note
+    }]);
+    if (error) throw new Error(error.message);
     return { success: true };
   }
 };
