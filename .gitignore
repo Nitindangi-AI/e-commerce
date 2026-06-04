@@ -14,3 +14,12 @@ node_modules
 .roo
 .trae
 .windsurf
+
+# Environment files
+.env
+*.env
+backend/.env
+
+# Cookie files
+cookie.txt
+backend/cookie.txt
