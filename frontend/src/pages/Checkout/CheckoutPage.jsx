@@ -4,8 +4,9 @@ import { useCartStore } from "../../store/useCartStore";
 import { orderAPI, authAPI, addressAPI } from "../../services/api";
 import toast from "react-hot-toast";
 import AddressForm from "../../components/AddressForm";
+import DeliverySlotPicker from "../../components/DeliverySlotPicker";
 
-const STEPS = ["Address", "Payment", "Confirm"];
+const STEPS = ["1. Address", "2. Payment", "3. Confirm"];
 
 export default function CheckoutPage() {
   const cartItems = useCartStore(s => s.cartItems);
@@ -39,8 +40,10 @@ export default function CheckoutPage() {
   const [cardCvv, setCardCvv] = useState("");
   const [netBank, setNetBank] = useState("sbi");
 
+  const [paymentErrors, setPaymentErrors] = useState({});
   const [placing, setPlacing] = useState(false);
   const [user, setUser] = useState(null);
+  const [selectedSlot, setSelectedSlot] = useState("slot1");
 
   useEffect(() => {
     let active = true;
@@ -128,30 +131,33 @@ export default function CheckoutPage() {
   };
 
   const handleNextStep2 = () => {
-    // Validate Payment details based on choice
+    const errs = {};
     if (payment === "upi") {
       if (!upiId.trim() || !upiId.includes("@")) {
-        toast.error("Please enter a valid UPI ID (e.g., name@okaxis)");
-        return;
+        errs.upiId = "Please enter a valid UPI ID (e.g., name@okaxis)";
       }
     } else if (payment === "card") {
       if (!cardHolder.trim()) {
-        toast.error("Please enter the cardholder's name");
-        return;
+        errs.cardHolder = "Cardholder name is required";
       }
       if (cardNumber.replace(/\s/g, "").length < 16) {
-        toast.error("Please enter a valid 16-digit card number");
-        return;
+        errs.cardNumber = "Please enter a valid 16-digit card number";
       }
       if (cardExpiry.length < 5 || !cardExpiry.includes("/")) {
-        toast.error("Please enter card expiry date in MM/YY format");
-        return;
+        errs.cardExpiry = "Expiry date in MM/YY format is required";
       }
       if (cardCvv.length < 3) {
-        toast.error("Please enter a valid 3-digit CVV");
-        return;
+        errs.cardCvv = "Please enter a valid 3-digit CVV";
       }
     }
+
+    if (Object.keys(errs).length > 0) {
+      setPaymentErrors(errs);
+      toast.error("Please correct the validation errors on the form");
+      return;
+    }
+
+    setPaymentErrors({});
     setStep(2);
   };
 
@@ -165,6 +171,7 @@ export default function CheckoutPage() {
     setPlacing(true);
     try {
       let finalDetails = {};
+      finalDetails.deliverySlot = selectedSlot;
       if (payment === "upi") {
         finalDetails.upiId = upiId;
       } else if (payment === "card") {
@@ -267,22 +274,32 @@ export default function CheckoutPage() {
                           <div 
                             key={addr.id}
                             onClick={() => handleSelectSavedAddress(addr)}
-                            className={`p-4 rounded-xl border cursor-pointer transition-all duration-200 ${
+                            className={`p-4 rounded-xl border cursor-pointer transition-all duration-200 flex items-start gap-4 ${
                               selectedAddressId === addr.id 
                                 ? "border-gold bg-gold/[0.03]" 
                                 : "border-[var(--card-border)] hover:border-gold/30 bg-[var(--bg-gradient)]"
                             }`}
                           >
-                            <div className="flex items-center justify-between mb-1.5">
-                              <span className="text-xs font-black text-gold uppercase tracking-wider">{addr.label || "Address"}</span>
-                              {addr.isDefault && (
-                                <span className="text-[9px] bg-gold/10 text-gold px-2 py-0.5 rounded-full font-bold uppercase">Default</span>
-                              )}
+                            <input 
+                              type="radio" 
+                              name="address_select" 
+                              value={addr.id} 
+                              checked={selectedAddressId === addr.id} 
+                              onChange={() => handleSelectSavedAddress(addr)}
+                              className="accent-gold h-4 w-4 mt-1 cursor-pointer flex-shrink-0"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-xs font-black text-gold uppercase tracking-wider">{addr.label || "Address"}</span>
+                                {addr.isDefault && (
+                                  <span className="text-[9px] bg-gold/10 text-gold px-2 py-0.5 rounded-full font-bold uppercase">Default</span>
+                                )}
+                              </div>
+                              <p className="text-xs font-bold text-[var(--text-primary)]">{addr.name} · {addr.phone}</p>
+                              <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                                {addr.line1}, {addr.city}, {addr.state} - {addr.pincode}
+                              </p>
                             </div>
-                            <p className="text-xs font-bold text-[var(--text-primary)]">{addr.name} · {addr.phone}</p>
-                            <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-                              {addr.line1}, {addr.city}, {addr.state} - {addr.pincode}
-                            </p>
                           </div>
                         ))}
                       </div>
@@ -328,6 +345,13 @@ export default function CheckoutPage() {
                   />
                 </div>
               )}
+
+              <div className="mt-6 pt-6 border-t border-[var(--card-border)]">
+                <DeliverySlotPicker 
+                  selectedSlot={selectedSlot} 
+                  onChange={setSelectedSlot} 
+                />
+              </div>
               
               <button 
                 onClick={handleNextStep1} 
@@ -383,9 +407,13 @@ export default function CheckoutPage() {
                         required
                         placeholder="e.g. name@okaxis" 
                         value={upiId} 
-                        onChange={e => setUpiId(e.target.value)} 
-                        className={inputStyle} 
+                        onChange={e => {
+                          setUpiId(e.target.value);
+                          if (paymentErrors.upiId) setPaymentErrors(prev => ({ ...prev, upiId: null }));
+                        }} 
+                        className={`${inputStyle} ${paymentErrors.upiId ? "border-red-500 focus:border-red-500 ring-1 ring-red-500/20" : ""}`} 
                       />
+                      {paymentErrors.upiId && <p className="text-red-500 text-[11px] font-semibold mt-1">{paymentErrors.upiId}</p>}
                     </div>
                   )}
                 </label>
@@ -413,9 +441,13 @@ export default function CheckoutPage() {
                           type="text" 
                           placeholder="John Doe" 
                           value={cardHolder} 
-                          onChange={e => setCardHolder(e.target.value)} 
-                          className={inputStyle} 
+                          onChange={e => {
+                            setCardHolder(e.target.value);
+                            if (paymentErrors.cardHolder) setPaymentErrors(prev => ({ ...prev, cardHolder: null }));
+                          }} 
+                          className={`${inputStyle} ${paymentErrors.cardHolder ? "border-red-500 focus:border-red-500 ring-1 ring-red-500/20" : ""}`} 
                         />
+                        {paymentErrors.cardHolder && <p className="text-red-500 text-[11px] font-semibold mt-1">{paymentErrors.cardHolder}</p>}
                       </div>
                       <div className="space-y-1">
                         <label className="block text-[10px] uppercase font-bold tracking-wider text-[var(--text-secondary)]">Card Number *</label>
@@ -431,9 +463,11 @@ export default function CheckoutPage() {
                               parts.push(val.substring(i, i + 4));
                             }
                             setCardNumber(parts.join(" "));
+                            if (paymentErrors.cardNumber) setPaymentErrors(prev => ({ ...prev, cardNumber: null }));
                           }} 
-                          className={inputStyle} 
+                          className={`${inputStyle} ${paymentErrors.cardNumber ? "border-red-500 focus:border-red-500 ring-1 ring-red-500/20" : ""}`} 
                         />
+                        {paymentErrors.cardNumber && <p className="text-red-500 text-[11px] font-semibold mt-1">{paymentErrors.cardNumber}</p>}
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
@@ -449,9 +483,11 @@ export default function CheckoutPage() {
                                 val = val.substring(0, 2) + "/" + val.substring(2, 4);
                               }
                               setCardExpiry(val);
+                              if (paymentErrors.cardExpiry) setPaymentErrors(prev => ({ ...prev, cardExpiry: null }));
                             }} 
-                            className={inputStyle} 
+                            className={`${inputStyle} ${paymentErrors.cardExpiry ? "border-red-500 focus:border-red-500 ring-1 ring-red-500/20" : ""}`} 
                           />
+                          {paymentErrors.cardExpiry && <p className="text-red-500 text-[11px] font-semibold mt-1">{paymentErrors.cardExpiry}</p>}
                         </div>
                         <div className="space-y-1">
                           <label className="block text-[10px] uppercase font-bold tracking-wider text-[var(--text-secondary)]">CVV *</label>
@@ -460,9 +496,13 @@ export default function CheckoutPage() {
                             maxLength={3} 
                             placeholder="•••" 
                             value={cardCvv} 
-                            onChange={e => setCardCvv(e.target.value.replace(/[^0-9]/g, ""))} 
-                            className={inputStyle} 
+                            onChange={e => {
+                              setCardCvv(e.target.value.replace(/[^0-9]/g, ""));
+                              if (paymentErrors.cardCvv) setPaymentErrors(prev => ({ ...prev, cardCvv: null }));
+                            }} 
+                            className={`${inputStyle} ${paymentErrors.cardCvv ? "border-red-500 focus:border-red-500 ring-1 ring-red-500/20" : ""}`} 
                           />
+                          {paymentErrors.cardCvv && <p className="text-red-500 text-[11px] font-semibold mt-1">{paymentErrors.cardCvv}</p>}
                         </div>
                       </div>
                     </div>
@@ -535,13 +575,22 @@ export default function CheckoutPage() {
               {/* Address detail review card */}
               <div className="bg-luxe-card border border-[var(--card-border)] rounded-2xl p-5 shadow-card">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-xs uppercase tracking-widest font-black text-gold">📍 Delivery Address</h3>
+                  <h3 className="text-xs uppercase tracking-widest font-black text-gold">📍 Delivery Address & Slot</h3>
                   <button onClick={() => setStep(0)} className="text-xs text-gold font-bold hover:underline">Change</button>
                 </div>
                 <p className="text-sm font-bold text-[var(--text-primary)]">{address.name} · {address.phone}</p>
                 <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                   {address.line1}{address.landmark ? `, Near ${address.landmark}` : ""}, {address.city}, {address.state} - {address.pincode}
                 </p>
+                <div className="mt-3 pt-3 border-t border-[var(--card-border)]/20 text-xs flex justify-between">
+                  <span className="text-[var(--text-secondary)]">Preferred Delivery Slot:</span>
+                  <span className="text-gold font-bold uppercase tracking-wider">
+                    {selectedSlot === "slot1" && "09:00 AM - 12:00 PM (Morning)"}
+                    {selectedSlot === "slot2" && "12:00 PM - 03:00 PM (Afternoon)"}
+                    {selectedSlot === "slot3" && "03:00 PM - 06:00 PM (Evening)"}
+                    {selectedSlot === "slot4" && "06:00 PM - 09:00 PM (Night)"}
+                  </span>
+                </div>
               </div>
 
               {/* Payment detail review card */}

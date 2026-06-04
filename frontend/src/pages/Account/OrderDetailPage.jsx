@@ -3,6 +3,8 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { orderAPI, logisticsAPI } from "../../services/api";
 import toast from "react-hot-toast";
 import { FileText, CheckCircle, Package, Truck, Home, XCircle, ArrowLeft, RotateCcw } from "lucide-react";
+import TrackingBadge from "../../components/TrackingBadge";
+import ReturnWindowBanner from "../../components/ReturnWindowBanner";
 
 const STATUS_ICONS = {
   "Processing": FileText,
@@ -99,7 +101,7 @@ export default function OrderDetailPage() {
     resizeCanvas();
     window.addEventListener("resize", resizeCanvas);
 
-    const colors = ["#C9A84C", "#EEDCA2", "#FFFFFF", "#F6E4A8", "#FFFFFF"];
+    const colors = ["#C9A84C", "#0A0A0A"];
     const particleCount = 100;
     const particles = [];
 
@@ -202,8 +204,27 @@ export default function OrderDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center pt-28 bg-[var(--bg-gradient)]">
-        <div className="w-8 h-8 border-2 border-gold border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-[#FAFAF8] dark:bg-[#0A0A0A] pt-28 pb-16 animate-pulse">
+        <div className="max-w-7xl mx-auto px-6 space-y-6">
+          {/* Breadcrumb line skeleton */}
+          <div className="h-4 w-48 bg-[#E8E8E8] dark:bg-white/5 rounded-full" />
+          {/* Header panel skeleton */}
+          <div className="h-24 w-full bg-[#E8E8E8] dark:bg-white/5 rounded-2xl" />
+          
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
+              {/* Product items list skeleton */}
+              <div className="h-48 w-full bg-[#E8E8E8] dark:bg-white/5 rounded-2xl" />
+              {/* Timeline feed skeleton */}
+              <div className="h-48 w-full bg-[#E8E8E8] dark:bg-white/5 rounded-2xl" />
+            </div>
+            
+            <div className="space-y-6">
+              {/* Order summary card skeleton */}
+              <div className="h-64 w-full bg-[#E8E8E8] dark:bg-white/5 rounded-2xl" />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -303,16 +324,21 @@ export default function OrderDetailPage() {
               {order.orderStatus === "Return Requested" && "🔄 Return Request Filed"}
               {order.orderStatus === "Returned" && "💰 Returned & Refunded"}
             </h2>
-            <p className="text-xs text-[var(--text-secondary)] max-w-md">
+            <div className="text-xs text-[var(--text-secondary)] max-w-md">
               {order.orderStatus === "Delivered" && "The package has been delivered to your shipping address. Thank you for shopping with us!"}
               {order.orderStatus === "Out for Delivery" && "Our local courier partner has picked up your package and is delivering it today."}
-              {order.orderStatus === "Shipped" && `Your order is in transit${shipment?.carrier ? ` via ${shipment.carrier}` : ""}. Tracking ID: ${shipment?.shipment_id || "TRD-PENDING"}`}
+              {order.orderStatus === "Shipped" && (
+                <span className="flex items-center gap-1.5 flex-wrap">
+                  Your order is in transit{shipment?.carrier ? ` via ${shipment.carrier}` : ""}. Tracking ID:
+                  <TrackingBadge number={shipment?.shipment_id} />
+                </span>
+              )}
               {order.orderStatus === "Confirmed" && "We have confirmed your payment and the merchant is packaging your items."}
               {order.orderStatus === "Processing" && "We are verifying your order details and payment info before sending to the merchant."}
               {order.orderStatus === "Cancelled" && "This order was cancelled. If payment was made, a refund will be processed shortly."}
               {order.orderStatus === "Return Requested" && "Your return request is currently under review by our support team."}
               {order.orderStatus === "Returned" && "We have received the returned items and successfully processed your refund."}
-            </p>
+            </div>
           </div>
           
           <div className="w-full md:w-64 space-y-2 flex-shrink-0">
@@ -329,6 +355,12 @@ export default function OrderDetailPage() {
           </div>
         </div>
       </div>
+
+      {order.orderStatus === "Delivered" && (
+        <div className="mb-6">
+          <ReturnWindowBanner order={order} />
+        </div>
+      )}
 
       {/* Header Panel */}
       <div className={`${cardBg} mb-6`}>
@@ -446,9 +478,10 @@ export default function OrderDetailPage() {
                 <h4 className="text-sm font-black text-[var(--text-primary)] uppercase tracking-wider flex items-center gap-2">
                   🛰️ Live Transit Telemetry
                 </h4>
-                <p className="text-[10px] text-[var(--text-secondary)] font-mono mt-0.5">
-                  AWB Tracking Code: {shipment.shipment_id}
-                </p>
+                <div className="text-[10px] text-[var(--text-secondary)] font-mono mt-0.5 flex items-center gap-1.5">
+                  <span>AWB Tracking Code:</span>
+                  <TrackingBadge number={shipment.shipment_id} />
+                </div>
               </div>
               
               <div>
@@ -469,7 +502,7 @@ export default function OrderDetailPage() {
                     Carrier Partner SLA
                   </span>
                   <p className="font-bold text-[var(--text-primary)] text-xs mt-0.5">
-                    {shipment.contractors?.name || 'Trendy Express Courier'}
+                    {shipment.contractors?.name || 'Trendz Express Courier'}
                   </p>
                   <p className="text-[10px] text-[var(--text-secondary)]">
                     Routing Zone: {shipment.contractors?.country || 'Domestic'}

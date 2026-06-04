@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { cartAPI } from '../services/api';
 import { insforge } from '../lib/insforge';
+import toast from 'react-hot-toast';
 
 export const useCartStore = create((set, get) => ({
   cartItems: [],
@@ -15,6 +16,7 @@ export const useCartStore = create((set, get) => ({
       }
     } catch (err) {
       console.error("Failed to fetch cart:", err);
+      toast.error(`Failed to sync shopping cart: ${err.message || err}`);
     }
   },
 
@@ -29,6 +31,7 @@ export const useCartStore = create((set, get) => ({
       await get().fetchCart();
     } catch (err) {
       console.error("Failed to sync cart:", err);
+      toast.error(`Failed to sync local cart with server: ${err.message || err}`);
     }
   },
 
@@ -55,10 +58,11 @@ export const useCartStore = create((set, get) => ({
     set({ cartItems: updatedItems });
 
     try {
-      const { data: userData } = await insforge.auth.getUser();
+      const { data: userData, error: userError } = await insforge.auth.getUser();
+      if (userError) throw userError;
       if (userData?.user) {
         if (existingIndex > -1) {
-          const { data: dbItem } = await insforge.database
+          const { data: dbItem, error: selectError } = await insforge.database
             .from('cart_items')
             .select('id')
             .eq('user_id', userData.user.id)
@@ -67,14 +71,17 @@ export const useCartStore = create((set, get) => ({
             .eq('selected_size', size)
             .maybeSingle();
 
+          if (selectError) throw selectError;
+
           if (dbItem) {
-            await insforge.database
+            const { error: updateError } = await insforge.database
               .from('cart_items')
               .update({ quantity: newQuantity })
               .eq('id', dbItem.id);
+            if (updateError) throw updateError;
           }
         } else {
-          await insforge.database
+          const { error: insertError } = await insforge.database
             .from('cart_items')
             .insert([{
               user_id: userData.user.id,
@@ -83,10 +90,12 @@ export const useCartStore = create((set, get) => ({
               selected_color: color,
               selected_size: size,
             }]);
+          if (insertError) throw insertError;
         }
       }
     } catch (err) {
       console.error("Failed to add to cart in DB:", err);
+      toast.error(`Failed to save item to server cart: ${err.message || err}`);
     }
   },
 
@@ -101,7 +110,8 @@ export const useCartStore = create((set, get) => ({
     set({ cartItems: updatedItems });
 
     try {
-      const { data: userData } = await insforge.auth.getUser();
+      const { data: userData, error: userError } = await insforge.auth.getUser();
+      if (userError) throw userError;
       if (userData?.user) {
         let query = insforge.database
           .from('cart_items')
@@ -112,10 +122,12 @@ export const useCartStore = create((set, get) => ({
         if (color !== undefined) query = query.eq('selected_color', color);
         if (size !== undefined) query = query.eq('selected_size', size);
 
-        await query;
+        const { error: deleteError } = await query;
+        if (deleteError) throw deleteError;
       }
     } catch (err) {
       console.error("Failed to remove from cart in DB:", err);
+      toast.error(`Failed to remove item from server cart: ${err.message || err}`);
     }
   },
 
@@ -132,7 +144,8 @@ export const useCartStore = create((set, get) => ({
     set({ cartItems: updatedItems });
 
     try {
-      const { data: userData } = await insforge.auth.getUser();
+      const { data: userData, error: userError } = await insforge.auth.getUser();
+      if (userError) throw userError;
       if (userData?.user) {
         let query = insforge.database
           .from('cart_items')
@@ -143,10 +156,12 @@ export const useCartStore = create((set, get) => ({
         if (color !== undefined) query = query.eq('selected_color', color);
         if (size !== undefined) query = query.eq('selected_size', size);
 
-        await query;
+        const { error: updateError } = await query;
+        if (updateError) throw updateError;
       }
     } catch (err) {
       console.error("Failed to update quantity in DB:", err);
+      toast.error(`Failed to update quantity on server: ${err.message || err}`);
     }
   },
 
@@ -156,8 +171,10 @@ export const useCartStore = create((set, get) => ({
       await cartAPI.clear();
     } catch (err) {
       console.error("Failed to clear cart in DB:", err);
+      toast.error(`Failed to clear server cart: ${err.message || err}`);
     }
   },
+
 
   getCartCount: (state) => {
     const items = state?.cartItems || get().cartItems;

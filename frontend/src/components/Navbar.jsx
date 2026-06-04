@@ -35,6 +35,18 @@ export default function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
 
+  const [cartAnimate, setCartAnimate] = useState(false);
+  const prevCartCountRef = useRef(cartCount);
+
+  useEffect(() => {
+    if (cartCount > prevCartCountRef.current) {
+      setCartAnimate(true);
+      const timer = setTimeout(() => setCartAnimate(false), 500);
+      return () => clearTimeout(timer);
+    }
+    prevCartCountRef.current = cartCount;
+  }, [cartCount]);
+
   useEffect(() => {
     setMobileMenuOpen(false);
     setSearchFocused(false);
@@ -154,7 +166,7 @@ export default function Navbar() {
             </button>
 
             {/* Desktop Links */}
-            <div className="hidden md:flex items-center gap-6 text-[10px] tracking-[0.25em] uppercase font-medium">
+            <div className="hidden md:flex items-center gap-6 text-xs tracking-widest uppercase font-medium">
               {navLinks.map((l) => (
                 <Link key={l.name} to={l.to}
                   className={`hover:text-[#C9A84C] dark:hover:text-[#C9A84C] hover:scale-105 active:scale-95 transition-all duration-300 ${
@@ -171,7 +183,7 @@ export default function Navbar() {
           {/* Center section: Logo */}
           <Link to="/" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center z-10 py-1 group">
             <span className="font-display text-2xl md:text-3xl font-bold tracking-[0.25em] uppercase text-[#0A0A0A] dark:text-white transition-colors duration-300 group-hover:text-[#C9A84C] select-none">
-              TRENDY
+              TRENDZ
             </span>
           </Link>
           
@@ -307,7 +319,7 @@ export default function Navbar() {
             </Link>
 
             {/* Cart */}
-            <Link to="/cart" className="relative p-2 text-[#111111] dark:text-slate-100 hover:text-[#C9A84C] dark:hover:text-[#C9A84C] hover:scale-110 active:scale-90 transition-all">
+            <Link to="/cart" className={`relative p-2 text-[#111111] dark:text-slate-100 hover:text-[#C9A84C] dark:hover:text-[#C9A84C] hover:scale-110 active:scale-90 transition-all ${cartAnimate ? "animate-cart-bounce" : ""}`}>
               <ShoppingBag size={20} strokeWidth={1.75} />
               <AnimatePresence mode="popLayout">
                 {cartCount > 0 && (
@@ -448,7 +460,7 @@ export default function Navbar() {
               <div className="flex items-center justify-between border-b border-[#E8E8E8] dark:border-white/5 pb-4 mb-6">
                 <Link to="/" className="flex items-center" onClick={() => setMobileMenuOpen(false)}>
                   <span className="font-display text-2xl font-bold tracking-[0.2em] uppercase text-[#0A0A0A] dark:text-white">
-                    Trendy
+                    TRENDZ
                   </span>
                 </Link>
                 <button
@@ -555,7 +567,7 @@ export default function Navbar() {
           <Search size={18} className={location.pathname === "/search" ? "text-gold" : "text-[var(--text-secondary)]"} />
           <span className="text-[8px] uppercase tracking-wider font-bold">Search</span>
         </Link>
-        <Link to="/cart" className="relative flex flex-col items-center gap-1 text-[var(--text-secondary)] hover:text-gold transition-colors">
+        <Link to="/cart" className={`relative flex flex-col items-center gap-1 text-[var(--text-secondary)] hover:text-gold transition-colors ${cartAnimate ? "animate-cart-bounce" : ""}`}>
           <ShoppingBag size={18} className={location.pathname === "/cart" ? "text-gold" : "text-[var(--text-secondary)]"} />
           {cartCount > 0 && (
             <span className="absolute top-0 right-1.5 w-4 h-4 bg-gold text-black text-[9px] font-black rounded-full flex items-center justify-center shadow-md">

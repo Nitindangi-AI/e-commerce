@@ -31,7 +31,8 @@ function App() {
     // 1. Session persistence check on initial load:
     const handleLoad = () => {
       const rememberMe = localStorage.getItem("remember_me") === "true";
-      if (!rememberMe) {
+      const sessionActive = sessionStorage.getItem("session_active") === "true";
+      if (!rememberMe && !sessionActive) {
         insforge.auth.signOut().catch(console.error);
       }
     };
@@ -61,17 +62,39 @@ function App() {
   return (
     <Router>
       <Toaster
-        position="bottom-right"
+        position="top-right"
         toastOptions={{
+          duration: 3000,
+          className: 'custom-toast',
           style: {
-            background: '#1a1a1a',
-            color: '#fff',
-            border: '1px solid rgba(212,175,55,0.3)',
-            fontSize: '14px',
+            background: '#FDF7E7',
+            color: '#B5963F',
+            border: '1px solid #E2CD8A',
+            fontSize: '13px',
+            fontWeight: 'bold',
+            borderRadius: '12px',
           },
-          iconTheme: {
-            primary: '#d4af37',
-            secondary: '#000',
+          success: {
+            style: {
+              background: '#DCFCE7',
+              color: '#15803D',
+              border: '1px solid #BBF7D0',
+            },
+            iconTheme: {
+              primary: '#15803D',
+              secondary: '#DCFCE7',
+            },
+          },
+          error: {
+            style: {
+              background: '#FEE2E2',
+              color: '#B91C1C',
+              border: '1px solid #FCA5A5',
+            },
+            iconTheme: {
+              primary: '#B91C1C',
+              secondary: '#FEE2E2',
+            },
           },
         }}
       />
@@ -108,7 +131,7 @@ function App() {
       </Routes>
 
       {showExpiredModal && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-md animate-fade-in opacity-0">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-md animate-fade-in">
           <div className="bg-white dark:bg-[#111111] border border-[#E8E8E8] dark:border-white/5 rounded-3xl p-8 max-w-sm w-full mx-4 shadow-luxury text-center space-y-6 transform translate-y-5">
             <div className="w-16 h-16 bg-[#C9A84C]/10 rounded-2xl flex items-center justify-center text-2xl text-[#C9A84C] mx-auto animate-pulse">
               ⚠️

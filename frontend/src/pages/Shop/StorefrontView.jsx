@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { insforge } from "../../lib/insforge";
 import ProductCard from "../../components/ProductCard";
-import Loader from "../../components/Loader";
+import { SkeletonGrid } from "../../components/SkeletonCard";
 
 export default function StorefrontView() {
   const { vendorId } = useParams();
@@ -74,9 +74,36 @@ export default function StorefrontView() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#faf8f5] via-[#f3f0e6] to-[#e8e4d5] text-[#2b2721] flex items-center justify-center pt-24 relative grain">
-        <div className="absolute top-[-100px] left-[-150px] w-[500px] h-[500px] rounded-full bg-rose-300/10 blur-[120px] pointer-events-none z-0" />
-        <Loader />
+      <div className="min-h-screen bg-[#FAFAF8] dark:bg-[#0A0A0A] pb-20 animate-pulse">
+        {/* Banner skeleton */}
+        <div className="h-64 sm:h-80 w-full bg-[#E8E8E8] dark:bg-white/5" />
+        
+        {/* Header content skeleton */}
+        <div className="max-w-7xl mx-auto px-6 -mt-16 sm:-mt-20 relative z-20">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-6 pb-8 border-b border-[#E8E8E8] dark:border-white/5">
+            {/* Logo placeholder */}
+            <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-2xl bg-[#FAFAF8] dark:bg-[#111] border border-[#E8E8E8] dark:border-white/5 flex-shrink-0" />
+            
+            {/* Details placeholders */}
+            <div className="flex-1 space-y-3">
+              <div className="h-8 w-48 bg-[#E8E8E8] dark:bg-white/5 rounded-lg" />
+              <div className="h-4 w-full max-w-xl bg-[#E8E8E8] dark:bg-white/5 rounded-full" />
+              <div className="h-4 w-2/3 max-w-md bg-[#E8E8E8] dark:bg-white/5 rounded-full" />
+            </div>
+          </div>
+        </div>
+
+        {/* Catalog grid skeleton */}
+        <div className="max-w-7xl mx-auto px-6 pt-12">
+          <div className="flex items-center justify-between mb-8">
+            <div className="space-y-2">
+              <div className="h-6 w-36 bg-[#E8E8E8] dark:bg-white/5 rounded-lg" />
+              <div className="h-4 w-64 bg-[#E8E8E8] dark:bg-white/5 rounded-full" />
+            </div>
+            <div className="h-8 w-24 bg-[#E8E8E8] dark:bg-white/5 rounded-full" />
+          </div>
+          <SkeletonGrid count={4} />
+        </div>
       </div>
     );
   }
@@ -137,7 +164,7 @@ export default function StorefrontView() {
           <div className="flex-1 min-w-0">
             <h1 className="display text-3xl sm:text-4xl font-black tracking-tight mb-2 truncate text-[#3d3522]">{vendor.store_name}</h1>
             <p className="text-[#2b2721]/60 text-xs sm:text-sm max-w-2xl leading-relaxed font-semibold">
-              Curated and verified partner boutique under Trendy Marketplace. 
+              Curated and verified partner boutique under Trendz Marketplace. 
               Delivering premium luxury goods and bespoke design products direct to your doorstep.
             </p>
           </div>
@@ -165,7 +192,7 @@ export default function StorefrontView() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {products.map(product => (
               <ProductCard key={product.id} product={product} />
             ))}

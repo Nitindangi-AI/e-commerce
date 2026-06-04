@@ -4,14 +4,16 @@ import { motion } from "framer-motion";
 import ProductCard from "./ProductCard";
 import { productAPI } from "../services/api";
 import localProducts from "../data/product";
+import { SkeletonGrid } from "./SkeletonCard";
 
 export default function FeaturedProducts() {
   const [activeCategory, setActiveCategory] = useState("All");
   const [products, setProducts] = useState(localProducts);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchFeatured = async () => {
+      setLoading(true);
       try {
         const res = await productAPI.getAll("sort=featured&limit=100");
         if (res.success && res.products?.length > 0) {
@@ -19,6 +21,8 @@ export default function FeaturedProducts() {
         }
       } catch (err) {
         console.error(err);
+      } finally {
+        setLoading(false);
       }
     };
     fetchFeatured();
@@ -53,14 +57,9 @@ export default function FeaturedProducts() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center items-center py-20">
-          <svg className="w-8 h-8 animate-spin text-gold" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-          </svg>
-        </div>
+        <SkeletonGrid count={4} />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {filtered.map((p) => (
             <ProductCard key={p.id} product={p} />
           ))}

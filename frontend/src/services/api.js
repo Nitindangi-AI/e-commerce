@@ -32,7 +32,7 @@ export const authAPI = {
       }
 
       // 2. Create profile row with 'user' role
-      await insforge.database.from('profiles').insert([{
+      const { error: profileError } = await insforge.database.from('profiles').insert([{
         id: userId,
         first_name: firstName,
         last_name: lastName,
@@ -40,6 +40,7 @@ export const authAPI = {
         role: 'user', // Set initially as 'user'
         avatar_url: email,
       }]);
+      if (profileError) throw new Error(profileError.message);
 
       // 3. Insert pending vendor onboarding details if role is vendor
       if (role === 'vendor') {
@@ -58,6 +59,7 @@ export const authAPI = {
           console.error("Vendor Onboarding Insert Error:", vendorError.message);
           throw new Error(vendorError.message);
         }
+        await insforge.auth.signOut().catch(console.error);
       }
     }
 
@@ -118,7 +120,8 @@ export const authAPI = {
         phone: '',
         role: 'user',
       };
-      await insforge.database.from('profiles').insert([newProfile]);
+      const { error: newProfileError } = await insforge.database.from('profiles').insert([newProfile]);
+      if (newProfileError) throw new Error(newProfileError.message);
       return { success: true, user: { ...data.user, ...newProfile } };
     }
 
@@ -318,7 +321,7 @@ export const orderAPI = {
     estimatedDelivery.setDate(estimatedDelivery.getDate() + (maxDeliveryDays || 3));
 
     // Generate order ID
-    const orderId = `TRENDY-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+    const orderId = `TRENDZ-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
 
     // Generate transaction ID for non-COD
     const selectedPayment = paymentMethod || 'cod';
@@ -362,21 +365,24 @@ export const orderAPI = {
       size: item.size,
     }));
 
-    await insforge.database.from('order_items').insert(itemsToInsert);
+    const { error: itemsError } = await insforge.database.from('order_items').insert(itemsToInsert);
+    if (itemsError) throw new Error(`Failed to save order items: ${itemsError.message}`);
 
     // Create initial status history
-    await insforge.database.from('order_status_history').insert([{
+    const { error: historyError } = await insforge.database.from('order_status_history').insert([{
       order_id: order.id,
       status: 'Processing',
       note: 'Order placed successfully',
     }]);
+    if (historyError) throw new Error(`Failed to log order status history: ${historyError.message}`);
 
     // Decrement stock
     for (const item of validatedItems) {
-      await insforge.database.rpc('decrement_stock', {
+      const { error: stockError } = await insforge.database.rpc('decrement_stock', {
         p_product_id: item.product_id,
         p_quantity: item.quantity,
       });
+      if (stockError) throw new Error(`Failed to update product stock: ${stockError.message}`);
     }
 
     // Return order with items
@@ -466,11 +472,12 @@ export const orderAPI = {
       .eq('id', id);
     if (error) throw new Error(error.message);
 
-    await insforge.database.from('order_status_history').insert([{
+    const { error: historyError } = await insforge.database.from('order_status_history').insert([{
       order_id: id,
       status: 'Cancelled',
       note: noteText,
     }]);
+    if (historyError) throw new Error(historyError.message);
 
     return { success: true };
   },
@@ -488,11 +495,12 @@ export const orderAPI = {
       .eq('id', id);
     if (error) throw new Error(error.message);
 
-    await insforge.database.from('order_status_history').insert([{
+    const { error: historyError } = await insforge.database.from('order_status_history').insert([{
       order_id: id,
       status: 'Return Requested',
       note: `Return requested: ${reason || 'No reason provided'}`,
     }]);
+    if (historyError) throw new Error(historyError.message);
 
     return { success: true, message: 'Return request submitted successfully.' };
   },
@@ -629,10 +637,11 @@ export const reviewAPI = {
       .eq('product_id', productId);
     if (reviews && reviews.length > 0) {
       const avg = reviews.reduce((s, r) => s + r.rating, 0) / reviews.length;
-      await insforge.database.from('products').update({
+      const { error: productUpdateError } = await insforge.database.from('products').update({
         rating: Math.round(avg * 10) / 10,
         num_reviews: reviews.length,
       }).eq('id', productId);
+      if (productUpdateError) throw new Error(productUpdateError.message);
     }
 
     return { success: true };
@@ -645,11 +654,13 @@ export const reviewAPI = {
   },
 
   markHelpful: async (reviewId) => {
-    const { data: review } = await insforge.database
-      .from('reviews').select('helpful').eq('id', reviewId).single();
+    const { data: review, error: fetchError } = await insforge.database
+      .from('reviews').select('helpful').eq('id', reviewId).maybeSingle();
+    if (fetchError) throw new Error(fetchError.message);
     if (review) {
-      await insforge.database.from('reviews')
+      const { error: updateError } = await insforge.database.from('reviews')
         .update({ helpful: (review.helpful || 0) + 1 }).eq('id', reviewId);
+      if (updateError) throw new Error(updateError.message);
     }
     return { success: true };
   },
@@ -685,13 +696,15 @@ export const wishlistAPI = {
       .maybeSingle();
 
     if (existing) {
-      await insforge.database.from('wishlist').delete().eq('id', existing.id);
+      const { error: deleteError } = await insforge.database.from('wishlist').delete().eq('id', existing.id);
+      if (deleteError) throw new Error(deleteError.message);
       return { success: true, added: false };
     } else {
-      await insforge.database.from('wishlist').insert([{
+      const { error: insertError } = await insforge.database.from('wishlist').insert([{
         user_id: userData.user.id,
         product_id: productId,
       }]);
+      if (insertError) throw new Error(insertError.message);
       return { success: true, added: true };
     }
   },
@@ -699,7 +712,8 @@ export const wishlistAPI = {
   clear: async () => {
     const { data: userData } = await insforge.auth.getUser();
     if (!userData?.user) throw new Error('Not authenticated');
-    await insforge.database.from('wishlist').delete().eq('user_id', userData.user.id);
+    const { error: clearError } = await insforge.database.from('wishlist').delete().eq('user_id', userData.user.id);
+    if (clearError) throw new Error(clearError.message);
     return { success: true };
   },
 };
@@ -742,25 +756,29 @@ export const cartAPI = {
         .maybeSingle();
 
       if (existing) {
-        await insforge.database.from('cart_items')
+        const { error: updateError } = await insforge.database.from('cart_items')
           .update({ quantity: item.quantity })
           .eq('id', existing.id);
+        if (updateError) throw new Error(updateError.message);
       } else {
-        await insforge.database.from('cart_items').insert([{
+        const { error: insertError } = await insforge.database.from('cart_items').insert([{
           user_id: userData.user.id,
           product_id: productId,
           quantity: item.quantity,
           selected_color: item.selectedColor || '',
           selected_size: item.selectedSize || '',
         }]);
+        if (insertError) throw new Error(insertError.message);
       }
     }
   },
 
   clear: async () => {
-    const { data: userData } = await insforge.auth.getUser();
+    const { data: userData, error: userError } = await insforge.auth.getUser();
+    if (userError) throw userError;
     if (!userData?.user) return;
-    await insforge.database.from('cart_items').delete().eq('user_id', userData.user.id);
+    const { error: deleteError } = await insforge.database.from('cart_items').delete().eq('user_id', userData.user.id);
+    if (deleteError) throw deleteError;
   },
 };
 
@@ -834,14 +852,16 @@ export const addressAPI = {
     if (!userData?.user) throw new Error('Not authenticated');
 
     // Unset all defaults first
-    await insforge.database.from('addresses')
+    const { error: unsetError } = await insforge.database.from('addresses')
       .update({ is_default: false })
       .eq('user_id', userData.user.id);
+    if (unsetError) throw new Error(unsetError.message);
 
     // Set new default
-    await insforge.database.from('addresses')
+    const { error: setError } = await insforge.database.from('addresses')
       .update({ is_default: true })
       .eq('id', id);
+    if (setError) throw new Error(setError.message);
 
     return { success: true };
   },
@@ -941,9 +961,10 @@ export const paymentAPI = {
     const { data: userData } = await insforge.auth.getUser();
     if (!userData?.user) throw new Error('Not authenticated');
 
-    await insforge.database.from('profiles')
+    const { error: updateError } = await insforge.database.from('profiles')
       .update({ payment_account: account, updated_at: new Date().toISOString() })
       .eq('id', userData.user.id);
+    if (updateError) throw new Error(updateError.message);
     return { success: true };
   },
 };
@@ -1354,6 +1375,7 @@ function normalizeOrder(o) {
   if (!o) return o;
 
   const delivered = o.delivered_at ? new Date(o.delivered_at) : null;
+  const created = o.created_at ? new Date(o.created_at) : new Date();
   const isDelivered = o.order_status === 'Delivered';
   
   // Calculate dynamic return window based on the items' return policies
@@ -1389,11 +1411,10 @@ function normalizeOrder(o) {
   const returnEligible = isDelivered && 
     o.return_status === 'none' && 
     isAnyItemReturnable &&
-    delivered && 
-    (Date.now() - delivered.getTime() <= returnWindowMs);
+    (Date.now() - created.getTime() <= returnWindowMs);
 
-  const returnDaysRemaining = delivered && o.return_status === 'none' && isAnyItemReturnable
-    ? Math.max(0, Math.ceil((returnWindowMs - (Date.now() - delivered.getTime())) / (24 * 60 * 60 * 1000)))
+  const returnDaysRemaining = isDelivered && o.return_status === 'none' && isAnyItemReturnable
+    ? Math.max(0, Math.ceil((returnWindowMs - (Date.now() - created.getTime())) / (24 * 60 * 60 * 1000)))
     : 0;
 
   return {

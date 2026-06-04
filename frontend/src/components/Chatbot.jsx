@@ -38,8 +38,8 @@ const TOPICS = [
   {
     id: "general",
     icon: "💎",
-    label: "About Trendy",
-    greeting: "Here's some info about Trendy! Feel free to ask me anything:",
+    label: "About Trendz",
+    greeting: "Here's some info about Trendz! Feel free to ask me anything:",
   },
 ];
 
@@ -72,7 +72,7 @@ const KNOWLEDGE_BASE = [
   {
     topic: "order",
     q: "How do I apply a coupon code?",
-    a: 'Enter your coupon code at checkout in the "Apply Coupon" field. Active codes: **TRENDY10** (10% off ₹5k+), **FIRST500** (₹500 off), **TRENDY20** (20% off ₹15k+).',
+    a: 'Enter your coupon code at checkout in the "Apply Coupon" field. Active codes: **TRENDZ10** (10% off ₹5k+), **FIRST500** (₹500 off), **TRENDZ20** (20% off ₹15k+).',
     keywords: ["coupon", "code", "discount", "promo", "offer", "apply", "voucher", "promotional"],
   },
   {
@@ -98,7 +98,7 @@ const KNOWLEDGE_BASE = [
   {
     topic: "tracking",
     q: "My order is delayed, what should I do?",
-    a: "Deliveries typically arrive within 2-4 business days. If it's been longer, please check your order status in **Account → Orders** or contact us at support@trendy.com.",
+    a: "Deliveries typically arrive within 2-4 business days. If it's been longer, please check your order status in **Account → Orders** or contact us at support@trendz.com.",
     keywords: ["delay", "delayed", "late", "not arrived", "not received", "still waiting", "taking long", "where is my order", "haven't received"],
   },
   {
@@ -186,12 +186,12 @@ const KNOWLEDGE_BASE = [
     keywords: ["address", "addresses", "manage", "add address", "edit address", "delete address", "default address", "saved address"],
   },
 
-  // ─── About Trendy ───
+  // ─── About Trendz ───
   {
     topic: "general",
-    q: "What does Trendy sell?",
-    a: "Trendy is a premium lifestyle brand offering curated **watches, eyewear, footwear, accessories, shirts, pants, and grooming** products.",
-    keywords: ["what", "sell", "products", "categories", "trendy", "about", "what do you sell", "what is trendy", "brand"],
+    q: "What does Trendz sell?",
+    a: "Trendz is a premium lifestyle brand offering curated **watches, eyewear, footwear, accessories, shirts, pants, and grooming** products.",
+    keywords: ["what", "sell", "products", "categories", "trendz", "about", "what do you sell", "what is trendz", "brand"],
   },
   {
     topic: "general",
@@ -202,13 +202,13 @@ const KNOWLEDGE_BASE = [
   {
     topic: "general",
     q: "Do you have physical stores?",
-    a: "Trendy is currently an **online-exclusive** brand, allowing us to offer premium products at competitive prices by cutting retail overhead.",
+    a: "Trendz is currently an **online-exclusive** brand, allowing us to offer premium products at competitive prices by cutting retail overhead.",
     keywords: ["store", "physical", "shop", "offline", "location", "visit", "showroom", "retail", "brick"],
   },
   {
     topic: "general",
     q: "How do I contact customer support?",
-    a: "You can reach us via:\n• **Email:** support@trendy.com\n• **Phone:** 1800-TRENDY-HELP (toll-free)\n• **This chat** — available 24/7!",
+    a: "You can reach us via:\n• **Email:** support@trendz.com\n• **Phone:** 1800-TRENDZ-HELP (toll-free)\n• **This chat** — available 24/7!",
     keywords: ["contact", "support", "help", "customer service", "email", "phone", "call", "reach", "talk", "human", "agent", "speak"],
   },
 
@@ -216,12 +216,12 @@ const KNOWLEDGE_BASE = [
   {
     topic: "general",
     q: "Do you have any offers right now?",
-    a: "Yes! Here are our active coupon codes:\n• **TRENDY10** — 10% off on orders above ₹5,000\n• **FIRST500** — ₹500 off on your first order\n• **TRENDY20** — 20% off on orders above ₹15,000\n\nApply them at checkout!",
+    a: "Yes! Here are our active coupon codes:\n• **TRENDZ10** — 10% off on orders above ₹5,000\n• **FIRST500** — ₹500 off on your first order\n• **TRENDZ20** — 20% off on orders above ₹15,000\n\nApply them at checkout!",
     keywords: ["offer", "offers", "deal", "deals", "sale", "promotion", "discount", "any offer", "current offer"],
   },
   {
     topic: "general",
-    q: "Is my data safe with Trendy?",
+    q: "Is my data safe with Trendz?",
     a: "Absolutely! We use **SSL encryption** for all transactions and never share your personal data with third parties. Your privacy is our priority.",
     keywords: ["data", "safe", "privacy", "secure", "security", "information", "personal data", "ssl", "encrypted"],
   },
@@ -300,7 +300,7 @@ function handleSmallTalk(input) {
 
   const greetings = ["hi", "hello", "hey", "hii", "hiii", "good morning", "good afternoon", "good evening", "howdy", "sup", "yo"];
   if (greetings.some((g) => lower === g || lower === g + "!") || lower.match(/^(hi|hello|hey)\b/)) {
-    return `${getGreeting()} Welcome to **Trendy** support! How can I help you today? You can ask me about orders, shipping, returns, your account, or anything else! 😊`;
+    return `${getGreeting()} Welcome to **Trendz** support! How can I help you today? You can ask me about orders, shipping, returns, your account, or anything else! 😊`;
   }
 
   const thanks = ["thanks", "thank you", "thank u", "thx", "ty", "appreciate"];
@@ -310,7 +310,7 @@ function handleSmallTalk(input) {
 
   const byes = ["bye", "goodbye", "see you", "later", "take care"];
   if (byes.some((b) => lower.includes(b))) {
-    return "Goodbye! 👋 Thank you for chatting with **Trendy** support. Have a wonderful day! We're here 24/7 if you need us.";
+    return "Goodbye! 👋 Thank you for chatting with **Trendz** support. Have a wonderful day! We're here 24/7 if you need us.";
   }
 
   const okays = ["ok", "okay", "got it", "understood", "alright", "fine", "cool", "nice"];
@@ -397,7 +397,7 @@ export default function Chatbot() {
       setMessages([
         {
           type: "bot",
-          text: `${greeting} Welcome to **Trendy** customer support.\n\nI'm here to help you with orders, shipping, returns, and more. You can pick a topic below or just type your question!`,
+          text: `${greeting} Welcome to **Trendz** customer support.\n\nI'm here to help you with orders, shipping, returns, and more. You can pick a topic below or just type your question!`,
           time: new Date(),
           showTopics: true,
         },
@@ -445,7 +445,7 @@ export default function Chatbot() {
 
       // 3. No match — friendly fallback with suggestions
       addBotMessage(
-        "I'm not sure I understood that correctly. 🤔 Let me show you the topics I can help with — or try asking in a different way!\n\nYou can ask about:\n• Orders & payments\n• Shipping & delivery\n• Returns & refunds\n• Account & profile\n• About Trendy",
+        "I'm not sure I understood that correctly. 🤔 Let me show you the topics I can help with — or try asking in a different way!\n\nYou can ask about:\n• Orders & payments\n• Shipping & delivery\n• Returns & refunds\n• Account & profile\n• About Trendz",
         { showTopics: true }
       );
     }, 200);
@@ -556,7 +556,7 @@ export default function Chatbot() {
               <span className="chatbot-online-dot" />
             </div>
             <div>
-              <h3 className="chatbot-header-title display">Trendy Support</h3>
+              <h3 className="chatbot-header-title display">Trendz Support</h3>
               <p className="chatbot-header-status">
                 <span className="chatbot-status-dot" />
                 Always online
@@ -689,7 +689,7 @@ export default function Chatbot() {
             </button>
           </div>
           <div className="chatbot-input-hint">
-            Press Enter to send · Powered by <span className="gold">Trendy</span>
+            Press Enter to send · Powered by <span className="gold">Trendz</span>
           </div>
         </div>
       </div>

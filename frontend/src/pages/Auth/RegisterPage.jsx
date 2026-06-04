@@ -109,7 +109,7 @@ export default function RegisterPage() {
 
         <div>
           <Link to="/" className="display text-2xl font-black tracking-[0.25em] uppercase gold inline-block hover:scale-105 transition-transform duration-300 select-none">
-            Trendy
+            Trendz
           </Link>
         </div>
 
@@ -136,7 +136,7 @@ export default function RegisterPage() {
           </div>
         </div>
 
-        <div className="text-[#2b2721]/35 text-xs font-bold">© 2026 Trendy</div>
+        <div className="text-[#2b2721]/35 text-xs font-bold">© 2026 Trendz</div>
       </div>
 
       {/* Right form panel */}
@@ -145,7 +145,7 @@ export default function RegisterPage() {
 
           <div className="lg:hidden mb-10 text-center flex justify-center">
             <span className="display text-2xl font-black tracking-[0.25em] uppercase gold select-none">
-              Trendy
+              Trendz
             </span>
           </div>
 
@@ -281,7 +281,7 @@ export default function RegisterPage() {
                       <div>
                         <label className="block text-xs tracking-widest uppercase text-[#2b2721]/50 mb-2 font-bold">Store / Brand Name</label>
                         <input value={form.storeName} onChange={e => set("storeName", e.target.value)}
-                          placeholder="Trendy Elite Store"
+                          placeholder="Trendz Elite Store"
                           className={`input-field w-full px-5 py-4 rounded-xl text-sm placeholder-[#2b2721]/30 font-medium ${errors.storeName ? "input-error" : ""}`} />
                         {errors.storeName && <p className="text-red-600 text-xs mt-1.5 font-semibold">{errors.storeName}</p>}
                       </div>
@@ -338,7 +338,7 @@ export default function RegisterPage() {
                     {form.agree && <svg className="w-3 h-3 text-white font-extrabold" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7"/></svg>}
                   </button>
                   <span className="text-sm text-[#2b2721]/60 leading-relaxed font-semibold">
-                    I agree to Trendy's{" "}
+                    I agree to Trendz's{" "}
                     <a href="#" className="gold hover:underline font-bold">Terms of Service</a> and{" "}
                     <a href="#" className="gold hover:underline font-bold">Privacy Policy</a>
                   </span>
@@ -374,7 +374,7 @@ export default function RegisterPage() {
                 ✓
               </div>
               <h1 className="display text-4xl font-black mb-3 text-[#3d3522]">
-                {form.role === "vendor" ? "Application Received!" : "Welcome to Trendy!"}
+                {form.role === "vendor" ? "Application Received!" : "Welcome to Trendz!"}
               </h1>
               <p className="text-[#2b2721]/60 mb-10 max-w-sm mx-auto leading-relaxed font-semibold">
                 {form.role === "vendor" 

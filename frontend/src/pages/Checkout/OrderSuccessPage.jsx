@@ -82,7 +82,7 @@ export default function OrderSuccessPage() {
               style={{ 
                 left: `${Math.random() * 100}%`, 
                 top: `${Math.random() * 60}%`, 
-                background: ["#C9A84C", "#E2CD8A", "#fff", "#9F833A"][i % 4], 
+                background: ["#C9A84C", "#0A0A0A"][i % 2], 
                 animationDelay: `${Math.random() * 1.5}s`, 
                 animationDuration: `${1 + Math.random() * 1.5}s`, 
                 opacity: 0.7 
@@ -124,11 +124,11 @@ export default function OrderSuccessPage() {
             
             {order.estimatedDelivery && (
               <div className="flex justify-between border-t border-[var(--card-border)] pt-2 mt-2">
-                <span>Estimated Handover</span>
+                <span>Estimated Delivery</span>
                 <span className="text-green-500 font-bold">
-                  {new Date(order.estimatedDelivery).toLocaleDateString("en-IN", { 
+                  {new Intl.DateTimeFormat("en-IN", { 
                     weekday: "short", month: "short", day: "numeric" 
-                  })}
+                  }).format(new Date(order.estimatedDelivery))}
                 </span>
               </div>
             )}

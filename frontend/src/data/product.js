@@ -56,9 +56,9 @@ export const getReviewsForProduct = (productId) => {
 };
 
 export const coupons = [
-  { code: "TRENDY10", discount: 10, type: "percent", minOrder: 5000, description: "10% off on orders above ₹5,000" },
+  { code: "TRENDZ10", discount: 10, type: "percent", minOrder: 5000, description: "10% off on orders above ₹5,000" },
   { code: "FIRST500", discount: 500, type: "flat", minOrder: 2000, description: "₹500 off on your first order" },
-  { code: "TRENDY20", discount: 20, type: "percent", minOrder: 15000, description: "20% off on orders above ₹15,000", maxDiscount: 5000 },
+  { code: "TRENDZ20", discount: 20, type: "percent", minOrder: 15000, description: "20% off on orders above ₹15,000", maxDiscount: 5000 },
 ];
 
 export const banners = [

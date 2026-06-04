@@ -205,11 +205,11 @@ export default function LoginPage() {
 
         // Seed users phone mapping fallbacks for instant local testing
         const phoneToEmailMap = {
-          "+91 98765 00001": "seller1@trendy.com",
-          "+91 98765 00002": "seller2@trendy.com",
-          "+91 98765 00003": "user1@trendy.com",
-          "+91 98765 00004": "user2@trendy.com",
-          "+91 98765 99999": "admin@trendy.com",
+          "+91 98765 00001": "seller1@trendz.com",
+          "+91 98765 00002": "seller2@trendz.com",
+          "+91 98765 00003": "user1@trendz.com",
+          "+91 98765 00004": "user2@trendz.com",
+          "+91 98765 99999": "admin@trendz.com",
         };
 
         const resolvedEmail = profile?.avatar_url || phoneToEmailMap[cleanPhone];
@@ -243,7 +243,7 @@ export default function LoginPage() {
           console.error("Email Lookup Error:", dbErr.message);
         }
 
-        if (!profile && cleanEmail !== "admin@trendy.com") {
+        if (!profile && cleanEmail !== "admin@trendz.com") {
           if (selectedRole === "vendor") {
             toast.error("No account exists, register an account");
             throw new Error("No account exists, register an account");
@@ -292,11 +292,11 @@ export default function LoginPage() {
 
         // Seed users credentials fallback
         const emailToPasswordMap = {
-          "seller1@trendy.com": "seller123",
-          "seller2@trendy.com": "seller123",
-          "user1@trendy.com": "user123",
-          "user2@trendy.com": "user123",
-          "admin@trendy.com": "admin123",
+          "seller1@trendz.com": "seller123",
+          "seller2@trendz.com": "seller123",
+          "user1@trendz.com": "user123",
+          "user2@trendz.com": "user123",
+          "admin@trendz.com": "admin123",
         };
 
         const resolvedPassword = emailToPasswordMap[loginEmail] || "user123";
@@ -402,7 +402,7 @@ export default function LoginPage() {
 
         <div className="absolute bottom-12 left-16 right-16 text-center">
           <span className="display text-3xl font-black tracking-[0.25em] uppercase gold select-none">
-            Trendy
+            Trendz
           </span>
           <p className="text-[#2b2721]/40 text-[10px] tracking-[0.4em] uppercase font-bold mt-1">
             THE PLATFORM GATEWAY
@@ -417,7 +417,7 @@ export default function LoginPage() {
           {/* Logo for mobile */}
           <div className="lg:hidden text-center mb-8">
             <span className="display text-3xl font-black tracking-[0.25em] uppercase gold select-none">
-              Trendy
+              Trendz
             </span>
           </div>
 
@@ -642,7 +642,7 @@ export default function LoginPage() {
                   <div>Seller: <span className="text-[#3d3522] font-extrabold">+91 98765 00001</span> (Pass: <span className="text-[#3d3522] font-mono font-bold">seller123</span>)</div>
                 )}
                 {selectedRole === "admin" && (
-                  <div>Admin: <span className="text-[#3d3522] font-extrabold">admin@trendy.com</span> (Pass: <span className="text-[#3d3522] font-mono font-bold">admin123</span>)</div>
+                  <div>Admin: <span className="text-[#3d3522] font-extrabold">admin@trendz.com</span> (Pass: <span className="text-[#3d3522] font-mono font-bold">admin123</span>)</div>
                 )}
                 <div className="text-[10px] text-[#9d7d3a] italic mt-1 font-semibold">💡 Any phone number logs in with OTP: 123456</div>
               </div>

@@ -253,8 +253,28 @@ export default function AccountPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center pt-28">
-        <div className="w-8 h-8 border-2 border-[#d4af37] border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-[#FAFAF8] dark:bg-[#0A0A0A] pt-28 pb-16 animate-pulse">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex flex-col lg:flex-row gap-10">
+            {/* Sidebar Skeleton */}
+            <div className="w-full lg:w-64 space-y-3">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="h-12 w-full bg-[#E8E8E8] dark:bg-white/5 rounded-xl" />
+              ))}
+            </div>
+            {/* Content Skeleton */}
+            <div className="flex-1 space-y-8">
+              <div className="space-y-3">
+                <div className="h-8 w-48 bg-[#E8E8E8] dark:bg-white/5 rounded-lg" />
+                <div className="h-4 w-96 bg-[#E8E8E8] dark:bg-white/5 rounded-full" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="h-48 bg-[#E8E8E8] dark:bg-white/5 rounded-2xl" />
+                <div className="h-48 bg-[#E8E8E8] dark:bg-white/5 rounded-2xl" />
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -387,7 +407,11 @@ export default function AccountPage() {
                   </div>
 
                   {ordersLoading ? (
-                    <div className="flex justify-center py-10"><div className="w-6 h-6 border-2 border-[#d4af37] border-t-transparent rounded-full animate-spin" /></div>
+                    <div className="space-y-3">
+                      {[...Array(2)].map((_, i) => (
+                        <div key={i} className="h-16 w-full bg-[#E8E8E8] dark:bg-white/5 rounded-xl animate-pulse" />
+                      ))}
+                    </div>
                   ) : orders.length === 0 ? (
                     <p className={`text-xs text-center py-10 ${textSubtle}`}>No purchase history recorded.</p>
                   ) : (
@@ -434,7 +458,7 @@ export default function AccountPage() {
                     <div className="grid grid-cols-3 gap-3">
                       {wishlistItems.slice(0, 3).map(item => (
                         <Link key={item.id} to={`/product/${item.id}`} className="block group">
-                          <img src={item.img} alt="" className="w-full aspect-square object-cover rounded-xl border border-white/5 group-hover:border-[#d4af37]/35 transition-all mb-2" />
+                          <img src={item.img} alt={item.name} className="w-full aspect-square object-cover rounded-xl border border-white/5 group-hover:border-[#d4af37]/35 transition-all mb-2" />
                           <p className={`text-[10px] font-semibold truncate ${textTitle}`}>{item.name}</p>
                           <span className="gold text-[10px] font-bold">{formatCurrency(item.price)}</span>
                         </Link>
@@ -456,7 +480,11 @@ export default function AccountPage() {
               </div>
 
               {ordersLoading ? (
-                <div className="flex justify-center py-20"><div className="w-8 h-8 border-2 border-[#d4af37] border-t-transparent rounded-full animate-spin" /></div>
+                <div className="space-y-4">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="h-28 w-full bg-[#E8E8E8] dark:bg-white/5 rounded-2xl animate-pulse" />
+                  ))}
+                </div>
               ) : orders.length === 0 ? (
                 <div className={`text-center py-20 border rounded-2xl ${cardBg}`}>
                   <span className="text-4xl block mb-4">🛒</span>
@@ -495,7 +523,7 @@ export default function AccountPage() {
                         <div className="p-5 border-b border-white/5 space-y-4">
                           {order.orderItems?.map((item, i) => (
                             <div key={i} className="flex items-center gap-4">
-                              <img src={item.image} alt="" className="w-12 h-12 rounded-xl object-cover border border-white/10" />
+                              <img src={item.image} alt={item.name} className="w-12 h-12 rounded-xl object-cover border border-white/10" />
                               <div className="flex-1 min-w-0">
                                 <h5 className={`font-bold text-xs truncate ${textTitle}`}>{item.name}</h5>
                                 <p className={`text-[10px] ${textSubtle}`}>
@@ -672,7 +700,7 @@ export default function AccountPage() {
             <div className="space-y-6 animate-fade-in">
               <div>
                 <h2 className={`display text-3xl font-black mb-1 ${textTitle}`}>My Wishlist</h2>
-                <p className={`text-xs ${textSubtle}`}>Saved items and early drop access alerts for Trendy limited editions.</p>
+                <p className={`text-xs ${textSubtle}`}>Saved items and early drop access alerts for Trendz limited editions.</p>
               </div>
 
               {wishlistItems.length === 0 ? (
@@ -688,7 +716,7 @@ export default function AccountPage() {
                     <div key={p.id || p._id} className={`border rounded-2xl overflow-hidden p-4 group relative ${cardBg}`}>
                       <Link to={`/product/${p.id || p._id}`} className="block">
                         <div className="overflow-hidden rounded-xl aspect-square border border-white/5 relative mb-4">
-                          <img src={p.img} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-all duration-500" />
+                          <img src={p.img} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-all duration-500" />
                           {p.badge && (
                             <span className="absolute top-2.5 left-2.5 bg-black/80 backdrop-blur-md border border-white/10 text-[#d4af37] text-[8px] font-extrabold px-2 py-0.5 rounded-full tracking-wider uppercase">
                               {p.badge}
@@ -724,7 +752,7 @@ export default function AccountPage() {
                   {recentlyViewed.map((p, idx) => (
                     <div key={idx} className={`border rounded-2xl p-4 relative ${cardBg}`}>
                       <Link to={`/product/${p.id}`} className="block">
-                        <img src={p.img} alt="" className="w-full aspect-square object-cover rounded-xl border border-white/5 mb-3" />
+                        <img src={p.img} alt={p.name} className="w-full aspect-square object-cover rounded-xl border border-white/5 mb-3" />
                         <h4 className={`font-bold text-[11px] truncate ${textTitle}`}>{p.name}</h4>
                         <span className="gold text-xs font-bold">{formatCurrency(p.price)}</span>
                       </Link>
@@ -762,7 +790,7 @@ export default function AccountPage() {
               {/* Coupons List - Scratch Card Interactive Design */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {[
-                  { id: "c1", title: "₹1,500 Flat Off", sub: "On orders above ₹9,999", code: "TRENDY1500", desc: "Applicable on premium watches and jewelry drops." },
+                  { id: "c1", title: "₹1,500 Flat Off", sub: "On orders above ₹9,999", code: "TRENDZ1500", desc: "Applicable on premium watches and jewelry drops." },
                   { id: "c2", title: "20% Exclusive Discount", sub: "On limited edition releases", code: "ELITE20", desc: "No minimum order amount cap." },
                   { id: "c3", title: "Free Express Shipment", sub: "Global courier shipping", code: "FSHIPGOLD", desc: "Applies instantly to cash and online orders." }
                 ].map(coupon => {
@@ -936,7 +964,11 @@ export default function AccountPage() {
               </div>
 
               {addressesLoading ? (
-                <div className="flex justify-center py-20"><div className="w-8 h-8 border-2 border-[#d4af37] border-t-transparent rounded-full animate-spin" /></div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {[...Array(2)].map((_, i) => (
+                    <div key={i} className="h-28 w-full bg-[#E8E8E8] dark:bg-white/5 rounded-2xl animate-pulse" />
+                  ))}
+                </div>
               ) : addresses.length === 0 ? (
                 <p className={`text-xs text-center py-20 border rounded-2xl ${cardBg} ${textSubtle}`}>No saved addresses recorded. Add one above.</p>
               ) : (
@@ -1047,7 +1079,7 @@ export default function AccountPage() {
             <div id="printable-invoice-body" className="space-y-6 text-white text-xs leading-relaxed">
               <div className="flex justify-between items-start gap-4">
                 <div>
-                  <h3 className="display text-xl font-black gold uppercase tracking-widest">Trendy Multivendor</h3>
+                  <h3 className="display text-xl font-black gold uppercase tracking-widest">Trendz Multivendor</h3>
                   <p className="text-[10px] text-white/40">Luxury Avenue Block C, Level 4<br />GSTIN: 27AABCT8491F1Z2</p>
                 </div>
                 <div className="text-right">
@@ -1068,7 +1100,7 @@ export default function AccountPage() {
                 </div>
                 <div className="text-right">
                   <p className="text-[9px] uppercase tracking-wider text-white/30 font-bold mb-1">Fulfillment Channel</p>
-                  <strong>Trendy Express Logistics</strong>
+                  <strong>Trendz Express Logistics</strong>
                   <p className="text-[10px] text-white/50 mt-1">
                     Payment Method: <span className="uppercase text-white">{selectedInvoice.paymentMethod}</span><br />
                     Fulfillment Status: <span className="uppercase text-yellow-500 font-bold">{selectedInvoice.orderStatus}</span>

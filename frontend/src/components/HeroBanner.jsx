@@ -362,10 +362,8 @@ export default function HeroBanner() {
         </p>
 
         {/* Main Headline */}
-        <h1 className="font-display text-6xl sm:text-7xl md:text-8xl lg:text-9xl font-bold text-[#0A0A0A] dark:text-white leading-[0.9] tracking-tight mb-6">
-          WEAR THE
-          <br />
-          <span className="text-[#C9A84C]">TREND.</span>
+        <h1 className="font-display text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold text-[#0A0A0A] dark:text-white leading-tight tracking-tight mb-6 uppercase">
+          WEAR THE TREND.
         </h1>
 
         {/* Subtitle */}

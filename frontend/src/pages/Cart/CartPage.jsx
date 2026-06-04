@@ -103,7 +103,7 @@ export default function CartPage() {
           </svg>
           <p className="text-[var(--text-primary)]/80 text-lg mb-2">Your cart is empty</p>
           <p className="text-[var(--text-secondary)] text-sm mb-8">Looks like you haven't added any items yet.</p>
-          <Link to="/shop" className="btn-gold px-8 py-3.5 rounded-full text-sm tracking-widest uppercase font-bold">Continue Shopping</Link>
+          <Link to="/shop" className="btn-gold px-8 py-3.5 rounded-full text-sm tracking-widest uppercase font-bold">Start Shopping</Link>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
@@ -142,7 +142,7 @@ export default function CartPage() {
 
                     {/* Stock warning */}
                     {isLowStock && (
-                      <p className="text-amber-500 text-[10px] font-semibold mt-1 flex items-center gap-1">
+                      <p className="text-orange-500 text-[10px] font-semibold mt-1 flex items-center gap-1">
                         ⚠️ Only {item.stock} left in stock
                       </p>
                     )}
@@ -169,7 +169,8 @@ export default function CartPage() {
                     </div>
                     
                     {/* Line total */}
-                    <p className="gold font-bold text-sm whitespace-nowrap hidden sm:block">
+                    <p className="gold font-bold text-sm whitespace-nowrap">
+                      <span className="text-[10px] text-[var(--text-secondary)] sm:hidden">Total: </span>
                       {formatPrice(item.price * item.quantity)}
                     </p>
                     
@@ -264,11 +265,11 @@ export default function CartPage() {
               
               <div className="space-y-3 text-sm border-b border-[var(--card-border)] pb-5 mb-5 text-[var(--text-secondary)]">
                 <div className="flex justify-between">
-                  <span>Price ({totalItems} items)</span>
+                  <span>Subtotal ({totalItems} items)</span>
                   <span className="text-[var(--text-primary)] font-medium">{formatPrice(subtotal)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Delivery</span>
+                  <span>Shipping</span>
                   <span className={shipping === 0 ? "text-green-500 font-bold" : "text-[var(--text-primary)] font-medium"}>
                     {shipping === 0 ? "FREE" : formatPrice(shipping)}
                   </span>

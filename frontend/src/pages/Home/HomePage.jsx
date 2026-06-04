@@ -13,21 +13,21 @@ import { productAPI } from "../../services/api";
 import localProducts from "../../data/product";
 
 const categories = [
-  { name: "Watches", img: "https://images.unsplash.com/photo-1524592094714-0f0654e20314?q=80&w=600&auto=format&fit=crop" },
-  { name: "Eyewear", img: "https://images.unsplash.com/photo-1511499767150-a48a237f0083?q=80&w=600&auto=format&fit=crop" },
-  { name: "Footwear", img: "https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?q=80&w=600&auto=format&fit=crop" },
+  { name: "Men", img: "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?q=80&w=600&auto=format&fit=crop" },
+  { name: "Women", img: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=600&auto=format&fit=crop" },
   { name: "Accessories", img: "https://images.unsplash.com/photo-1627123424574-724758594e93?q=80&w=600&auto=format&fit=crop" },
-  { name: "Shirts", img: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?q=80&w=600&auto=format&fit=crop" },
-  { name: "Pants", img: "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?q=80&w=600&auto=format&fit=crop" },
-  { name: "Grooming", img: "https://images.unsplash.com/photo-1585751119414-ef2636f8aede?q=80&w=600&auto=format&fit=crop" },
-  { name: "Perfumes", img: "https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?q=80&w=600&auto=format&fit=crop" },
+  { name: "Watches", img: "https://images.unsplash.com/photo-1524592094714-0f0654e20314?q=80&w=600&auto=format&fit=crop" },
+  { name: "Footwear", img: "https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?q=80&w=600&auto=format&fit=crop" },
+  { name: "Eyewear", img: "https://images.unsplash.com/photo-1511499767150-a48a237f0083?q=80&w=600&auto=format&fit=crop" },
 ];
 
 const testimonials = [
-  { name: "Arjun Mehta", role: "Entrepreneur", text: "Trendy has completely changed how I shop for premium accessories. The quality is unmatched.", rating: 5 },
-  { name: "Priya Sharma", role: "Fashion Designer", text: "I recommend Trendy to all my clients. The curation is impeccable — every piece tells a story.", rating: 5 },
+  { name: "Arjun Mehta", role: "Entrepreneur", text: "Trendz has completely changed how I shop for premium accessories. The quality is unmatched.", rating: 5 },
+  { name: "Priya Sharma", role: "Fashion Designer", text: "I recommend Trendz to all my clients. The curation is impeccable — every piece tells a story.", rating: 5 },
   { name: "Rahul Verma", role: "Tech Lead", text: "Finally, an Indian brand that delivers true luxury. The Noir Chronograph is my daily companion.", rating: 5 },
 ];
+
+const doubleCategories = [...categories, ...categories];
 
 export default function HomePage() {
   const recentItems = useRecentlyViewedStore(state => state.recentItems);
@@ -54,29 +54,26 @@ export default function HomePage() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Double the categories for infinite scroll effect
-  const scrollCategories = [...categories, ...categories];
-
   return (
     <div className="overflow-x-hidden">
       {/* Hero Banner */}
       <HeroBanner />
 
-      {/* Animated Category Strip — Apple-style horizontal scroll */}
+      {/* Category Strip — Apple-style horizontal scroll */}
       <section className="py-14 bg-white dark:bg-[#0A0A0A] border-b border-[#E8E8E8] dark:border-white/5 overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 mb-8">
           <p className="text-[10px] tracking-[0.3em] uppercase text-[#C9A84C] font-semibold mb-2">Browse</p>
           <h2 className="font-display text-3xl md:text-4xl font-bold text-[#111111] dark:text-white">Shop by Category</h2>
         </div>
-        <div className="relative w-full overflow-hidden">
-          <div className="category-scroll-strip flex gap-5 px-6 w-max">
-            {scrollCategories.map((cat, i) => (
+        <div className="w-full overflow-hidden py-2">
+          <div className="flex gap-6 px-6 md:px-12 w-max category-scroll-strip">
+            {doubleCategories.map((cat, idx) => (
               <Link
-                key={`${cat.name}-${i}`}
+                key={`${cat.name}-${idx}`}
                 to={`/shop?category=${cat.name}`}
-                className="flex-shrink-0 w-44 group"
+                className="flex-shrink-0 w-60 h-72 rounded-2xl overflow-hidden border border-[#E8E8E8] dark:border-white/5 shadow-card hover:shadow-luxury hover:-translate-y-1 transition-all duration-300 group"
               >
-                <div className="relative w-44 h-56 rounded-2xl overflow-hidden border border-[#E8E8E8] dark:border-white/5 shadow-card hover:shadow-luxury hover:-translate-y-1 transition-all duration-300">
+                <div className="relative w-full h-full">
                   <img
                     src={cat.img}
                     alt={cat.name}
@@ -84,9 +81,9 @@ export default function HomePage() {
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
-                  <div className="absolute bottom-0 left-0 right-0 p-4">
-                    <h3 className="text-white font-bold text-sm tracking-wide">{cat.name}</h3>
-                    <p className="text-white/60 text-[10px] tracking-wider uppercase mt-0.5 group-hover:text-[#C9A84C] transition-colors">Explore →</p>
+                  <div className="absolute bottom-0 left-0 right-0 p-6">
+                    <h3 className="text-white font-display text-lg font-bold tracking-wide">{cat.name}</h3>
+                    <p className="text-white/60 text-[10px] tracking-widest uppercase mt-1 group-hover:text-[#C9A84C] transition-colors">Explore →</p>
                   </div>
                 </div>
               </Link>
@@ -118,7 +115,7 @@ export default function HomePage() {
         {loading ? (
           <SkeletonGrid count={4} />
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {trendingProducts.map(p => <ProductCard key={p.id} product={p} />)}
           </div>
         )}

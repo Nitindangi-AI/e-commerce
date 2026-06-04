@@ -4,6 +4,7 @@ import { insforge } from "../../lib/insforge";
 import { logisticsAPI } from "../../services/api";
 import Loader from "../../components/Loader";
 import toast from "react-hot-toast";
+import { formatTrackingNumber } from "../../utils/formatTracking";
 import {
   BarChart3,
   TrendingUp,
@@ -60,6 +61,7 @@ export default function VendorDashboard() {
   const [vendorData, setVendorData] = useState(null);
   const [products, setProducts] = useState([]);
   const [orderItems, setOrderItems] = useState([]);
+  const [vendorOrders, setVendorOrders] = useState([]);
   const [stats, setStats] = useState({
     totalSales: 0,
     totalRevenue: 0,
@@ -290,64 +292,83 @@ export default function VendorDashboard() {
       if (pErr) throw pErr;
       setProducts(vendorProducts || []);
 
-      // 3. Fetch order items for this seller's products
-      const { data: items, error: oErr } = await insforge.database
-        .from("order_items")
-        .select("*, products!inner(*), orders!inner(*)")
-        .eq("products.seller_id", user.id);
+      // 3. Fetch orders containing vendor's products
+      const { data: vendorOrdersData, error: oErr } = await insforge.database
+        .from("orders")
+        .select("*, order_items(*, products(*))")
+        .order("created_at", { ascending: false });
 
       if (oErr) throw oErr;
 
-      // Sort items by parent order creation timestamp in memory (order_items table has no created_at column)
-      const sortedItems = (items || []).sort((a, b) => {
-        const dateA = a.orders?.created_at ? new Date(a.orders.created_at) : new Date(0);
-        const dateB = b.orders?.created_at ? new Date(b.orders.created_at) : new Date(0);
-        return dateB - dateA;
-      });
+      setVendorOrders(vendorOrdersData || []);
 
-      setOrderItems(sortedItems);
-
-      // 4. Calculate Stats
-      let revenue = 0;
-      let salesCount = 0;
+      // Flatten items to keep compatibility with existing features (returns, shipments, getOrderEarnings, etc.)
+      const flatItems = [];
       const uniqueOrderIds = new Set();
-      let lowStock = 0;
       let pendingOrders = 0;
       let cancelledOrders = 0;
-      let totalDeliveredRevenue = 0;
+      let salesCount = 0;
 
-      (items || []).forEach(item => {
-        const status = item.orders?.order_status;
+      (vendorOrdersData || []).forEach(order => {
+        const status = order.order_status;
         if (status === "Processing" || status === "Confirmed") {
           pendingOrders++;
         }
         if (status === "Cancelled") {
           cancelledOrders++;
         }
+        uniqueOrderIds.add(order.id);
 
-        if (status && status !== "Cancelled" && status !== "Returned") {
-          revenue += item.price * item.quantity;
-          salesCount += item.quantity;
-          uniqueOrderIds.add(item.order_id);
-        }
-
-        if (status === "Delivered") {
-          totalDeliveredRevenue += item.price * item.quantity;
-        }
+        (order.order_items || []).forEach(item => {
+          flatItems.push({
+            ...item,
+            orders: order
+          });
+          
+          if (status && status !== "Cancelled" && status !== "Returned") {
+            salesCount += item.quantity;
+          }
+        });
       });
+      setOrderItems(flatItems);
 
+      let lowStock = 0;
       (vendorProducts || []).forEach(p => {
         if ((p.stock || 0) < 5) {
           lowStock++;
         }
       });
 
-      const commRate = parseFloat(vendor.commission_rate || 10.00);
-      const commDeducted = (totalDeliveredRevenue * commRate) / 100;
-      const net = totalDeliveredRevenue - commDeducted;
+      // Calculate Top Product
+      const productSales = {};
+      flatItems.forEach(item => {
+        const prodId = item.product_id;
+        const qty = item.quantity;
+        productSales[prodId] = (productSales[prodId] || 0) + qty;
+      });
+
+      let topProdId = null;
+      let maxSales = 0;
+      Object.keys(productSales).forEach(prodId => {
+        if (productSales[prodId] > maxSales) {
+          maxSales = productSales[prodId];
+          topProdId = prodId;
+        }
+      });
+      const topProduct = vendorProducts.find(p => p.id === topProdId)?.name || "N/A";
+
+      // Fetch aggregated database earnings via RPC
+      const { data: earningsData, error: eErr } = await insforge.database.rpc('get_vendor_earnings', { p_user_id: user.id });
+      if (eErr) {
+        console.error("RPC get_vendor_earnings error:", eErr.message);
+      }
+
+      const dbGross = earningsData?.grossRevenue || 0;
+      const dbComm = earningsData?.commission || 0;
+      const dbNet = earningsData?.netRevenue || 0;
 
       // 5. Fetch Active Shipments associated with vendor's orders
-      const vendorOrderIds = Array.from(new Set((sortedItems || []).map(item => item.order_id)));
+      const vendorOrderIds = Array.from(new Set(flatItems.map(item => item.order_id)));
       let shipmentsData = [];
       if (vendorOrderIds.length > 0) {
         const { data: ships } = await insforge.database
@@ -367,15 +388,17 @@ export default function VendorDashboard() {
 
       setStats({
         totalSales: salesCount,
-        totalRevenue: revenue,
-        commissionDeducted: commDeducted,
-        netEarnings: net,
+        totalRevenue: dbGross,
+        commissionDeducted: dbComm,
+        netEarnings: dbNet,
         totalOrders: uniqueOrderIds.size,
         lowStockCount: lowStock,
         pendingOrdersCount: pendingOrders,
         cancelledOrdersCount: cancelledOrders,
         conversionRate: 2.8,
-        trafficVisits: 1890
+        trafficVisits: 1890,
+        topProduct: topProduct,
+        productsSold: salesCount
       });
 
     } catch (err) {
@@ -420,7 +443,7 @@ export default function VendorDashboard() {
         price: parseFloat(productForm.price),
         original_price: productForm.originalPrice ? parseFloat(productForm.originalPrice) : parseFloat(productForm.price),
         category: productForm.category,
-        brand: productForm.brand || "Trendy",
+        brand: productForm.brand || "Trendz",
         material: productForm.material || "",
         badge: productForm.badge || "",
         img: productForm.img || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500",
@@ -656,7 +679,7 @@ export default function VendorDashboard() {
           price: priceNum,
           original_price: p.originalPrice ? parseFloat(p.originalPrice) : priceNum,
           category: p.category || "Watches",
-          brand: p.brand || "Trendy",
+          brand: p.brand || "Trendz",
           material: p.material || "",
           badge: p.badge || "",
           img: finalImg,
@@ -909,7 +932,7 @@ export default function VendorDashboard() {
         destination
       });
 
-      toast.success(`Shipment successfully generated! AWB Tracking: ${res.trackingId}`);
+      toast.success(`Shipment successfully generated! AWB Tracking: ${formatTrackingNumber(res.trackingId)}`);
       setSelectedShipment(null);
       await loadDashboardData();
     } catch (err) {
@@ -1367,12 +1390,14 @@ export default function VendorDashboard() {
             </div>
 
             {/* Stats Metrics GTV Cards Grid */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
               {[
-                { title: "Today's Gross Sales", val: `₹${stats.totalRevenue.toLocaleString('en-IN')}`, desc: `${stats.totalSales} items bought`, color: "text-[#d4af37]" },
-                { title: "Total Orders Feed", val: stats.totalOrders, desc: `${stats.pendingOrdersCount} awaiting shipment`, color: "gold" },
-                { title: "Net Seller Payouts", val: `₹${stats.netEarnings.toLocaleString('en-IN')}`, desc: `Commission: ${vendorData?.commission_rate}%`, color: "text-green-400" },
-                { title: "Conversion Ratio", val: `${stats.conversionRate}%`, desc: `${stats.trafficVisits} site views`, color: "text-blue-400" },
+                { title: "Gross Revenue", val: `₹${stats.totalRevenue.toLocaleString('en-IN')}`, desc: `${stats.totalSales} items bought`, color: "text-[#d4af37]" },
+                { title: "Total Orders", val: stats.totalOrders, desc: `${stats.pendingOrdersCount} awaiting shipment`, color: "gold" },
+                { title: "Net Earnings", val: `₹${stats.netEarnings.toLocaleString('en-IN')}`, desc: `Commission: ${vendorData?.commission_rate}%`, color: "text-green-400" },
+                { title: "Products Sold", val: stats.productsSold || stats.totalSales, desc: "Successful checkouts", color: "text-blue-400" },
+                { title: "Top Product", val: stats.topProduct || "N/A", desc: "Most popular item", color: "text-purple-400" },
+                { title: "Conversion Rate", val: `${stats.conversionRate}%`, desc: `${stats.trafficVisits} site views`, color: "text-orange-400" },
               ].map((stat, idx) => (
                 <div key={idx} className={`border rounded-2xl p-5 shadow-lg relative overflow-hidden group ${cardBg}`}>
                   <div className="absolute top-0 right-0 w-20 h-20 rounded-full bg-white/5 blur-xl group-hover:bg-[#d4af37]/5 transition-all" />
@@ -1493,7 +1518,7 @@ export default function VendorDashboard() {
                 <div className="text-center py-20">
                   <span className="text-4xl block mb-4">📦</span>
                   <h4 className="font-bold text-base mb-2">No Listings Published</h4>
-                  <p className={`text-xs max-w-xs mx-auto mb-6 ${textSubtle}`}>Create storefront listings to publish models onto the global Trendy catalog.</p>
+                  <p className={`text-xs max-w-xs mx-auto mb-6 ${textSubtle}`}>Create storefront listings to publish models onto the global Trendz catalog.</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -1511,7 +1536,7 @@ export default function VendorDashboard() {
                       {products.map(p => (
                         <tr key={p.id} className="hover:bg-white/[0.005] transition-colors">
                           <td className="px-6 py-4 flex items-center gap-3">
-                            <img src={p.img} alt="" className="w-10 h-10 rounded-lg object-cover border border-white/10" />
+                            <img src={p.img} alt={p.name} className="w-10 h-10 rounded-lg object-cover border border-white/10" />
                             <div>
                               <p className={`font-bold text-sm ${textTitle}`}>{p.name}</p>
                               <span className={`text-[9px] uppercase tracking-widest font-bold ${textSubtle}`}>{p.category}</span>
@@ -1581,7 +1606,7 @@ export default function VendorDashboard() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className={`block text-[9px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>Selling Price (₹)</label>
                     <input
@@ -1602,6 +1627,20 @@ export default function VendorDashboard() {
                       placeholder="19900"
                       className={`input-field w-full px-4 py-3 rounded-xl text-xs ${inputBg}`}
                     />
+                  </div>
+                  <div>
+                    <label className={`block text-[9px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>Product Badge</label>
+                    <select
+                      value={productForm.badge}
+                      onChange={e => setProductForm({ ...productForm, badge: e.target.value })}
+                      className={`input-field w-full px-4 py-3 rounded-xl text-xs bg-black/45`}
+                    >
+                      <option value="">No Badge</option>
+                      <option value="New">New</option>
+                      <option value="Hot">Hot</option>
+                      <option value="Sale">Sale</option>
+                      <option value="Best Seller">Best Seller</option>
+                    </select>
                   </div>
                 </div>
 
@@ -1766,7 +1805,7 @@ export default function VendorDashboard() {
                     <div className="flex flex-wrap gap-3 p-3 bg-black/20 rounded-xl border border-white/5">
                       {productForm.images.map((url, index) => (
                         <div key={index} className="relative group w-16 h-16 rounded-lg overflow-hidden border border-white/10">
-                          <img src={url} alt="" className="w-full h-full object-cover" />
+                          <img src={url} alt="Product Gallery Thumbnail" className="w-full h-full object-cover" />
                           <button
                             type="button"
                             onClick={() => removeUploadedImage(index)}
@@ -1908,7 +1947,7 @@ export default function VendorDashboard() {
             </div>
 
             <div className={`border rounded-2xl overflow-hidden shadow-xl ${cardBg}`}>
-              {orderItems.length === 0 ? (
+              {vendorOrders.length === 0 ? (
                 <div className="text-center py-20">
                   <span className="text-4xl block mb-4">🛒</span>
                   <h4 className="font-bold text-base mb-2">No Active Orders Yet</h4>
@@ -1916,13 +1955,12 @@ export default function VendorDashboard() {
                 </div>
               ) : (
                 <div className="divide-y divide-white/5">
-                  {orderItems.map(item => {
-                    const order = item.orders;
-                    if (!order) return null;
+                  {vendorOrders.map(order => {
+                    const orderItemsForThisOrder = order.order_items || [];
+                    if (orderItemsForThisOrder.length === 0) return null;
                     return (
-                      <div key={item.id} className="p-6 flex flex-col md:flex-row justify-between gap-6 hover:bg-white/[0.005] transition-colors">
-                        <div className="flex items-start gap-4">
-                          <img src={item.image} alt="" className="w-14 h-14 rounded-xl object-cover border border-white/10" />
+                      <div key={order.id} className="p-6 flex flex-col justify-between gap-4 hover:bg-white/[0.005] transition-colors">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-3 border-b border-white/5">
                           <div>
                             <div className="flex items-center gap-2 flex-wrap mb-1">
                               <span className="text-xs font-bold font-mono gold">{order.order_id}</span>
@@ -1930,42 +1968,49 @@ export default function VendorDashboard() {
                                 · Date: {new Date(order.created_at).toLocaleDateString()}
                               </span>
                             </div>
-                            <h4 className={`font-bold text-sm ${textTitle}`}>{item.name}</h4>
-                            <div className={`text-[10px] flex gap-4 mt-1 ${textSubtle}`}>
-                              <span>Qty: <strong className={textTitle}>{item.quantity}</strong></span>
-                              {item.color && <span>Color: <strong className={textTitle}>{item.color}</strong></span>}
-                              {item.size && <span>Size: <strong className={textTitle}>{item.size}</strong></span>}
-                              <span>Revenue Share: <strong className="gold">₹{(item.price * item.quantity).toLocaleString()}</strong></span>
-                            </div>
-                            
-                            <div className={`text-[10px] mt-3 p-3 bg-black/25 border border-white/5 rounded-xl ${textSubtle}`}>
+                            <div className={`text-[10px] ${textSubtle}`}>
                               <strong className="text-white/60">Shipping Destination:</strong> {order.shipping_address?.name}, {order.shipping_address?.line1}, {order.shipping_address?.city} - {order.shipping_address?.pincode}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3 self-end sm:self-center">
+                            <span className={`inline-block text-[10px] font-bold px-3 py-1 rounded-full uppercase border tracking-wider ${statusColorMap[order.order_status]}`}>
+                              {order.order_status}
+                            </span>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {order.order_status === "Processing" && (
+                                <button onClick={() => handleUpdateOrderStatus(order.id, "Confirmed")} className="btn-gold px-4 py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-widest">
+                                  Accept Order
+                                </button>
+                              )}
+                              {order.order_status === "Confirmed" && (
+                                <button onClick={() => handleOpenShipmentModal(orderItemsForThisOrder[0])} className="btn-gold px-4 py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-widest flex items-center gap-1">
+                                  <Truck size={12} /> Dispatch Shipment
+                                </button>
+                              )}
+                              {order.order_status === "Shipped" && (
+                                <button onClick={() => handleUpdateOrderStatus(order.id, "Delivered")} className="btn-gold px-4 py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-widest">
+                                  Mark Delivered
+                                </button>
+                              )}
                             </div>
                           </div>
                         </div>
 
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 self-end md:self-center">
-                          <span className={`inline-block text-[10px] font-bold px-3 py-1 rounded-full uppercase border tracking-wider ${statusColorMap[order.order_status]}`}>
-                            {order.order_status}
-                          </span>
-                          
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {order.order_status === "Processing" && (
-                              <button onClick={() => handleUpdateOrderStatus(order.id, "Confirmed")} className="btn-gold px-4 py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-widest">
-                                Accept Order
-                              </button>
-                            )}
-                            {order.order_status === "Confirmed" && (
-                              <button onClick={() => handleOpenShipmentModal(item)} className="btn-gold px-4 py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-widest flex items-center gap-1">
-                                <Truck size={12} /> Dispatch Shipment
-                              </button>
-                            )}
-                            {order.order_status === "Shipped" && (
-                              <button onClick={() => handleUpdateOrderStatus(order.id, "Delivered")} className="btn-gold px-4 py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-widest">
-                                Mark Delivered
-                              </button>
-                            )}
-                          </div>
+                        <div className="space-y-3 pt-2">
+                          {orderItemsForThisOrder.map(item => (
+                            <div key={item.id} className="flex items-center gap-4 pl-2">
+                              <img src={item.image || item.products?.img} alt={item.name} className="w-10 h-10 rounded-lg object-cover border border-white/10" />
+                              <div className="flex-1 min-w-0">
+                                <h4 className={`font-bold text-xs truncate ${textTitle}`}>{item.name}</h4>
+                                <div className={`text-[9px] flex gap-3 mt-0.5 ${textSubtle}`}>
+                                  <span>Qty: <strong className={textTitle}>{item.quantity}</strong></span>
+                                  {item.color && <span>Color: <strong className={textTitle}>{item.color}</strong></span>}
+                                  {item.size && <span>Size: <strong className={textTitle}>{item.size}</strong></span>}
+                                  <span>Revenue Share: <strong className="gold">₹{(item.price * item.quantity).toLocaleString()}</strong></span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     );
@@ -2446,7 +2491,7 @@ export default function VendorDashboard() {
                     {products.map(p => (
                       <tr key={p.id} className="hover:bg-white/[0.005] transition-colors">
                         <td className="px-6 py-4 flex items-center gap-3">
-                          <img src={p.img} alt="" className="w-10 h-10 rounded-lg object-cover border border-white/10" />
+                          <img src={p.img} alt={p.name} className="w-10 h-10 rounded-lg object-cover border border-white/10" />
                           <span className={`font-bold ${textTitle}`}>{p.name}</span>
                         </td>
                         <td className="px-6 py-4 font-mono font-bold gold">{p.specs?.sku || "SKU-AUTO"}</td>

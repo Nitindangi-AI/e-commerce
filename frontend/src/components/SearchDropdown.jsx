@@ -214,7 +214,7 @@ export default function SearchDropdown() {
                         >
                           <img 
                             src={p.img} 
-                            alt="" 
+                            alt={p.name} 
                             className="w-12 h-12 rounded-xl object-cover flex-shrink-0 border border-[#E7E2D8] bg-[#F5F3EE]" 
                           />
                           <div className="flex-1 min-w-0">

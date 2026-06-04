@@ -66,6 +66,10 @@ if (client.auth) {
   if (originalSignOut) {
     client.auth.signOut = async function (...args) {
       try {
+        localStorage.removeItem("remember_me");
+        sessionStorage.removeItem("session_active");
+        sessionStorage.setItem("manual_logout", "true");
+        
         const res = await originalSignOut.apply(this, args);
         // Defensively trigger SIGNED_OUT event to reset UI
         notifyListeners('SIGNED_OUT', null);

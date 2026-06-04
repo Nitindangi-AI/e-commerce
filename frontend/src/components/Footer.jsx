@@ -9,7 +9,7 @@ export default function Footer() {
   const handleSubscribe = (e) => {
     e.preventDefault();
     if (!email.trim()) return;
-    toast.success("Thank you for subscribing to Trendy!");
+    toast.success("Thank you for subscribing to TRENDZ!");
     setEmail("");
   };
 
@@ -37,7 +37,7 @@ export default function Footer() {
           {/* Column 1: Brand Story */}
           <div className="space-y-6">
             <Link to="/" className="font-display text-2xl font-bold tracking-[0.25em] uppercase text-[#C9A84C] hover:scale-105 transition-transform duration-300 inline-block select-none">
-              TRENDY
+              TRENDZ
             </Link>
             <p className="text-white/60 text-xs leading-relaxed max-w-sm">
               Curated luxury for those who define their own standard. Timeless pieces, uncompromising craft, delivered to your doorstep.
@@ -120,7 +120,7 @@ export default function Footer() {
       {/* Bottom Bar */}
       <div className="border-t border-white/5 py-8 bg-[#070707]">
         <div className="max-w-7xl mx-auto px-6 flex flex-col items-center justify-center gap-4 text-center">
-          <p className="text-white/30 text-xs">© 2025 Trendy. All rights reserved.</p>
+          <p className="text-white/30 text-xs">© 2025 TRENDZ. All rights reserved.</p>
           <div className="flex flex-wrap justify-center gap-6 text-[10px] tracking-wider uppercase text-white/30 font-medium">
             <a href="#" className="hover:text-[#C9A84C] transition-colors">Privacy Policy</a>
             <a href="#" className="hover:text-[#C9A84C] transition-colors">Terms of Service</a>

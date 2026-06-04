@@ -36,7 +36,9 @@ import {
   Database,
   Cpu,
   Fingerprint,
-  Truck
+  Truck,
+  PlusCircle,
+  X
 } from "lucide-react";
 
 export default function AdminDashboard() {
@@ -59,6 +61,35 @@ export default function AdminDashboard() {
   const [platformOrders, setPlatformOrders] = useState([]);
   const [profilesList, setProfilesList] = useState([]);
   const [selectedKycDocument, setSelectedKycDocument] = useState(null);
+
+  // Product CRUD State
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [productForm, setProductForm] = useState({
+    name: "",
+    price: "",
+    originalPrice: "",
+    category: "Watches",
+    brand: "",
+    material: "",
+    badge: "",
+    img: "",
+    images: [],
+    description: "",
+    stock: "",
+    colors: "",
+    sizes: "",
+    sku: "",
+    metaTitle: "",
+    metaDescription: "",
+    deliveryDays: 3,
+    returnable: true,
+    returnDays: 5,
+    specsList: [{ key: "", value: "" }],
+    seller_id: "",
+  });
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [formError, setFormError] = useState("");
+  const categories = ["Watches", "Shirts", "Footwear", "Grooming", "Accessories", "Apparel"];
 
   // Global Logistics Network State
   const [activeShipments, setActiveShipments] = useState([]);
@@ -118,9 +149,10 @@ export default function AdminDashboard() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  const userRole = user?.profile?.role || user?.role;
+
   useEffect(() => {
     if (!user) return;
-    const userRole = user.profile?.role || user.role;
     if (userRole !== "admin") {
       toast.error("Access Denied: You do not have Administrator permissions.");
       navigate("/");
@@ -128,6 +160,14 @@ export default function AdminDashboard() {
     }
     loadAdminData();
   }, [user]);
+
+  if (loading || !user || userRole !== "admin") {
+    return (
+      <div className="min-h-screen pt-24 pb-16 flex items-center justify-center">
+        <Loader />
+      </div>
+    );
+  }
 
   const loadAdminData = async () => {
     setLoading(true);
@@ -279,6 +319,10 @@ export default function AdminDashboard() {
 
   // Vendor actions
   const handleVendorAction = async (vendorId, action) => {
+    if (userRole !== "admin") {
+      toast.error("Access Denied: You do not have Administrator permissions.");
+      return;
+    }
     try {
       const { error } = await insforge.database
         .from("vendors")
@@ -311,6 +355,10 @@ export default function AdminDashboard() {
 
   // Update commission rate splits
   const handleUpdateCommission = async (vendorId, rate) => {
+    if (userRole !== "admin") {
+      toast.error("Access Denied: You do not have Administrator permissions.");
+      return;
+    }
     try {
       const rateVal = parseFloat(rate);
       if (isNaN(rateVal) || rateVal < 0 || rateVal > 100) {
@@ -333,8 +381,12 @@ export default function AdminDashboard() {
     }
   };
 
-  // Policy listing revoking
+  // Policy listing revoking/deletion
   const handleDeleteProduct = async (id) => {
+    if (userRole !== "admin") {
+      toast.error("Access Denied: You do not have Administrator permissions.");
+      return;
+    }
     if (!window.confirm("Are you sure you want to revoke this product listing? This will violate merchant agreements.")) return;
     try {
       const { error } = await insforge.database
@@ -351,6 +403,10 @@ export default function AdminDashboard() {
 
   // Block/unblock shoppers
   const handleBlockProfile = async (id, currentRole) => {
+    if (userRole !== "admin") {
+      toast.error("Access Denied: You do not have Administrator permissions.");
+      return;
+    }
     const targetRole = currentRole === "blocked" ? "customer" : "blocked";
     try {
       const { error } = await insforge.database
@@ -366,6 +422,10 @@ export default function AdminDashboard() {
   };
 
   const handleUpdateUserRole = async (userId, targetRole) => {
+    if (userRole !== "admin") {
+      toast.error("Access Denied: You do not have Administrator permissions.");
+      return;
+    }
     try {
       const { error } = await insforge.database
         .from("profiles")
@@ -380,6 +440,10 @@ export default function AdminDashboard() {
   };
 
   const handleUpdateOrderStatus = async (orderId, newStatus) => {
+    if (userRole !== "admin") {
+      toast.error("Access Denied: You do not have Administrator permissions.");
+      return;
+    }
     try {
       const updates = {
         order_status: newStatus,
@@ -414,6 +478,10 @@ export default function AdminDashboard() {
 
   const handleCouponSubmit = async (e) => {
     e.preventDefault();
+    if (userRole !== "admin") {
+      toast.error("Access Denied: You do not have Administrator permissions.");
+      return;
+    }
     try {
       const payload = {
         code: couponForm.code.toUpperCase().trim(),
@@ -462,6 +530,10 @@ export default function AdminDashboard() {
   };
 
   const handleDeleteCoupon = async (id) => {
+    if (userRole !== "admin") {
+      toast.error("Access Denied: You do not have Administrator permissions.");
+      return;
+    }
     if (!window.confirm("Are you sure you want to delete this coupon?")) return;
     try {
       const { error } = await insforge.database
@@ -474,6 +546,185 @@ export default function AdminDashboard() {
     } catch (err) {
       toast.error("Failed to delete coupon");
     }
+  };
+
+  // Product CRUD Handlers
+  const handleProductSubmit = async (e) => {
+    e.preventDefault();
+    if (userRole !== "admin") {
+      toast.error("Access Denied: You do not have Administrator permissions.");
+      return;
+    }
+    setFormError("");
+    const { name, price, stock } = productForm;
+    if (!name || !price || stock === "") {
+      setFormError("Product Name, Price, and Stock are required");
+      return;
+    }
+
+    try {
+      const colorsArr = productForm.colors ? productForm.colors.split(",").map(c => c.trim()).filter(Boolean) : [];
+      const sizesArr = productForm.sizes ? productForm.sizes.split(",").map(s => s.trim()).filter(Boolean) : [];
+
+      const specsObj = {};
+      (productForm.specsList || []).forEach(item => {
+        if (item.key.trim()) {
+          specsObj[item.key.trim()] = item.value.trim();
+        }
+      });
+      specsObj.sku = productForm.sku || `SKU-${Math.random().toString(36).substring(2,8).toUpperCase()}`;
+      specsObj.meta_title = productForm.metaTitle || productForm.name;
+      specsObj.meta_desc = productForm.metaDescription || productForm.description;
+
+      const payload = {
+        name: productForm.name,
+        price: parseFloat(productForm.price),
+        original_price: productForm.originalPrice ? parseFloat(productForm.originalPrice) : parseFloat(productForm.price),
+        category: productForm.category,
+        brand: productForm.brand || "Trendz",
+        material: productForm.material || "",
+        badge: productForm.badge || "",
+        img: productForm.img || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500",
+        images: productForm.images || [],
+        description: productForm.description || "",
+        stock: parseInt(productForm.stock),
+        colors: colorsArr,
+        sizes: sizesArr,
+        delivery_days: parseInt(productForm.deliveryDays) || 3,
+        seller_id: productForm.seller_id || user.id,
+        return_policy: {
+          returnable: productForm.returnable,
+          returnDays: parseInt(productForm.returnDays) || 5,
+        },
+        specs: specsObj
+      };
+
+      if (editingProduct) {
+        const { error } = await insforge.database
+          .from("products")
+          .update(payload)
+          .eq("id", editingProduct.id);
+
+        if (error) throw error;
+        toast.success("Listing updated successfully!");
+      } else {
+        const { error } = await insforge.database
+          .from("products")
+          .insert([payload]);
+
+        if (error) throw error;
+        toast.success("New product published!");
+      }
+
+      setActiveTab("products");
+      setEditingProduct(null);
+      resetProductForm();
+      loadAdminData();
+    } catch (err) {
+      setFormError(err.message || "Failed to save product");
+    }
+  };
+
+  const resetProductForm = () => {
+    setProductForm({
+      name: "", price: "", originalPrice: "", category: "Watches", brand: "", material: "", badge: "",
+      img: "", images: [], description: "", stock: "", colors: "", sizes: "", sku: "", metaTitle: "", metaDescription: "", deliveryDays: 3,
+      returnable: true, returnDays: 5, specsList: [{ key: "", value: "" }], seller_id: "",
+    });
+  };
+
+  const handleEditProduct = (p) => {
+    setEditingProduct(p);
+    
+    // Parse specs JSON to list, excluding SKU, meta_title, meta_desc
+    const rawSpecs = p.specs || {};
+    const list = Object.keys(rawSpecs)
+      .filter(k => k !== "sku" && k !== "meta_title" && k !== "meta_desc")
+      .map(k => ({ key: k, value: String(rawSpecs[k]) }));
+
+    setProductForm({
+      name: p.name || "",
+      price: p.price || "",
+      originalPrice: p.original_price || "",
+      category: p.category || "Watches",
+      brand: p.brand || "",
+      material: p.material || "",
+      badge: p.badge || "",
+      img: p.img || "",
+      images: p.images || [],
+      description: p.description || "",
+      stock: p.stock || 0,
+      colors: (p.colors || []).join(", "),
+      sizes: (p.sizes || []).join(", "),
+      sku: p.specs?.sku || "",
+      metaTitle: p.specs?.meta_title || "",
+      metaDescription: p.specs?.meta_desc || "",
+      deliveryDays: p.delivery_days || 3,
+      returnable: p.return_policy?.returnable ?? true,
+      returnDays: p.return_policy?.returnDays ?? 5,
+      specsList: list.length > 0 ? list : [{ key: "", value: "" }],
+      seller_id: p.seller_id || "",
+    });
+    setActiveTab("add-product");
+  };
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploadingImage(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+      const filePath = `products/${fileName}`;
+
+      const { data, error } = await insforge.storage
+        .from('images')
+        .upload(filePath, file);
+
+      if (error) throw error;
+      setProductForm(f => ({ ...f, img: data.url }));
+      toast.success("Product image uploaded to Storage bucket!");
+    } catch (err) {
+      toast.error("Image upload failed");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleMultipleImagesUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+    
+    setUploadingImage(true);
+    const uploadedUrls = [...(productForm.images || [])];
+    
+    try {
+      for (const file of files) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+        const filePath = `products/${fileName}`;
+
+        const { data, error } = await insforge.storage
+          .from('images')
+          .upload(filePath, file);
+
+        if (error) throw error;
+        if (data?.url) {
+          uploadedUrls.push(data.url);
+        }
+      }
+      setProductForm(f => ({ ...f, images: uploadedUrls }));
+      toast.success("Product gallery images uploaded!");
+    } catch (err) {
+      toast.error("Gallery upload failed");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const removeUploadedImage = (index) => {
+    const urls = (productForm.images || []).filter((_, idx) => idx !== index);
+    setProductForm(f => ({ ...f, images: urls }));
   };
 
   // Command palette filter list
@@ -558,7 +809,7 @@ export default function AdminDashboard() {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all ${
-                  activeTab === tab.id
+                  activeTab === tab.id || (tab.id === "products" && activeTab === "add-product")
                     ? "bg-yellow-500/10 gold border border-yellow-500/20"
                     : "text-white/50 hover:text-white hover:bg-white/5 border border-transparent"
                 }`}
@@ -941,9 +1192,21 @@ export default function AdminDashboard() {
         {/* ─── TAB: CATALOG AUDITING ─── */}
         {activeTab === "products" && (
           <div className="space-y-6 animate-fade-in">
-            <div>
-              <h2 className={`display text-3xl font-black mb-1 ${textTitle}`}>Global Catalog Auditing</h2>
-              <p className={`text-xs ${textSubtle}`}>Moderating merchant storefront catalog items, price index guidelines, and policy revoking.</p>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h2 className={`display text-3xl font-black mb-1 ${textTitle}`}>Global Catalog Auditing</h2>
+                <p className={`text-xs ${textSubtle}`}>Moderating merchant storefront catalog items, price index guidelines, and policy revoking.</p>
+              </div>
+              <button
+                onClick={() => {
+                  resetProductForm();
+                  setEditingProduct(null);
+                  setActiveTab("add-product");
+                }}
+                className="px-5 py-2.5 bg-gradient-to-tr from-[#d4af37] to-[#f5d26e] text-[#0a0a0a] font-bold text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg hover:shadow-yellow-500/10"
+              >
+                + Add Product
+              </button>
             </div>
 
             <div className={`border rounded-2xl shadow-xl overflow-hidden ${cardBg}`}>
@@ -962,14 +1225,14 @@ export default function AdminDashboard() {
                     {allProducts.map(p => (
                       <tr key={p.id} className="hover:bg-white/[0.005] transition-colors">
                         <td className="px-6 py-4 flex items-center gap-3">
-                          <img src={p.img} alt="" className="w-10 h-10 rounded-lg object-cover border border-white/10" />
+                          <img src={p.img} alt={p.name} className="w-10 h-10 rounded-lg object-cover border border-white/10" />
                           <div>
                             <p className={`font-bold text-sm ${textTitle}`}>{p.name}</p>
                             <span className={`text-[9px] font-mono ${textSubtle}`}>ID: {p.id.slice(0, 8)}</span>
                           </div>
                         </td>
                         <td className="px-6 py-4 font-bold text-yellow-500 uppercase tracking-widest">
-                          {p.vendors?.store_name || "Trendy Admin"}
+                          {p.vendors?.store_name || "Trendz Admin"}
                         </td>
                         <td className="px-6 py-4 font-semibold text-white/60">
                           Sale: ₹{p.price.toLocaleString()}<br />
@@ -977,18 +1240,406 @@ export default function AdminDashboard() {
                         </td>
                         <td className={`px-6 py-4 font-bold ${p.stock < 5 ? 'text-yellow-500' : textSubtle}`}>{p.stock} units</td>
                         <td className="px-6 py-4 text-center">
-                          <button
-                            onClick={() => handleDeleteProduct(p.id)}
-                            className="border border-red-500/20 text-red-400 hover:text-red-300 hover:bg-red-500/10 px-4 py-2 rounded-xl text-[9px] font-bold uppercase transition-all"
-                          >
-                            Revoke Listing 🗑️
-                          </button>
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={() => handleEditProduct(p)}
+                              className="px-3 py-1.5 border border-white/10 hover:border-yellow-500 rounded-lg hover:bg-yellow-500/5 transition-all text-[10px] font-bold uppercase tracking-wider text-yellow-500"
+                            >
+                              Edit ✏️
+                            </button>
+                            <button
+                              onClick={() => handleDeleteProduct(p.id)}
+                              className="border border-red-500/20 text-red-400 hover:text-red-300 hover:bg-red-500/10 px-4 py-2 rounded-xl text-[9px] font-bold uppercase transition-all"
+                            >
+                              Revoke Listing 🗑️
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── TAB: ADD / EDIT PRODUCT ─── */}
+        {activeTab === "add-product" && (
+          <div className="space-y-6 animate-fade-in max-w-4xl">
+            <div>
+              <h2 className={`display text-3xl font-black mb-1 ${textTitle}`}>
+                {editingProduct ? "Modify Product Listing" : "Upload Store Products"}
+              </h2>
+              <p className={`text-xs ${textSubtle}`}>Configure single listing descriptions manually and assign the listing to an approved vendor.</p>
+            </div>
+
+            <div className={`border rounded-2xl p-6 shadow-xl ${cardBg}`}>
+              {formError && (
+                <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs px-4 py-3 rounded-xl mb-6">
+                  {formError}
+                </div>
+              )}
+
+              <form onSubmit={handleProductSubmit} className="space-y-5 text-xs font-semibold">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className={`block text-[9px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>Product Title</label>
+                    <input
+                      type="text"
+                      value={productForm.name}
+                      onChange={e => setProductForm({ ...productForm, name: e.target.value })}
+                      placeholder="Classic Luxury Gold Chronograph"
+                      className={`input-field w-full px-4 py-3 rounded-xl text-xs ${inputBg}`}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className={`block text-[9px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>Assign Vendor (Seller)</label>
+                    <select
+                      value={productForm.seller_id || user?.id}
+                      onChange={e => setProductForm({ ...productForm, seller_id: e.target.value })}
+                      className={`input-field w-full px-4 py-3 rounded-xl text-xs bg-black/45 ${inputBg}`}
+                    >
+                      <option value={user?.id} className="bg-[#111] text-white">Admin Seller ({user?.email})</option>
+                      {approvedVendors.filter(v => v.status === "approved").map(v => (
+                        <option key={v.user_id} value={v.user_id} className="bg-[#111] text-white">
+                          {v.store_name} ({v.profiles?.first_name} {v.profiles?.last_name})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className={`block text-[9px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>Selling Price (₹)</label>
+                    <input
+                      type="number"
+                      value={productForm.price}
+                      onChange={e => setProductForm({ ...productForm, price: e.target.value })}
+                      placeholder="14900"
+                      className={`input-field w-full px-4 py-3 rounded-xl text-xs ${inputBg}`}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-[9px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>Original Price (₹)</label>
+                    <input
+                      type="number"
+                      value={productForm.originalPrice}
+                      onChange={e => setProductForm({ ...productForm, originalPrice: e.target.value })}
+                      placeholder="19900"
+                      className={`input-field w-full px-4 py-3 rounded-xl text-xs ${inputBg}`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-[9px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>Product Badge</label>
+                    <select
+                      value={productForm.badge}
+                      onChange={e => setProductForm({ ...productForm, badge: e.target.value })}
+                      className={`input-field w-full px-4 py-3 rounded-xl text-xs bg-black/45 ${inputBg}`}
+                    >
+                      <option value="" className="bg-[#111] text-white">No Badge</option>
+                      <option value="New" className="bg-[#111] text-white">New</option>
+                      <option value="Hot" className="bg-[#111] text-white">Hot</option>
+                      <option value="Sale" className="bg-[#111] text-white">Sale</option>
+                      <option value="Best Seller" className="bg-[#111] text-white">Best Seller</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className={`block text-[9px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>Category</label>
+                    <select
+                      value={productForm.category}
+                      onChange={e => setProductForm({ ...productForm, category: e.target.value })}
+                      className={`input-field w-full px-4 py-3 rounded-xl text-xs bg-black/45 ${inputBg}`}
+                    >
+                      {categories.map(cat => (
+                        <option key={cat} value={cat} className="bg-[#111] text-white">{cat}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={`block text-[9px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>Brand Identity</label>
+                    <input
+                      type="text"
+                      value={productForm.brand}
+                      onChange={e => setProductForm({ ...productForm, brand: e.target.value })}
+                      placeholder="Meridian Watch Elite"
+                      className={`input-field w-full px-4 py-3 rounded-xl text-xs ${inputBg}`}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className={`block text-[9px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>Material details</label>
+                    <input
+                      type="text"
+                      value={productForm.material}
+                      onChange={e => setProductForm({ ...productForm, material: e.target.value })}
+                      placeholder="Stainless Steel / Italian Leather"
+                      className={`input-field w-full px-4 py-3 rounded-xl text-xs ${inputBg}`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-[9px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>Warehouse Stock quantity</label>
+                    <input
+                      type="number"
+                      value={productForm.stock}
+                      onChange={e => setProductForm({ ...productForm, stock: e.target.value })}
+                      placeholder="25"
+                      className={`input-field w-full px-4 py-3 rounded-xl text-xs ${inputBg}`}
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Sizing & colors Variants */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className={`block text-[9px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>Colors Matrix (Comma separated)</label>
+                    <input
+                      type="text"
+                      value={productForm.colors}
+                      onChange={e => setProductForm({ ...productForm, colors: e.target.value })}
+                      placeholder="Gold, Black, Navy"
+                      className={`input-field w-full px-4 py-3 rounded-xl text-xs ${inputBg}`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-[9px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>Sizing Matrix (Comma separated)</label>
+                    <input
+                      type="text"
+                      value={productForm.sizes}
+                      onChange={e => setProductForm({ ...productForm, sizes: e.target.value })}
+                      placeholder="S, M, L, XL"
+                      className={`input-field w-full px-4 py-3 rounded-xl text-xs ${inputBg}`}
+                    />
+                  </div>
+                </div>
+
+                {/* SKU Code block */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className={`block text-[9px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>SKU Catalog ID</label>
+                    <input
+                      type="text"
+                      value={productForm.sku}
+                      onChange={e => setProductForm({ ...productForm, sku: e.target.value })}
+                      placeholder="MER-GOLD-01"
+                      className={`input-field w-full px-4 py-3 rounded-xl text-xs ${inputBg}`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-[9px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>Delivery SLA days</label>
+                    <input
+                      type="number"
+                      value={productForm.deliveryDays}
+                      onChange={e => setProductForm({ ...productForm, deliveryDays: e.target.value })}
+                      placeholder="3"
+                      className={`input-field w-full px-4 py-3 rounded-xl text-xs ${inputBg}`}
+                    />
+                  </div>
+                </div>
+
+                {/* Image Media source */}
+                <div>
+                  <label className={`block text-[9px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>Listing Image Media URL</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={productForm.img}
+                      onChange={e => setProductForm({ ...productForm, img: e.target.value })}
+                      placeholder="https://domain.com/photo.png"
+                      className={`input-field flex-1 px-4 py-3 rounded-xl text-xs ${inputBg}`}
+                    />
+                    <div className="relative flex-shrink-0">
+                      <input
+                        type="file"
+                        id="admin-image-file"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                      />
+                      <label
+                        htmlFor="admin-image-file"
+                        className="btn-outline px-4 py-3.5 rounded-xl text-[9px] font-bold uppercase tracking-wider block cursor-pointer border border-white/10 hover:border-[#C9A84C] text-center"
+                      >
+                        {uploadingImage ? "Uploading..." : "📷 Upload"}
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Detailed Description */}
+                <div>
+                  <label className={`block text-[9px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>Description details</label>
+                  <textarea
+                    value={productForm.description}
+                    onChange={e => setProductForm({ ...productForm, description: e.target.value })}
+                    rows={3}
+                    placeholder="Provide customer copy detailing specification, materials, and sizes."
+                    className={`input-field w-full px-4 py-3 rounded-xl text-xs resize-none ${inputBg}`}
+                  />
+                </div>
+
+                {/* Multiple Images Upload */}
+                <div>
+                  <label className={`block text-[9px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>Additional Product Gallery Images (Optional)</label>
+                  <div className="flex gap-2 mb-3">
+                    <input
+                      type="file"
+                      id="admin-multiple-images"
+                      className="hidden"
+                      accept="image/*"
+                      multiple
+                      onChange={handleMultipleImagesUpload}
+                    />
+                    <label
+                      htmlFor="admin-multiple-images"
+                      className="btn-outline px-4 py-3 rounded-xl text-[9px] font-bold uppercase tracking-wider block cursor-pointer border border-white/10 hover:border-[#C9A84C]"
+                    >
+                      {uploadingImage ? "Uploading..." : "📷 Upload Gallery Images"}
+                    </label>
+                  </div>
+                  {productForm.images && productForm.images.length > 0 && (
+                    <div className="flex flex-wrap gap-3 p-3 bg-black/20 rounded-xl border border-white/5">
+                      {productForm.images.map((url, index) => (
+                        <div key={index} className="relative group w-16 h-16 rounded-lg overflow-hidden border border-white/10">
+                          <img src={url} alt="Product Thumbnail" className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => removeUploadedImage(index)}
+                            className="absolute inset-0 bg-red-600/80 text-white font-bold text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Return Policy */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center gap-2 select-none h-full">
+                    <input
+                      type="checkbox"
+                      id="returnable"
+                      checked={productForm.returnable}
+                      onChange={e => setProductForm({ ...productForm, returnable: e.target.checked })}
+                      className="w-4 h-4 rounded border-gray-300 text-[#C9A84C] focus:ring-[#C9A84C] accent-[#C9A84C]"
+                    />
+                    <label htmlFor="returnable" className={`text-xs font-bold ${textTitle} cursor-pointer`}>
+                      Return Policy Eligible
+                    </label>
+                  </div>
+                  <div>
+                    <label className={`block text-[9px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>Return Window Days</label>
+                    <input
+                      type="number"
+                      value={productForm.returnDays}
+                      onChange={e => setProductForm({ ...productForm, returnDays: e.target.value })}
+                      disabled={!productForm.returnable}
+                      placeholder="5"
+                      className={`input-field w-full px-4 py-3 rounded-xl text-xs ${inputBg} ${!productForm.returnable ? "opacity-50 cursor-not-allowed" : ""}`}
+                    />
+                  </div>
+                </div>
+
+                {/* Specifications JSON Editor */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <label className={`block text-[9px] tracking-widest uppercase font-bold ${textSubtle}`}>Product Specifications</label>
+                    <button
+                      type="button"
+                      onClick={() => setProductForm(f => ({ ...f, specsList: [...(f.specsList || []), { key: "", value: "" }] }))}
+                      className="text-[#C9A84C] text-[10px] hover:underline font-bold"
+                    >
+                      ➕ Add Spec
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {(productForm.specsList || []).map((spec, index) => (
+                      <div key={index} className="flex gap-2 items-center">
+                        <input
+                          type="text"
+                          value={spec.key}
+                          onChange={e => {
+                            const list = [...(productForm.specsList || [])];
+                            list[index].key = e.target.value;
+                            setProductForm({ ...productForm, specsList: list });
+                          }}
+                          placeholder="Key (e.g. Fit)"
+                          className={`input-field flex-1 px-3 py-2 rounded-lg text-xs ${inputBg}`}
+                        />
+                        <input
+                          type="text"
+                          value={spec.value}
+                          onChange={e => {
+                            const list = [...(productForm.specsList || [])];
+                            list[index].value = e.target.value;
+                            setProductForm({ ...productForm, specsList: list });
+                          }}
+                          placeholder="Value (e.g. Regular Fit)"
+                          className={`input-field flex-1 px-3 py-2 rounded-lg text-xs ${inputBg}`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const list = (productForm.specsList || []).filter((_, idx) => idx !== index);
+                            setProductForm({ ...productForm, specsList: list.length > 0 ? list : [{ key: "", value: "" }] });
+                          }}
+                          className="text-red-500 font-bold px-2"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* SEO METADATA BLOCK */}
+                <div className="space-y-4 border-t border-white/5 pt-5 mt-5">
+                  <span className="text-[10px] font-bold tracking-widest uppercase gold">Search Engine Optimization (SEO) Metadata</span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className={`block text-[9px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>Meta Title</label>
+                      <input
+                        type="text"
+                        value={productForm.metaTitle}
+                        onChange={e => setProductForm({ ...productForm, metaTitle: e.target.value })}
+                        placeholder="Search engine preview title..."
+                        className={`input-field w-full px-4 py-3 rounded-xl text-xs ${inputBg}`}
+                      />
+                    </div>
+                    <div>
+                      <label className={`block text-[9px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>Meta Description Keyword tags</label>
+                      <input
+                        type="text"
+                        value={productForm.metaDescription}
+                        onChange={e => setProductForm({ ...productForm, metaDescription: e.target.value })}
+                        placeholder="Premium watch, gold watch, chronograph..."
+                        className={`input-field w-full px-4 py-3 rounded-xl text-xs ${inputBg}`}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-white/5 flex gap-3">
+                  <button type="button" onClick={() => { resetProductForm(); setActiveTab("products"); }} className="btn-outline flex-1 py-3 rounded-xl text-xs font-bold uppercase tracking-wider border border-white/10 text-center">
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn-gold flex-1 py-3 rounded-xl text-xs font-bold uppercase tracking-wider">
+                    {editingProduct ? "Update Listing" : "Publish Listing"}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
@@ -1014,8 +1665,8 @@ export default function AdminDashboard() {
 
               <div className="space-y-4">
                 {[
-                  { user: "admin@trendy.com", ip: "103.45.24.120", geo: "Mumbai, Maharashtra, IN", device: "Chrome 124 / Windows Desktop", time: "Just Now", status: "Successful MFA Verified" },
-                  { user: "seller1@trendy.com", ip: "42.102.5.19", geo: "Delhi, IN", device: "Safari 17 / iPhone 15", time: "1 hour ago", status: "Successful Credentials Login" },
+                  { user: "admin@trendz.com", ip: "103.45.24.120", geo: "Mumbai, Maharashtra, IN", device: "Chrome 124 / Windows Desktop", time: "Just Now", status: "Successful MFA Verified" },
+                  { user: "seller1@trendz.com", ip: "42.102.5.19", geo: "Delhi, IN", device: "Safari 17 / iPhone 15", time: "1 hour ago", status: "Successful Credentials Login" },
                   { user: "unknown_user", ip: "198.51.100.4", geo: "California, US", device: "Firefox / Linux Desktop", time: "3 hours ago", status: "Failed Login: Unauthorized Role Card" }
                 ].map((log, idx) => (
                   <div key={idx} className="p-4 bg-black/[0.02] border border-white/5 rounded-xl text-[10px] font-semibold text-white/40 space-y-1.5 relative">
@@ -1290,7 +1941,7 @@ export default function AdminDashboard() {
                                 <p className={`font-mono font-semibold ${textTitle}`}>{s.shipment_id}</p>
                                 <span className={`text-[10px] ${textSubtle}`}>{s.delivery_mode} routing</span>
                               </td>
-                              <td className={`px-6 py-4 font-semibold ${textTitle}`}>{s.contractors?.name || s.carrier || "Trendy Express"}</td>
+                              <td className={`px-6 py-4 font-semibold ${textTitle}`}>{s.contractors?.name || s.carrier || "Trendz Express"}</td>
                               <td className="px-6 py-4">
                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${badgeColor}`}>
                                   {status}

@@ -36,9 +36,7 @@ export default function ProductCard({ product }) {
 
   const badgeColor = () => {
     const b = product.badge?.toLowerCase();
-    if (b === "sale") return "bg-red-500 text-white";
-    if (b === "hot") return "bg-orange-500 text-white";
-    if (b === "limited") return "bg-[#111111] text-white";
+    if (b === "sale" || b === "hot") return "bg-red-600 text-white";
     return "bg-[#C9A84C] text-white"; 
   };
 

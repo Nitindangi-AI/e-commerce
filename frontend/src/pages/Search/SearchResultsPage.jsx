@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { productAPI } from "../../services/api";
 import ProductCard from "../../components/ProductCard";
+import { SkeletonGrid } from "../../components/SkeletonCard";
 import localProducts from "../../data/product";
 
 const PRICE_RANGES = [
@@ -61,9 +62,11 @@ export default function SearchResultsPage() {
   const [minDiscount, setMinDiscount] = useState(0);
   const [sort, setSort] = useState("Relevance");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sortOpen, setSortOpen] = useState(false);
 
   useEffect(() => {
     const fetchProducts = async () => {
+      setLoading(true);
       try {
         const res = await productAPI.getAll("limit=100");
         if (res.success && res.products?.length > 0) {
@@ -71,6 +74,8 @@ export default function SearchResultsPage() {
         }
       } catch (err) {
         console.error(err);
+      } finally {
+        setLoading(false);
       }
     };
     fetchProducts();
@@ -227,10 +232,35 @@ export default function SearchResultsPage() {
               </button>
               <p className="text-white/40 text-sm">{filtered.length} results</p>
             </div>
-            <select value={sort} onChange={e => setSort(e.target.value)}
-              className="input-field px-4 py-2 rounded-xl text-sm text-white/70 bg-luxe-card cursor-pointer">
-              {SORT_OPTIONS.map(o => <option key={o}>{o}</option>)}
-            </select>
+            {/* Custom Sort Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setSortOpen(!sortOpen)}
+                className="flex items-center gap-2 px-4 py-2.5 border border-[#E8E8E8] dark:border-white/5 rounded-xl text-sm text-[#111111] dark:text-white bg-white dark:bg-[#111111] hover:border-[#C9A84C] transition-colors font-medium min-w-[180px] justify-between"
+              >
+                <span className="text-xs">{sort}</span>
+                <svg className={`w-3.5 h-3.5 text-[#6B6B6B] transition-transform ${sortOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {sortOpen && (
+                <div className="absolute right-0 top-full mt-1 w-full bg-white dark:bg-[#111111] border border-[#E8E8E8] dark:border-white/5 rounded-xl shadow-luxury z-50 py-1 overflow-hidden">
+                  {SORT_OPTIONS.map(o => (
+                    <button
+                      key={o}
+                      onClick={() => { setSort(o); setSortOpen(false); }}
+                      className={`w-full text-left px-4 py-2.5 text-xs transition-colors ${
+                        sort === o
+                          ? "text-[#C9A84C] font-bold bg-[#C9A84C]/5"
+                          : "text-[#6B6B6B] hover:text-[#111111] dark:hover:text-white hover:bg-[#FAFAF8] dark:hover:bg-white/[0.02]"
+                      }`}
+                    >
+                      {o}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Active pills */}
@@ -246,12 +276,7 @@ export default function SearchResultsPage() {
           )}
 
           {loading ? (
-            <div className="flex justify-center items-center py-24">
-              <svg className="w-10 h-10 animate-spin text-gold" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-              </svg>
-            </div>
+            <SkeletonGrid count={8} />
           ) : filtered.length === 0 ? (
             <div className="text-center py-20 bg-luxe-card border border-[var(--card-border)] rounded-2xl p-8 shadow-card max-w-xl mx-auto">
               <div className="text-5xl mb-4">🔍</div>
@@ -272,7 +297,7 @@ export default function SearchResultsPage() {
               <Link to="/shop" className="btn-gold px-8 py-3.5 rounded-xl text-xs tracking-widest uppercase font-bold border-0">Browse All</Link>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {filtered.map(p => <ProductCard key={p.id} product={p} />)}
             </div>
           )}
