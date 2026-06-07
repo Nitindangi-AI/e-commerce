@@ -22,6 +22,7 @@ export default function CartPage() {
         if (res.success) setCoupons(res.coupons || []);
       } catch (err) {
         console.error(err);
+        toast.error("Failed to load available coupons.");
       }
     };
     fetchCoupons();
@@ -118,8 +119,8 @@ export default function CartPage() {
                   key={itemKey} 
                   className="flex gap-4 sm:gap-6 border border-[var(--card-border)] p-4 rounded-2xl bg-luxe-card items-center hover:border-gold/20 transition-all duration-300 shadow-card"
                 >
-                  <Link to={`/product/${item.id}`} className="flex-shrink-0">
-                    <img src={item.img} alt={item.name} className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-xl border border-[var(--card-border)]" />
+                  <Link to={`/product/slug/${item.slug || item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`} className="flex-shrink-0">
+                    <img src={item.img} alt={item.name} loading="lazy" width="96" height="96" className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-xl border border-[var(--card-border)]" />
                   </Link>
                   
                   <div className="flex-1 min-w-0">
@@ -129,7 +130,7 @@ export default function CartPage() {
                         {item.brand}
                       </span>
                     )}
-                    <Link to={`/product/${item.id}`} className="font-semibold hover:text-gold transition-colors line-clamp-1 text-[var(--text-primary)]">
+                    <Link to={`/product/slug/${item.slug || item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`} className="font-semibold hover:text-gold transition-colors line-clamp-1 text-[var(--text-primary)]">
                       {item.name}
                     </Link>
                     <p className="text-[var(--text-secondary)] text-[10px] tracking-wider mt-0.5">{item.category}</p>

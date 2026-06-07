@@ -1,406 +1,506 @@
-import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { authAPI } from "../../services/api";
-
-const steps = ["Account", "Personal", "Done"];
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { authService } from '../../services/authService';
+import { useAuthStore } from '../../store/useAuthStore';
+import OTPInput from '../../components/OTPInput';
+import PasswordStrengthMeter from '../../components/PasswordStrengthMeter';
+import { toast } from '../../store/useToastStore';
+import { Eye, EyeOff } from 'lucide-react';
 
 export default function RegisterPage() {
-  const [step, setStep] = useState(0);
+  const navigate = useNavigate();
+  const setAuth = useAuthStore((state) => state.setAuth);
+
+  const [step, setStep] = useState(1); // 1: Details, 2: OTP, 3: Success
   const [loading, setLoading] = useState(false);
-  const [showPass, setShowPass] = useState(false);
-  const [form, setForm] = useState({
-    email: "",
-    password: "",
-    firstName: "",
-    lastName: "",
-    phone: "",
-    role: "customer",
-    storeName: "",
-    panCard: "",
-    gstNumber: "",
-    bankAccount: "",
-    aadharNumber: "",
-    agree: false
-  });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Form Fields
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [referralCode, setReferralCode] = useState('');
+  const [agree, setAgree] = useState(false);
+
+  // Step 1 Validation Errors
   const [errors, setErrors] = useState({});
-  const [logoFile, setLogoFile] = useState(null);
+  const [shakeDetails, setShakeDetails] = useState(false);
 
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  // OTP Step State
+  const [otpError, setOtpError] = useState('');
+  const [shakeOtp, setShakeOtp] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
+  // Cooldown countdown timer
   useEffect(() => {
-    const roleParam = new URLSearchParams(window.location.search).get("role");
-    if (roleParam === "vendor" || roleParam === "customer") {
-      set("role", roleParam);
+    let timer;
+    if (resendCooldown > 0) {
+      timer = setInterval(() => {
+        setResendCooldown((prev) => prev - 1);
+      }, 1000);
     }
-  }, []);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
 
-  const validateStep0 = () => {
-    const e = {};
-    if (!form.email) e.email = "Email is required";
-    else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = "Enter a valid email";
-    if (!form.password) e.password = "Password is required";
-    else if (form.password.length < 8) e.password = "Minimum 8 characters";
-    return e;
-  };
-  const validateStep1 = () => {
-    const e = {};
-    if (!form.firstName) e.firstName = "First name is required";
-    if (!form.lastName) e.lastName = "Last name is required";
-    
-    // Vendor onboarding fields validation
-    if (form.role === "vendor") {
-      if (!form.storeName) e.storeName = "Store Name is required";
-      if (!logoFile) e.storeLogo = "Store Logo is required";
-      if (!form.panCard) e.panCard = "PAN Card is required";
-      if (!form.gstNumber) e.gstNumber = "GST Number is required";
-      if (!form.bankAccount) e.bankAccount = "Bank Account is required";
-      if (!form.aadharNumber) e.aadharNumber = "Aadhaar is required";
+  const validateDetails = () => {
+    const newErrors = {};
+    if (!fullName.trim() || fullName.trim().length < 2) {
+      newErrors.fullName = 'Full Name must be at least 2 characters';
     }
-    
-    if (!form.agree) e.agree = "You must accept the terms";
-    return e;
+    const emailRegex = /^\S+@\S+\.\S+$/;
+    if (!email.trim() || !emailRegex.test(email)) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+    const phoneDigits = phone.replace(/\D/g, '');
+    if (phoneDigits.length !== 10) {
+      newErrors.phone = 'Please enter a valid 10-digit Indian phone number';
+    }
+    if (!password || password.length < 8) {
+      newErrors.password = 'Password must be at least 8 characters';
+    }
+    if (password !== confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
+    }
+    if (!agree) {
+      newErrors.agree = 'You must agree to the Terms and Privacy Policy';
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
-  const next = async () => {
-    const e = step === 0 ? validateStep0() : validateStep1();
-    if (Object.keys(e).length) { setErrors(e); return; }
-    setErrors({});
-    if (step === 1) {
-      setLoading(true);
-      try {
-        await authAPI.register({
-          firstName: form.firstName,
-          lastName: form.lastName,
-          email: form.email,
-          password: form.password,
-          phone: form.phone,
-          role: form.role,
-          storeName: form.storeName,
-          storeLogoFile: logoFile,
-          panCard: form.panCard,
-          gstNumber: form.gstNumber,
-          bankAccount: form.bankAccount,
-          aadharNumber: form.aadharNumber,
-        });
+  const handleSendOTP = async (e) => {
+    e.preventDefault();
+    if (!validateDetails()) {
+      setShakeDetails(true);
+      setTimeout(() => setShakeDetails(false), 500);
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const res = await authService.signUp({
+        email,
+        password,
+        name: fullName,
+        phone
+      });
+      if (res.success) {
+        toast.success(res.message || 'Verification code sent to your email.');
         setStep(2);
-      } catch (err) {
-        setErrors({ submit: err.message || "Failed to register. Please try again." });
-      } finally {
-        setLoading(false);
+        setResendCooldown(60);
+      } else {
+        // Handle existing account error message specifically
+        if (res.message && (res.message.toLowerCase().includes('already exists') || res.message.toLowerCase().includes('duplicate') || res.message.toLowerCase().includes('registered'))) {
+          setErrors({
+            submit: (
+              <span>
+                An account with this email already exists.{' '}
+                <Link to="/login" className="text-[#C9A84C] hover:underline font-bold">
+                  Log in instead?
+                </Link>
+              </span>
+            )
+          });
+        } else {
+          setErrors({ submit: res.message || 'Failed to send verification code. Please try again.' });
+        }
       }
-    } else setStep(s => s + 1);
+    } catch (err) {
+      setErrors({ submit: 'Something went wrong. Please try again later.' });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const strength = form.password.length === 0 ? 0 : form.password.length < 6 ? 1 : form.password.length < 10 ? 2 : 3;
-  const strengthColors = ["bg-transparent", "bg-red-500", "bg-yellow-400", "bg-green-400"];
-  const strengthLabels = ["", "Weak", "Fair", "Strong"];
+  const handleVerifyOTP = async (otpValue) => {
+    setLoading(true);
+    setOtpError('');
+    setShakeOtp(false);
+
+    try {
+      const res = await authService.verifyEmail({
+        email,
+        otp: otpValue,
+        name: fullName,
+        phone
+      });
+
+      if (res.success) {
+        // Set Auth State
+        setAuth(res.user, res.token);
+        toast.success('Account created successfully!');
+        setStep(3);
+      } else {
+        setShakeOtp(true);
+        setOtpError(res.message || 'Invalid verification code');
+        setTimeout(() => setShakeOtp(false), 500);
+      }
+    } catch (err) {
+      setShakeOtp(true);
+      setOtpError('Failed to verify verification code. Please try again.');
+      setTimeout(() => setShakeOtp(false), 500);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOTP = async () => {
+    if (resendCooldown > 0) return;
+    setLoading(true);
+    setOtpError('');
+
+    try {
+      const res = await authService.resendOTP(email, 'register');
+      if (res.success) {
+        toast.success('Verification code resent successfully.');
+        setResendCooldown(60);
+      } else {
+        setOtpError(res.message || 'Failed to resend verification code.');
+      }
+    } catch (err) {
+      setOtpError('Error resending verification code. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Mask middle digits of phone number e.g. +91 XXXXXXXX
+  const getMaskedPhone = () => {
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (cleanPhone.length >= 10) {
+      return `+91 ${cleanPhone.slice(0, 2)}******${cleanPhone.slice(-2)}`;
+    }
+    return `+91 ${cleanPhone}`;
+  };
+
+  const firstName = fullName.trim().split(/\s+/)[0] || '';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#faf8f5] via-[#f3f0e6] to-[#e8e4d5] text-[#2b2721] flex overflow-hidden grain relative">
-      {/* Elegant Ambient Pastel Blur Spheres ( Vibe & Smoothness ) */}
-      <div className="absolute top-[-100px] left-[-150px] w-[500px] h-[500px] rounded-full bg-rose-300/15 blur-[120px] pointer-events-none z-0 mix-blend-multiply" />
-      <div className="absolute top-[25%] right-[-200px] w-[600px] h-[600px] rounded-full bg-sky-300/12 blur-[130px] pointer-events-none z-0 mix-blend-multiply" />
-      <div className="absolute top-[60%] left-[-100px] w-[550px] h-[550px] rounded-full bg-amber-300/12 blur-[110px] pointer-events-none z-0 mix-blend-multiply" />
-      <div className="absolute bottom-[-100px] right-[-150px] w-[500px] h-[500px] rounded-full bg-sky-200/10 blur-[120px] pointer-events-none z-0 mix-blend-multiply" />
-
-      {/* Left panel */}
-      <div className="hidden lg:flex lg:w-5/12 relative flex-col justify-between px-16 py-16 overflow-hidden border-r border-[#e8e4d5] bg-gradient-to-br from-[#faf8f5] via-[#f3f0e6] to-[#e8e4d5] z-10">
-        <div className="absolute top-0 right-0 w-80 h-80 rounded-full bg-yellow-500/[0.06] blur-3xl" />
-
-        <div>
-          <Link to="/" className="display text-2xl font-black tracking-[0.25em] uppercase gold inline-block hover:scale-105 transition-transform duration-300 select-none">
-            Trendz
-          </Link>
-        </div>
-
-        <div>
-          <p className="text-xs tracking-[0.4em] uppercase text-yellow-600 mb-4 font-bold">Member Benefits</p>
-          <h2 className="display text-4xl font-black mb-10 leading-tight">
-            Unlock<br /><span className="gold italic">Exclusive</span><br />Access
-          </h2>
-          <div className="space-y-5">
-            {[
-              { icon: "✦", title: "Early Drop Access", desc: "First to know about limited releases" },
-              { icon: "◈", title: "Member Pricing", desc: "Up to 20% off on select items" },
-              { icon: "⬡", title: "Free Express Shipping", desc: "On all orders above ₹2,999" },
-              { icon: "◉", title: "Loyalty Points", desc: "Earn on every purchase" },
-            ].map(b => (
-              <div key={b.title} className="flex items-start gap-4">
-                <span className="gold text-lg mt-0.5">{b.icon}</span>
-                <div>
-                  <div className="font-bold text-sm text-[#3d3522]">{b.title}</div>
-                  <div className="text-[#2b2721]/50 text-xs mt-0.5 font-semibold">{b.desc}</div>
-                </div>
-              </div>
-            ))}
+    <div className="min-h-screen bg-[#FAFAF8] text-[#0A0A0A] flex flex-col justify-center items-center py-12 px-4 sm:px-6 lg:px-8 font-sans">
+      <div className={`max-w-md w-full space-y-8 bg-white border border-[#E8E8E8] rounded-3xl p-8 shadow-sm transition-all duration-300 ${shakeDetails || shakeOtp ? 'animate-shake' : ''}`}>
+        
+        {/* Stepper Header (steps 1 & 2) */}
+        {step < 3 && (
+          <div className="flex items-center justify-between pb-6 border-b border-[#E8E8E8]">
+            <div className="flex items-center space-x-3">
+              <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                step >= 1 ? 'bg-[#C9A84C] text-white' : 'bg-gray-100 text-gray-400'
+              }`}>
+                1
+              </span>
+              <span className={`text-xs font-bold tracking-wider uppercase ${
+                step === 1 ? 'text-[#C9A84C]' : 'text-gray-400'
+              }`}>
+                Details
+              </span>
+            </div>
+            <div className="w-12 h-[2px] bg-gray-200" />
+            <div className="flex items-center space-x-3">
+              <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                step >= 2 ? 'bg-[#C9A84C] text-white' : 'bg-gray-100 text-gray-400'
+              }`}>
+                2
+              </span>
+              <span className={`text-xs font-bold tracking-wider uppercase ${
+                step === 2 ? 'text-[#C9A84C]' : 'text-gray-400'
+              }`}>
+                Verification
+              </span>
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className="text-[#2b2721]/35 text-xs font-bold">© 2026 Trendz</div>
-      </div>
-
-      {/* Right form panel */}
-      <div className="w-full lg:w-7/12 flex flex-col justify-center px-8 md:px-16 lg:px-20 py-16 relative z-10">
-        <div className="max-w-lg mx-auto w-full">
-
-          <div className="lg:hidden mb-10 text-center flex justify-center">
-            <span className="display text-2xl font-black tracking-[0.25em] uppercase gold select-none">
-              Trendz
-            </span>
-          </div>
-
-          {/* Step indicator */}
-          <div className="flex items-center gap-0 mb-12">
-            {steps.map((s, i) => (
-              <div key={s} className="flex items-center flex-1 last:flex-none">
-                <div className="flex flex-col items-center">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all duration-300 ${
-                    i < step ? "gold-bg border-transparent text-white" :
-                    i === step ? "border-yellow-600 text-yellow-600 font-extrabold bg-white/80" :
-                    "border-[#e8e4d5] text-[#2b2721]/30 bg-white/40"
-                  }`}>
-                    {i < step ? "✓" : i + 1}
-                  </div>
-                  <span className={`text-[10px] tracking-widest uppercase mt-1.5 ${i === step ? "gold font-extrabold" : "text-[#2b2721]/30 font-semibold"}`}>{s}</span>
-                </div>
-                {i < steps.length - 1 && (
-                  <div className={`flex-1 h-px mx-3 mb-4 transition-all duration-500 ${i < step ? "bg-[#d4af37]/50" : "bg-[#e8e4d5]"}`} />
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Step 0 — Account */}
-          {step === 0 && (
-            <div className="slide-up">
-              <p className="text-xs tracking-[0.4em] uppercase text-yellow-600 mb-3 font-bold">Step 1 of 2</p>
-              <h1 className="display text-4xl font-black mb-2 text-[#3d3522]">Create Account</h1>
-              <p className="text-[#2b2721]/60 text-sm mb-10 font-semibold">Set up your login credentials and account type to get started.</p>
-
-              <div className="space-y-5">
-                <div>
-                  <label className="block text-xs tracking-widest uppercase text-[#2b2721]/50 mb-2 font-bold">Account Type</label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <button type="button" onClick={() => set("role", "customer")}
-                      className={`py-3.5 rounded-xl border text-xs font-bold tracking-widest transition-all duration-300 ${form.role === "customer" ? "border-yellow-600 gold text-yellow-600 bg-yellow-500/10 shadow-sm" : "border-[#e8e4d5] text-[#2b2721]/60 bg-white/50 hover:border-[#d4af37]/45 hover:bg-white"}`}>
-                      SHOPPER / CUSTOMER
-                    </button>
-                    <button type="button" onClick={() => set("role", "vendor")}
-                      className={`py-3.5 rounded-xl border text-xs font-bold tracking-widest transition-all duration-300 ${form.role === "vendor" ? "border-yellow-600 gold text-yellow-600 bg-yellow-500/10 shadow-sm" : "border-[#e8e4d5] text-[#2b2721]/60 bg-white/50 hover:border-[#d4af37]/45 hover:bg-white"}`}>
-                      MERCHANT / SELLER
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs tracking-widest uppercase text-[#2b2721]/50 mb-2 font-bold">Email Address</label>
-                  <input type="email" value={form.email} onChange={e => set("email", e.target.value)}
-                    placeholder="you@example.com"
-                    className={`input-field w-full px-5 py-4 rounded-xl text-sm placeholder-[#2b2721]/30 font-medium ${errors.email ? "input-error" : ""}`} />
-                  {errors.email && <p className="text-red-600 text-xs mt-1.5 font-semibold">{errors.email}</p>}
-                </div>
-
-                <div>
-                  <label className="block text-xs tracking-widest uppercase text-[#2b2721]/50 mb-2 font-bold">Password</label>
-                  <div className="relative">
-                    <input type={showPass ? "text" : "password"} value={form.password} onChange={e => set("password", e.target.value)}
-                      placeholder="Min. 8 characters"
-                      className={`input-field w-full px-5 py-4 rounded-xl text-sm placeholder-[#2b2721]/30 pr-14 font-medium ${errors.password ? "input-error" : ""}`} />
-                    <button type="button" onClick={() => setShowPass(s => !s)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-[#2b2721]/40 hover:text-[#d4af37] transition-colors text-xs tracking-wider font-bold">
-                      {showPass ? "HIDE" : "SHOW"}
-                    </button>
-                  </div>
-                  {form.password && (
-                    <div className="mt-2.5">
-                      <div className="flex gap-1.5 mb-1">
-                        {[1,2,3].map(l => (
-                          <div key={l} className={`h-1 flex-1 rounded-full transition-all duration-300 ${strength >= l ? strengthColors[strength] : "bg-[#e8e4d5]"}`} />
-                        ))}
-                      </div>
-                      <p className={`text-xs font-semibold ${strength === 1 ? "text-red-500" : strength === 2 ? "text-yellow-600" : "text-green-600"}`}>
-                        {strengthLabels[strength]} password
-                      </p>
-                    </div>
-                  )}
-                  {errors.password && <p className="text-red-600 text-xs mt-1.5 font-semibold">{errors.password}</p>}
-                </div>
-              </div>
-
-              <button onClick={next} className="btn-gold w-full py-4 rounded-xl text-sm font-bold tracking-widest uppercase mt-8">
-                Continue →
-              </button>
-              <p className="text-center text-[#2b2721]/50 text-sm mt-6 font-semibold">
-                Already registered?{" "}
-                <Link to="/login" className="gold hover:underline font-bold">Sign in</Link>
+        {/* STEP 1: Enter Details */}
+        {step === 1 && (
+          <form onSubmit={handleSendOTP} className="space-y-6">
+            <div className="text-center">
+              <h2 className="text-3xl font-bold tracking-tight text-[#0A0A0A] font-display" style={{ fontFamily: "'Playfair Display', serif" }}>
+                Create Your Account
+              </h2>
+              <p className="mt-2 text-sm text-gray-500">
+                Join Trendy to experience premium shopping
               </p>
             </div>
-          )}
 
-          {/* Step 1 — Personal / Onboarding */}
-          {step === 1 && (
-            <div className="animate-slide-up">
-              <p className="text-xs tracking-[0.4em] uppercase text-yellow-600 mb-3 font-bold">Step 2 of 2</p>
-              <h1 className="display text-4xl font-black mb-2 text-[#3d3522]">
-                {form.role === "vendor" ? "Seller Registration" : "Your Details"}
-              </h1>
-              <p className="text-[#2b2721]/60 text-sm mb-10 font-semibold">
-                {form.role === "vendor" ? "Configure your public storefront and tax credentials." : "Tell us a little about yourself."}
-              </p>
+            {errors.submit && (
+              <div className="p-3.5 bg-red-50 text-red-700 text-xs font-semibold rounded-xl border border-red-100 leading-relaxed">
+                {errors.submit}
+              </div>
+            )}
 
-              <div className="space-y-5">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs tracking-widest uppercase text-[#2b2721]/50 mb-2 font-bold">First Name</label>
-                    <input value={form.firstName} onChange={e => set("firstName", e.target.value)}
-                      placeholder="Alex"
-                      className={`input-field w-full px-5 py-4 rounded-xl text-sm placeholder-[#2b2721]/30 font-medium ${errors.firstName ? "input-error" : ""}`} />
-                    {errors.firstName && <p className="text-red-600 text-xs mt-1.5 font-semibold">{errors.firstName}</p>}
-                  </div>
-                  <div>
-                    <label className="block text-xs tracking-widest uppercase text-[#2b2721]/50 mb-2 font-bold">Last Name</label>
-                    <input value={form.lastName} onChange={e => set("lastName", e.target.value)}
-                      placeholder="Rivera"
-                      className={`input-field w-full px-5 py-4 rounded-xl text-sm placeholder-[#2b2721]/30 font-medium ${errors.lastName ? "input-error" : ""}`} />
-                    {errors.lastName && <p className="text-red-600 text-xs mt-1.5 font-semibold">{errors.lastName}</p>}
-                  </div>
-                </div>
+            <div className="space-y-4">
+              {/* Full Name */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className={`w-full px-4 py-3 bg-[#FAFAF8] border ${
+                    errors.fullName ? 'border-red-500' : 'border-[#E8E8E8]'
+                  } rounded-xl text-sm placeholder-gray-400 focus:outline-none focus:border-[#C9A84C] focus:ring-1 focus:ring-[#C9A84C] transition-all`}
+                  placeholder="Enter your full name"
+                />
+                {errors.fullName && <p className="text-red-500 text-xs mt-1 font-semibold">{errors.fullName}</p>}
+              </div>
 
-                <div>
-                  <label className="block text-xs tracking-widest uppercase text-[#2b2721]/50 mb-2 font-bold">Phone Number</label>
-                  <input type="tel" value={form.phone} onChange={e => set("phone", e.target.value)}
-                    placeholder="+91 98765 43210"
-                    className="input-field w-full px-5 py-4 rounded-xl text-sm placeholder-[#2b2721]/30 font-medium" />
-                </div>
+              {/* Email Address */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={`w-full px-4 py-3 bg-[#FAFAF8] border ${
+                    errors.email ? 'border-red-500' : 'border-[#E8E8E8]'
+                  } rounded-xl text-sm placeholder-gray-400 focus:outline-none focus:border-[#C9A84C] focus:ring-1 focus:ring-[#C9A84C] transition-all`}
+                  placeholder="name@example.com"
+                />
+                {errors.email && <p className="text-red-500 text-xs mt-1 font-semibold">{errors.email}</p>}
+              </div>
 
-                {form.role === "vendor" && (
-                  <div className="space-y-5 border-t border-[#e8e4d5] pt-5 mt-5">
-                    <p className="text-xs font-bold tracking-widest uppercase gold">Store & Legal Details</p>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs tracking-widest uppercase text-[#2b2721]/50 mb-2 font-bold">Store / Brand Name</label>
-                        <input value={form.storeName} onChange={e => set("storeName", e.target.value)}
-                          placeholder="Trendz Elite Store"
-                          className={`input-field w-full px-5 py-4 rounded-xl text-sm placeholder-[#2b2721]/30 font-medium ${errors.storeName ? "input-error" : ""}`} />
-                        {errors.storeName && <p className="text-red-600 text-xs mt-1.5 font-semibold">{errors.storeName}</p>}
-                      </div>
-                      <div>
-                        <label className="block text-xs tracking-widest uppercase text-[#2b2721]/50 mb-2 font-bold">Store Logo Image</label>
-                        <input type="file" accept="image/*" onChange={e => setLogoFile(e.target.files[0])}
-                          className={`input-field w-full px-5 py-3 rounded-xl text-sm bg-white/50 border-[#e8e4d5] ${errors.storeLogo ? "border-red-500" : ""}`} />
-                        {errors.storeLogo && <p className="text-red-600 text-xs mt-1.5 font-semibold">{errors.storeLogo}</p>}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs tracking-widest uppercase text-[#2b2721]/50 mb-2 font-bold">PAN Card Number</label>
-                        <input value={form.panCard} onChange={e => set("panCard", e.target.value?.toUpperCase())}
-                          placeholder="ABCDE1234F"
-                          maxLength={10}
-                          className={`input-field w-full px-5 py-4 rounded-xl text-sm placeholder-[#2b2721]/30 font-medium ${errors.panCard ? "input-error" : ""}`} />
-                        {errors.panCard && <p className="text-red-600 text-xs mt-1.5 font-semibold">{errors.panCard}</p>}
-                      </div>
-                      <div>
-                        <label className="block text-xs tracking-widest uppercase text-[#2b2721]/50 mb-2 font-bold">GSTIN Number</label>
-                        <input value={form.gstNumber} onChange={e => set("gstNumber", e.target.value?.toUpperCase())}
-                          placeholder="27ABCDE1234F1Z5"
-                          maxLength={15}
-                          className={`input-field w-full px-5 py-4 rounded-xl text-sm placeholder-[#2b2721]/30 font-medium ${errors.gstNumber ? "input-error" : ""}`} />
-                        {errors.gstNumber && <p className="text-red-600 text-xs mt-1.5 font-semibold">{errors.gstNumber}</p>}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs tracking-widest uppercase text-[#2b2721]/50 mb-2 font-bold">Aadhaar Number</label>
-                        <input value={form.aadharNumber} onChange={e => set("aadharNumber", e.target.value)}
-                          placeholder="1234 5678 9012"
-                          maxLength={12}
-                          className={`input-field w-full px-5 py-4 rounded-xl text-sm placeholder-[#2b2721]/30 font-medium ${errors.aadharNumber ? "input-error" : ""}`} />
-                        {errors.aadharNumber && <p className="text-red-600 text-xs mt-1.5 font-semibold">{errors.aadharNumber}</p>}
-                      </div>
-                      <div>
-                        <label className="block text-xs tracking-widest uppercase text-[#2b2721]/50 mb-2 font-bold">Bank Payout Account</label>
-                        <input value={form.bankAccount} onChange={e => set("bankAccount", e.target.value)}
-                          placeholder="Account Number / IFSC"
-                          className={`input-field w-full px-5 py-4 rounded-xl text-sm placeholder-[#2b2721]/30 font-medium ${errors.bankAccount ? "input-error" : ""}`} />
-                        {errors.bankAccount && <p className="text-red-600 text-xs mt-1.5 font-semibold">{errors.bankAccount}</p>}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex items-start gap-3 pt-2">
-                  <button type="button" onClick={() => set("agree", !form.agree)}
-                    className={`w-5 h-5 flex-shrink-0 rounded border mt-0.5 flex items-center justify-center transition-all duration-200 ${form.agree ? "gold-bg border-transparent" : "border-[#e8e4d5] bg-white/70"}`}>
-                    {form.agree && <svg className="w-3 h-3 text-white font-extrabold" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7"/></svg>}
-                  </button>
-                  <span className="text-sm text-[#2b2721]/60 leading-relaxed font-semibold">
-                    I agree to Trendz's{" "}
-                    <a href="#" className="gold hover:underline font-bold">Terms of Service</a> and{" "}
-                    <a href="#" className="gold hover:underline font-bold">Privacy Policy</a>
+              {/* Phone Number */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">
+                  Phone Number
+                </label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-500">
+                    +91
                   </span>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    className={`w-full pl-12 pr-4 py-3 bg-[#FAFAF8] border ${
+                      errors.phone ? 'border-red-500' : 'border-[#E8E8E8]'
+                    } rounded-xl text-sm placeholder-gray-400 focus:outline-none focus:border-[#C9A84C] focus:ring-1 focus:ring-[#C9A84C] transition-all`}
+                    placeholder="98765 43210"
+                  />
                 </div>
-                {errors.agree && <p className="text-red-600 text-xs font-semibold">{errors.agree}</p>}
-                {errors.submit && <p className="text-red-600 text-sm font-semibold bg-red-500/10 border border-red-500/20 px-4 py-3 rounded-xl mt-3">{errors.submit}</p>}
+                {errors.phone && <p className="text-red-500 text-xs mt-1 font-semibold">{errors.phone}</p>}
               </div>
 
-              <div className="flex gap-3 mt-8">
-                <button onClick={() => setStep(0)} className="border border-[#e8e4d5] bg-white/50 px-6 py-4 rounded-xl text-sm text-[#2b2721]/60 hover:border-[#d4af37]/45 hover:text-[#2b2721] hover:bg-white transition-all">
-                  ← Back
-                </button>
-                <button onClick={next} disabled={loading}
-                  className="btn-gold flex-1 py-4 rounded-xl text-sm font-bold tracking-widest uppercase flex items-center justify-center gap-2 disabled:opacity-60">
-                  {loading ? (
-                    <>
-                      <svg className="w-4 h-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-                      </svg>
-                      Creating...
-                    </>
-                  ) : "Create Account"}
-                </button>
+              {/* Password */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className={`w-full pl-4 pr-12 py-3 bg-[#FAFAF8] border ${
+                      errors.password ? 'border-red-500' : 'border-[#E8E8E8]'
+                    } rounded-xl text-sm placeholder-gray-400 focus:outline-none focus:border-[#C9A84C] focus:ring-1 focus:ring-[#C9A84C] transition-all`}
+                    placeholder="Min. 8 characters"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#C9A84C] transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+                <PasswordStrengthMeter password={password} />
+                {errors.password && <p className="text-red-500 text-xs mt-1 font-semibold">{errors.password}</p>}
               </div>
+
+              {/* Confirm Password */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">
+                  Confirm Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className={`w-full pl-4 pr-12 py-3 bg-[#FAFAF8] border ${
+                      errors.confirmPassword ? 'border-red-500' : 'border-[#E8E8E8]'
+                    } rounded-xl text-sm placeholder-gray-400 focus:outline-none focus:border-[#C9A84C] focus:ring-1 focus:ring-[#C9A84C] transition-all`}
+                    placeholder="Confirm password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#C9A84C] transition-colors"
+                  >
+                    {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+                {errors.confirmPassword && <p className="text-red-500 text-xs mt-1 font-semibold">{errors.confirmPassword}</p>}
+              </div>
+
+              {/* Referral Code (optional) */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">
+                  Referral Code (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={referralCode}
+                  onChange={(e) => setReferralCode(e.target.value)}
+                  className="w-full px-4 py-2 bg-[#FAFAF8] border border-[#E8E8E8] rounded-xl text-xs placeholder-gray-400 focus:outline-none focus:border-[#C9A84C] transition-all"
+                  placeholder="Enter referral code"
+                />
+              </div>
+
+              {/* Terms Checkbox */}
+              <div className="flex items-start mt-2">
+                <input
+                  id="agree-checkbox"
+                  type="checkbox"
+                  checked={agree}
+                  onChange={(e) => setAgree(e.target.checked)}
+                  className="w-4 h-4 mt-0.5 text-[#C9A84C] border-gray-300 rounded focus:ring-[#C9A84C] accent-[#C9A84C]"
+                />
+                <label htmlFor="agree-checkbox" className="ml-2 text-xs font-medium text-gray-500 leading-relaxed">
+                  I agree to the Terms of Service and Privacy Policy
+                </label>
+              </div>
+              {errors.agree && <p className="text-red-500 text-xs mt-1 font-semibold">{errors.agree}</p>}
             </div>
-          )}
 
-          {/* Step 2 — Done */}
-          {step === 2 && (
-            <div className="text-center animate-slide-up">
-              <div className="animate-pop-in w-24 h-24 gold-bg rounded-full flex items-center justify-center text-4xl mx-auto mb-8 text-white font-black">
-                ✓
-              </div>
-              <h1 className="display text-4xl font-black mb-3 text-[#3d3522]">
-                {form.role === "vendor" ? "Application Received!" : "Welcome to Trendz!"}
-              </h1>
-              <p className="text-[#2b2721]/60 mb-10 max-w-sm mx-auto leading-relaxed font-semibold">
-                {form.role === "vendor" 
-                  ? "Your application is under review by our administrators. We will verify your store credentials and tax documents. Once approved, you can login to manage your seller account." 
-                  : "Your customer account is ready. Start exploring our premium collections."}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-4 bg-[#C9A84C] hover:bg-[#b8952e] text-white rounded-xl text-sm font-bold tracking-widest uppercase transition-all duration-300 flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                'Send Verification Code'
+              )}
+            </button>
+
+            <p className="text-center text-sm font-medium text-gray-500 mt-4">
+              Already have an account?{' '}
+              <Link to="/login" className="text-[#C9A84C] hover:underline font-bold">
+                Log in
+              </Link>
+            </p>
+          </form>
+        )}
+
+        {/* STEP 2: Verify OTP */}
+        {step === 2 && (
+          <div className="space-y-6">
+            <div className="text-center">
+              <h2 className="text-3xl font-bold tracking-tight text-[#0A0A0A] font-display" style={{ fontFamily: "'Playfair Display', serif" }}>
+                Verify Email
+              </h2>
+              <p className="mt-2 text-sm text-gray-500">
+                We sent a 6-digit code to <span className="font-bold text-[#0A0A0A]">{email}</span>
               </p>
-              <div className="space-y-3 max-w-xs mx-auto">
-                {form.role === "vendor" ? (
-                  <Link to="/login" className="btn-gold block w-full py-4 rounded-xl text-sm font-bold tracking-widest uppercase text-center">
-                    Return to Login
-                  </Link>
-                ) : (
-                  <>
-                    <Link to="/" className="btn-gold block w-full py-4 rounded-xl text-sm font-bold tracking-widest uppercase text-center">
-                      Start Shopping
-                    </Link>
-                    <Link to="/login" className="block w-full py-4 rounded-xl text-sm tracking-widest uppercase border border-[#e8e4d5] bg-white/50 text-[#2b2721]/50 hover:border-[#d4af37]/45 hover:text-[#2b2721] hover:bg-white transition-all text-center">
-                      Sign In
-                    </Link>
-                  </>
-                )}
+            </div>
+
+            {otpError && (
+              <div className="p-3 bg-red-50 border border-red-100 text-red-600 text-xs font-semibold rounded-xl text-center leading-relaxed">
+                {otpError}
+              </div>
+            )}
+
+            <div className="py-4">
+              <OTPInput
+                length={6}
+                onComplete={handleVerifyOTP}
+                disabled={loading}
+                shake={shakeOtp}
+              />
+            </div>
+
+            <div className="flex flex-col items-center gap-4">
+              <button
+                type="button"
+                onClick={handleResendOTP}
+                disabled={resendCooldown > 0 || loading}
+                className="text-xs font-bold tracking-wider uppercase text-[#C9A84C] disabled:text-gray-400 transition-colors"
+              >
+                {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Code'}
+              </button>
+
+              <div className="flex gap-3 w-full">
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  disabled={loading}
+                  className="flex-1 py-3.5 border border-[#E8E8E8] text-[#0A0A0A] hover:bg-gray-50 rounded-xl text-xs font-bold tracking-widest uppercase transition-colors"
+                >
+                  Back
+                </button>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
+
+        {/* STEP 3: Success Screen */}
+        {step === 3 && (
+          <div className="text-center py-6 space-y-6 animate-fade-in">
+            {/* Animated Gold Checkmark */}
+            <div className="flex justify-center">
+              <div className="w-20 h-20 bg-[#C9A84C]/10 border border-[#C9A84C]/30 rounded-full flex items-center justify-center text-4xl text-[#C9A84C] relative overflow-hidden animate-checkmark">
+                <svg
+                  className="w-10 h-10 stroke-current"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth="3"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold text-[#0A0A0A] font-display" style={{ fontFamily: "'Playfair Display', serif" }}>
+                Welcome to Trendy, {firstName}! 🎉
+              </h2>
+              <p className="text-sm text-gray-500 font-medium">
+                Your account is ready
+              </p>
+            </div>
+
+            <button
+              onClick={() => navigate('/')}
+              className="w-full py-4 bg-[#C9A84C] hover:bg-[#b8952e] text-white rounded-xl text-sm font-bold tracking-widest uppercase transition-all duration-300 shadow-md"
+            >
+              Start Shopping
+            </button>
+          </div>
+        )}
       </div>
+
+      <style>{`
+        @keyframes pop-in {
+          0% { transform: scale(0.8); opacity: 0; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-checkmark {
+          animation: pop-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          20%, 60% { transform: translateX(-6px); }
+          40%, 80% { transform: translateX(6px); }
+        }
+        .animate-shake {
+          animation: shake 0.4s ease-in-out;
+        }
+      `}</style>
     </div>
   );
 }

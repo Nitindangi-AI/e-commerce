@@ -22,6 +22,7 @@
     "react-hot-toast": "^2.6.0",
     "react-icons": "^5.6.0",
     "react-router-dom": "^7.15.0",
+    "recharts": "^3.8.1",
     "swiper": "^12.1.4",
     "trendy": "file:..",
     "yup": "^1.7.1",
@@ -39,6 +40,7 @@
     "globals": "^17.6.0",
     "postcss": "^8.5.14",
     "tailwindcss": "^3.4.19",
-    "vite": "^8.0.12"
+    "vite": "^8.0.12",
+    "vite-plugin-compression": "^0.5.1"
   }
 }

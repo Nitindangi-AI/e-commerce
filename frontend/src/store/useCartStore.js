@@ -1,37 +1,124 @@
 import { create } from 'zustand';
-import { cartAPI } from '../services/api';
 import { insforge } from '../lib/insforge';
-import toast from 'react-hot-toast';
+import { toast } from '../components/GlobalToast';
 
 export const useCartStore = create((set, get) => ({
   cartItems: [],
   
   setCartItems: (items) => set({ cartItems: items }),
 
-  fetchCart: async () => {
+  // On login: fetch database cart and merge it with local Zustand cart
+  mergeCart: async () => {
     try {
-      const res = await cartAPI.get();
-      if (res.success) {
-        set({ cartItems: res.items || [] });
+      const { data: userData } = await insforge.auth.getUser();
+      const userId = userData?.user?.id;
+      if (!userId) return;
+
+      const { data: dbItems, error: fetchError } = await insforge.database
+        .from('cart_items')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (fetchError) throw fetchError;
+
+      const localItems = [...get().cartItems];
+      const mergedItems = [...localItems];
+
+      for (const dbItem of dbItems || []) {
+        const existingIndex = mergedItems.findIndex(
+          (item) =>
+            (item.id || item._id) === dbItem.product_id &&
+            (item.selectedColor || '') === (dbItem.selected_color || '') &&
+            (item.selectedSize || '') === (dbItem.selected_size || '')
+        );
+
+        if (existingIndex > -1) {
+          // Exists in both: combine quantities and update DB
+          const newQty = mergedItems[existingIndex].quantity + dbItem.quantity;
+          mergedItems[existingIndex].quantity = newQty;
+
+          await insforge.database
+            .from('cart_items')
+            .update({ quantity: newQty })
+            .eq('id', dbItem.id);
+        } else {
+          // Only in DB: fetch product info and insert to Zustand
+          const { data: productData } = await insforge.database
+            .from('products')
+            .select('*')
+            .eq('id', dbItem.product_id)
+            .maybeSingle();
+
+          if (productData) {
+            mergedItems.push({
+              ...productData,
+              quantity: dbItem.quantity,
+              selectedColor: dbItem.selected_color || '',
+              selectedSize: dbItem.selected_size || '',
+            });
+          }
+        }
       }
+
+      // Any local items that weren't in DB: insert them
+      const dbKeys = new Set((dbItems || []).map(d => `${d.product_id}-${d.selected_color || ''}-${d.selected_size || ''}`));
+      for (const localItem of localItems) {
+        const key = `${localItem.id || localItem._id}-${localItem.selectedColor || ''}-${localItem.selectedSize || ''}`;
+        if (!dbKeys.has(key)) {
+          await insforge.database
+            .from('cart_items')
+            .insert([{
+              user_id: userId,
+              product_id: localItem.id || localItem._id,
+              quantity: localItem.quantity,
+              selected_color: localItem.selectedColor || '',
+              selected_size: localItem.selectedSize || '',
+            }]);
+        }
+      }
+
+      set({ cartItems: mergedItems });
     } catch (err) {
-      console.error("Failed to fetch cart:", err);
-      toast.error(`Failed to sync shopping cart: ${err.message || err}`);
+      console.error("Cart merge error:", err);
+      toast.error("Failed to merge your local cart with server cart.");
     }
   },
 
-  syncLocalCart: async () => {
-    const localItems = get().cartItems;
-    if (localItems.length === 0) {
-      await get().fetchCart();
-      return;
-    }
+  fetchCart: async () => {
     try {
-      await cartAPI.sync(localItems);
-      await get().fetchCart();
+      const { data: userData } = await insforge.auth.getUser();
+      const userId = userData?.user?.id;
+      if (!userId) return;
+
+      const { data: dbItems, error: fetchError } = await insforge.database
+        .from('cart_items')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (fetchError) throw fetchError;
+
+      const items = [];
+      for (const dbItem of dbItems || []) {
+        const { data: productData } = await insforge.database
+          .from('products')
+          .select('*')
+          .eq('id', dbItem.product_id)
+          .maybeSingle();
+
+        if (productData) {
+          items.push({
+            ...productData,
+            quantity: dbItem.quantity,
+            selectedColor: dbItem.selected_color || '',
+            selectedSize: dbItem.selected_size || '',
+          });
+        }
+      }
+
+      set({ cartItems: items });
     } catch (err) {
-      console.error("Failed to sync cart:", err);
-      toast.error(`Failed to sync local cart with server: ${err.message || err}`);
+      console.error("Failed to fetch cart:", err);
+      toast.error("Failed to load shopping cart.");
     }
   },
 
@@ -58,11 +145,10 @@ export const useCartStore = create((set, get) => ({
     set({ cartItems: updatedItems });
 
     try {
-      const { data: userData, error: userError } = await insforge.auth.getUser();
-      if (userError) throw userError;
+      const { data: userData } = await insforge.auth.getUser();
       if (userData?.user) {
         if (existingIndex > -1) {
-          const { data: dbItem, error: selectError } = await insforge.database
+          const { data: dbItem } = await insforge.database
             .from('cart_items')
             .select('id')
             .eq('user_id', userData.user.id)
@@ -71,17 +157,14 @@ export const useCartStore = create((set, get) => ({
             .eq('selected_size', size)
             .maybeSingle();
 
-          if (selectError) throw selectError;
-
           if (dbItem) {
-            const { error: updateError } = await insforge.database
+            await insforge.database
               .from('cart_items')
               .update({ quantity: newQuantity })
               .eq('id', dbItem.id);
-            if (updateError) throw updateError;
           }
         } else {
-          const { error: insertError } = await insforge.database
+          await insforge.database
             .from('cart_items')
             .insert([{
               user_id: userData.user.id,
@@ -90,52 +173,46 @@ export const useCartStore = create((set, get) => ({
               selected_color: color,
               selected_size: size,
             }]);
-          if (insertError) throw insertError;
         }
       }
     } catch (err) {
-      console.error("Failed to add to cart in DB:", err);
-      toast.error(`Failed to save item to server cart: ${err.message || err}`);
+      console.error("Failed to save to database cart:", err);
+      toast.error("Failed to add item to server cart.");
     }
   },
 
   removeFromCart: async (productId, color = '', size = '') => {
     const updatedItems = get().cartItems.filter(item => {
       const matchesProduct = (item.id || item._id) === productId;
-      const matchesColor = color === undefined || item.selectedColor === color;
-      const matchesSize = size === undefined || item.selectedSize === size;
+      const matchesColor = item.selectedColor === color;
+      const matchesSize = item.selectedSize === size;
       return !(matchesProduct && matchesColor && matchesSize);
     });
 
     set({ cartItems: updatedItems });
 
     try {
-      const { data: userData, error: userError } = await insforge.auth.getUser();
-      if (userError) throw userError;
+      const { data: userData } = await insforge.auth.getUser();
       if (userData?.user) {
-        let query = insforge.database
+        await insforge.database
           .from('cart_items')
           .delete()
           .eq('user_id', userData.user.id)
-          .eq('product_id', productId);
-        
-        if (color !== undefined) query = query.eq('selected_color', color);
-        if (size !== undefined) query = query.eq('selected_size', size);
-
-        const { error: deleteError } = await query;
-        if (deleteError) throw deleteError;
+          .eq('product_id', productId)
+          .eq('selected_color', color)
+          .eq('selected_size', size);
       }
     } catch (err) {
-      console.error("Failed to remove from cart in DB:", err);
-      toast.error(`Failed to remove item from server cart: ${err.message || err}`);
+      console.error("Failed to remove from database cart:", err);
+      toast.error("Failed to remove item from server cart.");
     }
   },
 
   updateQuantity: async (productId, quantity, color = '', size = '') => {
     const updatedItems = get().cartItems.map(item => {
       const matchesProduct = (item.id || item._id) === productId;
-      const matchesColor = color === undefined || item.selectedColor === color;
-      const matchesSize = size === undefined || item.selectedSize === size;
+      const matchesColor = item.selectedColor === color;
+      const matchesSize = item.selectedSize === size;
       return (matchesProduct && matchesColor && matchesSize) 
         ? { ...item, quantity: Math.max(1, quantity) } 
         : item;
@@ -144,37 +221,42 @@ export const useCartStore = create((set, get) => ({
     set({ cartItems: updatedItems });
 
     try {
-      const { data: userData, error: userError } = await insforge.auth.getUser();
-      if (userError) throw userError;
+      const { data: userData } = await insforge.auth.getUser();
       if (userData?.user) {
-        let query = insforge.database
+        await insforge.database
           .from('cart_items')
           .update({ quantity: Math.max(1, quantity) })
           .eq('user_id', userData.user.id)
-          .eq('product_id', productId);
-
-        if (color !== undefined) query = query.eq('selected_color', color);
-        if (size !== undefined) query = query.eq('selected_size', size);
-
-        const { error: updateError } = await query;
-        if (updateError) throw updateError;
+          .eq('product_id', productId)
+          .eq('selected_color', color)
+          .eq('selected_size', size);
       }
     } catch (err) {
-      console.error("Failed to update quantity in DB:", err);
-      toast.error(`Failed to update quantity on server: ${err.message || err}`);
+      console.error("Failed to update database cart quantity:", err);
+      toast.error("Failed to update cart quantity on server.");
     }
   },
 
   clearCart: async () => {
     set({ cartItems: [] });
     try {
-      await cartAPI.clear();
+      const { data: userData } = await insforge.auth.getUser();
+      if (userData?.user) {
+        await insforge.database
+          .from('cart_items')
+          .delete()
+          .eq('user_id', userData.user.id);
+      }
     } catch (err) {
-      console.error("Failed to clear cart in DB:", err);
-      toast.error(`Failed to clear server cart: ${err.message || err}`);
+      console.error("Failed to clear database cart:", err);
+      toast.error("Failed to clear server cart.");
     }
   },
 
+  // On logout: clear Zustand only (keep DB cart for next login)
+  logoutCart: () => {
+    set({ cartItems: [] });
+  },
 
   getCartCount: (state) => {
     const items = state?.cartItems || get().cartItems;

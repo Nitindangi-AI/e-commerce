@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { insforge } from '../lib/insforge';
 import Loader from './Loader';
-import toast from 'react-hot-toast';
+import { toast } from './GlobalToast';
 
 export default function RoleGuard({ allowedRoles }) {
   const [loading, setLoading] = useState(true);
@@ -32,57 +32,46 @@ export default function RoleGuard({ allowedRoles }) {
           return;
         }
 
-        // Fetch profile and vendor record in parallel
-        const [profileRes, vendorRes] = await Promise.all([
-          insforge.database
-            .from('profiles')
-            .select('role')
-            .eq('id', authData.user.id)
-            .maybeSingle(),
-          insforge.database
-            .from('vendors')
-            .select('status')
-            .eq('user_id', authData.user.id)
-            .maybeSingle()
-        ]);
+        // Fetch profile from InsForge profiles table
+        const { data: profile, error: profileError } = await insforge.database
+          .from('profiles')
+          .select('role')
+          .eq('id', authData.user.id)
+          .maybeSingle();
 
-        const profile = profileRes.data;
-        const vendor = vendorRes.data;
+        if (profileError) {
+          console.error("Profile Fetch Error:", profileError.message);
+        }
 
         if (active) {
           const userRole = profile?.role || 'user';
           setUser({ ...authData.user, role: userRole });
 
-          const needsAdmin = allowedRoles.includes('admin');
-          const needsVendor = allowedRoles.includes('vendor') || allowedRoles.includes('merchant');
+          let isAuthorized = false;
 
-          if (needsAdmin) {
-            if (userRole === 'admin') {
-              setAuthorized(true);
-            } else {
-              toast.error("Access Denied: You do not have Administrator permissions.");
-              setRedirectTo("/");
-            }
-          } else if (needsVendor) {
-            if (vendor) {
-              setAuthorized(true);
-            } else {
-              toast.error("Access Denied: You do not have Merchant permissions.");
-              setRedirectTo("/");
-            }
+          if (allowedRoles.includes(userRole)) {
+            isAuthorized = true;
+          } else if (allowedRoles.includes('vendor') && (userRole === 'merchant' || userRole === 'vendor' || userRole === 'admin')) {
+            isAuthorized = true;
+          } else if (allowedRoles.includes('merchant') && (userRole === 'merchant' || userRole === 'vendor' || userRole === 'admin')) {
+            isAuthorized = true;
+          } else if (allowedRoles.includes('customer') && userRole === 'user') {
+            isAuthorized = true;
+          } else if (allowedRoles.includes('user') && userRole === 'customer') {
+            isAuthorized = true;
+          }
+
+          if (isAuthorized) {
+            setAuthorized(true);
           } else {
-            // General role checking
-            let isAuth = allowedRoles.includes(userRole);
-            if (!isAuth) {
-              if (allowedRoles.includes('customer') && userRole === 'user') isAuth = true;
-              if (allowedRoles.includes('user') && userRole === 'customer') isAuth = true;
+            let errorMessage = "Access Denied: Unauthorized access.";
+            if (allowedRoles.includes('admin')) {
+              errorMessage = "Access Denied: You do not have Administrator permissions.";
+            } else if (allowedRoles.includes('vendor') || allowedRoles.includes('merchant')) {
+              errorMessage = "Access Denied: You do not have Merchant permissions.";
             }
-            if (isAuth) {
-              setAuthorized(true);
-            } else {
-              toast.error("Access Denied: Unauthorized access.");
-              setRedirectTo("/");
-            }
+            toast.error(errorMessage);
+            setRedirectTo("/");
           }
           setLoading(false);
         }
@@ -117,3 +106,12 @@ export default function RoleGuard({ allowedRoles }) {
 
   return authorized ? <Outlet context={{ user }} /> : <Navigate to="/login" replace />;
 }
+
+export function RequireAdmin() {
+  return <RoleGuard allowedRoles={["admin"]} />;
+}
+
+export function RequireVendor() {
+  return <RoleGuard allowedRoles={["vendor", "merchant", "admin"]} />;
+}
+

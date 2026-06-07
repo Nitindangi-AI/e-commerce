@@ -7,6 +7,7 @@ import BackToTop from "../components/BackToTop";
 import Chatbot from "../components/Chatbot";
 import { useThemeStore } from "../store/useThemeStore";
 import { useSearchStore } from "../store/useSearchStore";
+import { useAuthStore } from "../store/useAuthStore";
 import SearchDropdown from "../components/SearchDropdown";
 import { AnimatePresence } from "framer-motion";
 
@@ -19,6 +20,10 @@ export default function MainLayout() {
   useEffect(() => {
     applyTheme();
   }, [theme, applyTheme]);
+
+  useEffect(() => {
+    useAuthStore.getState().initialize();
+  }, []);
   
   return (
     <div className="min-h-screen font-sans flex flex-col overflow-x-hidden relative bg-[#FAFAF8] transition-colors duration-500">

@@ -1,22 +1,13 @@
 services:
   - type: web
     name: trendy-backend
-    env: node
+    runtime: node
     plan: free
     buildCommand: npm install
-    startCommand: npm start
+    startCommand: node index.js
+    healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
-        value: 5000
-      - key: MONGO_URI
-        sync: false
-      - key: JWT_SECRET
-        sync: false
-      - key: JWT_EXPIRE
-        value: 7d
-      - key: COOKIE_EXPIRE
-        value: 7
-      - key: CLIENT_URL
-        sync: false
+        value: 10000

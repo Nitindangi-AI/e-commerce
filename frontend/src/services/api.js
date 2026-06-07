@@ -1,4 +1,4 @@
-
+import axios from 'axios';
 import { insforge } from '../lib/insforge';
 
 // ─── Auth API ────────────────────────────────────────────
@@ -32,15 +32,13 @@ export const authAPI = {
       }
 
       // 2. Create profile row with 'user' role
-      const { error: profileError } = await insforge.database.from('profiles').insert([{
-        id: userId,
+      await authAPI.createProfile(userId, {
         first_name: firstName,
         last_name: lastName,
         phone: phone || '',
         role: 'user', // Set initially as 'user'
         avatar_url: email,
-      }]);
-      if (profileError) throw new Error(profileError.message);
+      });
 
       // 3. Insert pending vendor onboarding details if role is vendor
       if (role === 'vendor') {
@@ -64,6 +62,19 @@ export const authAPI = {
     }
 
     return { success: true, user: data.user, token: data.accessToken };
+  },
+
+  createProfile: async (userId, { first_name, last_name, phone, role, avatar_url }) => {
+    const { error } = await insforge.database.from('profiles').insert([{
+      id: userId,
+      first_name,
+      last_name,
+      phone: phone || '',
+      role: role || 'user',
+      avatar_url: avatar_url || '',
+    }]);
+    if (error) throw new Error(error.message);
+    return { success: true };
   },
 
   login: async ({ email, password }) => {
@@ -145,18 +156,25 @@ export const authAPI = {
     };
   },
 
-  updateProfile: async ({ firstName, lastName, email, phone }) => {
+  updateProfile: async ({ firstName, lastName, displayName, phone, dateOfBirth, gender, avatarUrl, notificationPreferences }) => {
     const { data: userData } = await insforge.auth.getUser();
     if (!userData?.user) throw new Error('Not authenticated');
 
+    const updateFields = {
+      updated_at: new Date().toISOString(),
+    };
+    if (firstName !== undefined) updateFields.first_name = firstName;
+    if (lastName !== undefined) updateFields.last_name = lastName;
+    if (displayName !== undefined) updateFields.display_name = displayName;
+    if (phone !== undefined) updateFields.phone = phone || '';
+    if (dateOfBirth !== undefined) updateFields.date_of_birth = dateOfBirth || null;
+    if (gender !== undefined) updateFields.gender = gender || null;
+    if (avatarUrl !== undefined) updateFields.avatar_url = avatarUrl;
+    if (notificationPreferences !== undefined) updateFields.notification_preferences = notificationPreferences;
+
     const { error } = await insforge.database
       .from('profiles')
-      .update({
-        first_name: firstName,
-        last_name: lastName,
-        phone: phone || '',
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateFields)
       .eq('id', userData.user.id);
 
     if (error) throw new Error(error.message);
@@ -185,97 +203,56 @@ export const authAPI = {
 // ─── Products API ────────────────────────────────────────
 export const productAPI = {
   getAll: async (params = '') => {
-    const searchParams = new URLSearchParams(params);
-    let query = insforge.database.from('products').select('*', { count: 'exact' });
-
-    // Filtering
-    const category = searchParams.get('category');
-    if (category) query = query.eq('category', category);
-
-    const brand = searchParams.get('brand');
-    if (brand) query = query.eq('brand', brand);
-
-    const minPrice = searchParams.get('minPrice');
-    if (minPrice) query = query.gte('price', parseInt(minPrice));
-
-    const maxPrice = searchParams.get('maxPrice');
-    if (maxPrice) query = query.lte('price', parseInt(maxPrice));
-
-    const search = searchParams.get('search') || searchParams.get('keyword');
-    if (search) query = query.ilike('name', `%${search}%`);
-
-    // Sorting
-    const sort = searchParams.get('sort');
-    if (sort === 'price_asc') query = query.order('price', { ascending: true });
-    else if (sort === 'price_desc') query = query.order('price', { ascending: false });
-    else if (sort === 'rating') query = query.order('rating', { ascending: false });
-    else if (sort === 'featured') query = query.order('rating', { ascending: false }).order('num_reviews', { ascending: false });
-    else if (sort === 'newest') query = query.order('created_at', { ascending: false });
-    else query = query.order('created_at', { ascending: false });
-
-    // Pagination
-    const page = parseInt(searchParams.get('page')) || 1;
-    const limit = parseInt(searchParams.get('limit')) || 50;
-    const from = (page - 1) * limit;
-    query = query.range(from, from + limit - 1);
-
-    const { data, error, count } = await query;
-    if (error) throw new Error(error.message);
-
+    const res = await axios.get(`/api/v1/products?${params}`);
     return {
       success: true,
-      products: (data || []).map(normalizeProduct),
-      total: count || 0,
-      page,
-      pages: Math.ceil((count || 0) / limit),
+      products: (res.data.products || []).map(normalizeProduct),
+      total: res.data.totalProducts || 0,
+      page: res.data.page || 1,
+      pages: res.data.totalPages || 1,
     };
   },
 
   getById: async (id) => {
-    const { data, error } = await insforge.database
-      .from('products')
-      .select()
-      .eq('id', id)
-      .single();
-    if (error) throw new Error(error.message);
-    return { success: true, product: normalizeProduct(data) };
+    const res = await axios.get(`/api/v1/products/${id}`);
+    return { success: true, product: normalizeProduct(res.data.product) };
+  },
+
+  getBySlug: async (slug) => {
+    const res = await axios.get(`/api/v1/products/slug/${slug}`);
+    return { success: true, product: normalizeProduct(res.data.product) };
   },
 
   getCategories: async () => {
-    const { data, error } = await insforge.database
-      .from('products')
-      .select('category');
-    if (error) throw new Error(error.message);
-    const categories = [...new Set((data || []).map(p => p.category))];
+    const res = await axios.get('/api/v1/products/categories');
+    const categories = (res.data.categories || []).map(c => c.name);
     return { success: true, categories };
   },
 
   getBrands: async (category) => {
-    let query = insforge.database.from('products').select('brand');
-    if (category) query = query.eq('category', category);
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
-    const brands = [...new Set((data || []).map(p => p.brand))];
+    const res = await axios.get(`/api/v1/products/brands${category ? `?category=${category}` : ''}`);
+    const brands = (res.data.brands || []).map(b => b.name);
     return { success: true, brands };
   },
 
   getRelated: async (id) => {
-    // Get the current product's category first
-    const { data: product } = await insforge.database
-      .from('products')
-      .select('category')
-      .eq('id', id)
-      .single();
-    if (!product) return { success: true, products: [] };
+    const res = await axios.get(`/api/v1/products/${id}/related`);
+    return { success: true, products: (res.data.products || []).map(normalizeProduct) };
+  },
 
-    const { data, error } = await insforge.database
-      .from('products')
-      .select()
-      .eq('category', product.category)
-      .neq('id', id)
-      .limit(4);
-    if (error) throw new Error(error.message);
-    return { success: true, products: (data || []).map(normalizeProduct) };
+  getTopSelling: async (limit = 8) => {
+    const res = await axios.get(`/api/v1/products/top-selling?limit=${limit}`);
+    return { success: true, products: (res.data.products || []).map(normalizeProduct) };
+  },
+
+  getFeatured: async (limit = 8) => {
+    const res = await axios.get(`/api/v1/products/featured?limit=${limit}`);
+    return { success: true, products: (res.data.products || []).map(normalizeProduct) };
+  },
+
+  search: async (query) => {
+    const res = await axios.get(`/api/v1/products/search?q=${encodeURIComponent(query)}`);
+    return { success: true, products: (res.data.products || []).map(normalizeProduct) };
   },
 };
 
@@ -1360,6 +1337,7 @@ function normalizeProduct(p) {
     returnPolicy: p.return_policy || { returnable: true, returnDays: 5 },
     createdAt: p.created_at,
     updatedAt: p.updated_at,
+    slug: p.slug,
     // Computed discount
     get discount() {
       if (this.originalPrice && this.originalPrice > this.price) {
@@ -1421,6 +1399,7 @@ function normalizeOrder(o) {
     _id: o.id,
     id: o.id,
     orderId: o.order_id,
+    orderNumber: o.order_number,
     orderStatus: o.order_status,
     shippingAddress: o.shipping_address,
     paymentMethod: o.payment_method,

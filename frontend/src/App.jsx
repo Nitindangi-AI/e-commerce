@@ -1,34 +1,43 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { insforge } from "./lib/insforge";
 
-import MainLayout from "./layouts/MainLayout";
-import HomePage from "./pages/Home/HomePage";
-import LoginPage from "./pages/Auth/LoginPage";
-import RegisterPage from "./pages/Auth/RegisterPage";
-import ShopPage from "./pages/Shop/ShopPage";
-import CartPage from "./pages/Cart/CartPage";
-import ProductDetails from "./pages/Product/ProductDetails";
-import WishlistPage from "./pages/Wishlist/WishlistPage";
-import SearchResultsPage from "./pages/Search/SearchResultsPage";
-import CheckoutPage from "./pages/Checkout/CheckoutPage";
-import OrderSuccessPage from "./pages/Checkout/OrderSuccessPage";
-import AccountPage from "./pages/Account/AccountPage";
-import OrderDetailPage from "./pages/Account/OrderDetailPage";
-import StorefrontView from "./pages/Shop/StorefrontView";
-import NotFound from "./pages/NotFound";
+import PageLoader from "./components/PageLoader";
+import ErrorBoundary from "./components/ErrorBoundary";
+import GlobalToast from "./components/GlobalToast";
 
-// Multi-Vendor Portal Imports
-import RoleGuard from "./components/RoleGuard";
-import VendorDashboard from "./pages/Vendor/VendorDashboard";
-import AdminDashboard from "./pages/Admin/AdminDashboard";
+// Lazy-loaded customer pages
+const MainLayout = React.lazy(() => import("./layouts/MainLayout"));
+const HomePage = React.lazy(() => import("./pages/Home/HomePage"));
+const LoginPage = React.lazy(() => import("./pages/Auth/LoginPage"));
+const RegisterPage = React.lazy(() => import("./pages/Auth/RegisterPage"));
+const ShopPage = React.lazy(() => import("./pages/Shop/ShopPage"));
+const CartPage = React.lazy(() => import("./pages/Cart/CartPage"));
+const ProductDetails = React.lazy(() => import("./pages/Product/ProductDetails"));
+const WishlistPage = React.lazy(() => import("./pages/Wishlist/WishlistPage"));
+const SearchResultsPage = React.lazy(() => import("./pages/Search/SearchResultsPage"));
+const CheckoutPage = React.lazy(() => import("./pages/Checkout/CheckoutPage"));
+const OrderSuccessPage = React.lazy(() => import("./pages/Checkout/OrderSuccessPage"));
+const AccountPage = React.lazy(() => import("./pages/Account/AccountPage"));
+const OrderDetailPage = React.lazy(() => import("./pages/Account/OrderDetailPage"));
+const StorefrontView = React.lazy(() => import("./pages/Shop/StorefrontView"));
+const TrackingPage = React.lazy(() => import("./pages/Shop/TrackingPage"));
+const NotFound = React.lazy(() => import("./pages/NotFound"));
+
+// Lazy-loaded portals & guards
+import RoleGuard, { RequireAdmin, RequireVendor } from "./components/RoleGuard";
+import GuestGuard from "./components/GuestGuard";
+import AuthGuard from "./components/AuthGuard";
+const VendorDashboard = React.lazy(() => import("./pages/Vendor/VendorDashboard"));
+const AdminDashboard = React.lazy(() => import("./pages/Admin/AdminDashboard"));
+const ForgotPasswordPage = React.lazy(() => import("./pages/Auth/ForgotPasswordPage"));
+const VerifyEmailPage = React.lazy(() => import("./pages/Auth/VerifyEmailPage"));
 
 function App() {
   const [showExpiredModal, setShowExpiredModal] = useState(false);
 
   useEffect(() => {
-    // 1. Session persistence check on initial load:
     const handleLoad = () => {
       const rememberMe = localStorage.getItem("remember_me") === "true";
       const sessionActive = sessionStorage.getItem("session_active") === "true";
@@ -38,7 +47,6 @@ function App() {
     };
     window.addEventListener("load", handleLoad);
 
-    // 2. Setup subscription to state changes to detect unexpected session expiry
     const { data: { subscription } } = insforge.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
         sessionStorage.setItem("session_active", "true");
@@ -60,101 +68,109 @@ function App() {
   }, []);
 
   return (
-    <Router>
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          duration: 3000,
-          className: 'custom-toast',
-          style: {
-            background: '#FDF7E7',
-            color: '#B5963F',
-            border: '1px solid #E2CD8A',
-            fontSize: '13px',
-            fontWeight: 'bold',
-            borderRadius: '12px',
-          },
-          success: {
+    <ErrorBoundary>
+      <Router>
+        <GlobalToast />
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            duration: 3000,
+            className: 'custom-toast',
             style: {
-              background: '#DCFCE7',
-              color: '#15803D',
-              border: '1px solid #BBF7D0',
+              background: '#FDF7E7',
+              color: '#B5963F',
+              border: '1px solid #E2CD8A',
+              fontSize: '13px',
+              fontWeight: 'bold',
+              borderRadius: '12px',
             },
-            iconTheme: {
-              primary: '#15803D',
-              secondary: '#DCFCE7',
+            success: {
+              style: {
+                background: '#DCFCE7',
+                color: '#15803D',
+                border: '1px solid #BBF7D0',
+              },
+              iconTheme: {
+                primary: '#15803D',
+                secondary: '#DCFCE7',
+              },
             },
-          },
-          error: {
-            style: {
-              background: '#FEE2E2',
-              color: '#B91C1C',
-              border: '1px solid #FCA5A5',
+            error: {
+              style: {
+                background: '#FEE2E2',
+                color: '#B91C1C',
+                border: '1px solid #FCA5A5',
+              },
+              iconTheme: {
+                primary: '#B91C1C',
+                secondary: '#FEE2E2',
+              },
             },
-            iconTheme: {
-              primary: '#B91C1C',
-              secondary: '#FEE2E2',
-            },
-          },
-        }}
-      />
-      <Routes>
-        {/* ── Customer Storefront ── */}
-        <Route path="/" element={<MainLayout />}>
-          <Route index element={<HomePage />} />
-          <Route path="shop" element={<ShopPage />} />
-          <Route path="search" element={<SearchResultsPage />} />
-          <Route path="product/:id" element={<ProductDetails />} />
-          <Route path="cart" element={<CartPage />} />
-          <Route path="checkout" element={<CheckoutPage />} />
-          <Route path="order-success" element={<OrderSuccessPage />} />
-          <Route path="account" element={<AccountPage />} />
-          <Route path="orders/:id" element={<OrderDetailPage />} />
-          <Route path="wishlist" element={<WishlistPage />} />
-          <Route path="store/:vendorId" element={<StorefrontView />} />
-          <Route path="*" element={<NotFound />} />
-        </Route>
+          }}
+        />
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            {/* ── Customer Storefront ── */}
+            <Route path="/" element={<MainLayout />}>
+              <Route index element={<HomePage />} />
+              <Route path="shop" element={<ShopPage />} />
+              <Route path="search" element={<SearchResultsPage />} />
+              <Route path="product/slug/:slug" element={<ProductDetails />} />
+              <Route path="track" element={<TrackingPage />} />
+              <Route path="cart" element={<CartPage />} />
+              <Route path="checkout" element={<AuthGuard><CheckoutPage /></AuthGuard>} />
+              <Route path="order-success" element={<AuthGuard><OrderSuccessPage /></AuthGuard>} />
+              <Route path="account" element={<AuthGuard><AccountPage /></AuthGuard>} />
+              <Route path="orders/:id" element={<AuthGuard><OrderDetailPage /></AuthGuard>} />
+              <Route path="wishlist" element={<AuthGuard><WishlistPage /></AuthGuard>} />
+              <Route path="store/:vendorId" element={<StorefrontView />} />
+              <Route path="*" element={<NotFound />} />
+            </Route>
 
-        {/* Vendor Portal — Protected for vendor role */}
-        <Route path="/vendor" element={<RoleGuard allowedRoles={["vendor", "admin"]} />}>
-          <Route path="dashboard" element={<VendorDashboard />} />
-        </Route>
+            {/* Vendor Portal — Protected for vendor role */}
+            <Route path="/vendor/*" element={<RequireVendor />}>
+              <Route path="*" element={<VendorDashboard />} />
+            </Route>
 
-        {/* Admin Portal — Protected for admin role */}
-        <Route path="/admin" element={<RoleGuard allowedRoles={["admin"]} />}>
-          <Route path="dashboard" element={<AdminDashboard />} />
-        </Route>
+            {/* Admin Portal — Protected for admin role */}
+            <Route path="/admin/*" element={<RequireAdmin />}>
+              <Route path="*" element={<AdminDashboard />} />
+            </Route>
 
-        {/* ── Auth Pages ── */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-      </Routes>
+            {/* ── Auth Pages (GuestGuard redirects logged-in users) ── */}
+            <Route path="/login" element={<GuestGuard><LoginPage /></GuestGuard>} />
+            <Route path="/register" element={<GuestGuard><RegisterPage /></GuestGuard>} />
+            <Route path="/forgot-password" element={<GuestGuard><ForgotPasswordPage /></GuestGuard>} />
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
+          </Routes>
+        </Suspense>
 
-      {showExpiredModal && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-md animate-fade-in">
-          <div className="bg-white dark:bg-[#111111] border border-[#E8E8E8] dark:border-white/5 rounded-3xl p-8 max-w-sm w-full mx-4 shadow-luxury text-center space-y-6 transform translate-y-5">
-            <div className="w-16 h-16 bg-[#C9A84C]/10 rounded-2xl flex items-center justify-center text-2xl text-[#C9A84C] mx-auto animate-pulse">
-              ⚠️
+        {showExpiredModal && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-md animate-fade-in">
+            <div className="bg-white dark:bg-[#111111] border border-[#E8E8E8] dark:border-white/5 rounded-3xl p-8 max-w-sm w-full mx-4 shadow-luxury text-center space-y-6 transform translate-y-5">
+              <div className="w-16 h-16 bg-[#C9A84C]/10 rounded-2xl flex items-center justify-center text-2xl text-[#C9A84C] mx-auto animate-pulse">
+                ⚠️
+              </div>
+              <div className="space-y-2">
+                <h3 className="font-display text-xl font-bold text-[#111111] dark:text-white uppercase tracking-wider">Session Expired</h3>
+                <p className="text-sm text-[#6B6B6B] dark:text-slate-400 font-medium">
+                  Your session has expired. Please log in again to continue accessing your account.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowExpiredModal(false);
+                  window.location.href = "/login";
+                }}
+                className="w-full py-3.5 bg-[#C9A84C] hover:bg-[#b8952e] text-white rounded-xl text-xs font-bold tracking-widest uppercase transition-all duration-300 shadow-md shadow-[#C9A84C]/10"
+              >
+                Log In Again
+              </button>
             </div>
-            <div className="space-y-2">
-              <h3 className="font-display text-xl font-bold text-[#111111] dark:text-white uppercase tracking-wider">Session Expired</h3>
-              <p className="text-sm text-[#6B6B6B] dark:text-slate-400 font-medium">
-                Your session has expired. Please log in again to continue accessing your account.
-              </p>
-            </div>
-            <button
-              onClick={() => {
-                setShowExpiredModal(false);
-                window.location.href = "/login";
-              }}
-              className="w-full py-3.5 bg-[#C9A84C] hover:bg-[#b8952e] text-white rounded-xl text-xs font-bold tracking-widest uppercase transition-all duration-300 shadow-md shadow-[#C9A84C]/10"
-            >
-              Log In Again
-            </button>
           </div>
-        </div>
-      )}
-    </Router>
+        )}
+      </Router>
+    </ErrorBoundary>
   );
 }
 

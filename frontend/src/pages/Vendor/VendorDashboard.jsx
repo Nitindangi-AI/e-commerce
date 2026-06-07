@@ -4,6 +4,7 @@ import { insforge } from "../../lib/insforge";
 import { logisticsAPI } from "../../services/api";
 import Loader from "../../components/Loader";
 import toast from "react-hot-toast";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { formatTrackingNumber } from "../../utils/formatTracking";
 import {
   BarChart3,
@@ -26,8 +27,7 @@ import {
   FileSpreadsheet,
   Printer,
   ChevronRight,
-  Sun,
-  Moon,
+
   Truck,
   FileText,
   X
@@ -51,7 +51,7 @@ export default function VendorDashboard() {
   // Navigation and UI state
   const [activeTab, setActiveTab] = useState("overview");
   const [loading, setLoading] = useState(true);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+
   
   // Command Palette State (Ctrl+K Launcher)
   const [showCommandPalette, setShowCommandPalette] = useState(false);
@@ -1112,12 +1112,12 @@ export default function VendorDashboard() {
     { label: "Manage Store Settings", action: () => { setActiveTab("settings"); setShowCommandPalette(false); } },
     { label: "Payout Ledger Splits", action: () => { setActiveTab("payouts"); setShowCommandPalette(false); } },
     { label: "Help Desk Widget", action: () => { setActiveTab("help-center"); setShowCommandPalette(false); } },
-    { label: "Toggle Dark / Light Style", action: () => { setIsDarkMode(!isDarkMode); setShowCommandPalette(false); } }
+    { label: "Theme: Blossom Pink Active", action: () => { setShowCommandPalette(false); } }
   ].filter(c => c.label.toLowerCase().includes(commandSearch.toLowerCase()));
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center pt-24">
+      <div className="min-h-screen bg-gradient-to-br from-[#fff0f3] via-[#fff5f6] to-[#ffe5ec] flex items-center justify-center pt-24">
         <Loader />
       </div>
     );
@@ -1126,49 +1126,55 @@ export default function VendorDashboard() {
   // Handle case where seller application is rejected
   if (vendorData && vendorData.status === "rejected") {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center py-24 px-6 text-white font-sans">
-        <div className="max-w-xl w-full bg-[#111] border border-red-500/20 rounded-3xl p-8 shadow-luxury text-center space-y-6 animate-fade-in">
+      <div className="dashboard-pink-theme min-h-screen bg-gradient-to-br from-[#fff0f3] via-[#fff5f6] to-[#ffe5ec] flex items-center justify-center py-24 px-6 text-[#3d2428] font-sans">
+        <div className="max-w-xl w-full bg-white/80 border border-[#ffd5dd] rounded-3xl p-8 shadow-xl text-center space-y-6 animate-fade-in">
           <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto border border-red-500/20 text-red-500 text-3xl">
             ❌
           </div>
           <div className="space-y-2">
-            <h2 className="display text-2xl font-bold text-white uppercase tracking-wider">Application Rejected</h2>
-            <p className="text-white/60 text-sm leading-relaxed max-w-md mx-auto">
+            <h2 className="display text-2xl font-bold text-[#3d2428] uppercase tracking-wider">Application Rejected</h2>
+            <p className="text-[#3d2428]/60 text-sm leading-relaxed max-w-md mx-auto">
               We regret to inform you that your vendor account application has been rejected. 
               Please review your credentials below, update any incorrect details, and reapply for verification.
             </p>
+            {vendorData.rejection_reason && (
+              <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-700 rounded-xl text-xs text-left max-w-md mx-auto">
+                <strong className="block font-bold mb-1 uppercase tracking-wider">Reason for Rejection:</strong>
+                {vendorData.rejection_reason}
+              </div>
+            )}
           </div>
 
-          <form onSubmit={handleReapplySubmit} className="text-left space-y-4 max-w-md mx-auto bg-white/[0.02] p-6 rounded-2xl border border-white/5">
+          <form onSubmit={handleReapplySubmit} className="text-left space-y-4 max-w-md mx-auto bg-white/50 p-6 rounded-2xl border border-[#ffd5dd]">
             <div>
-              <label className="block text-[10px] tracking-widest uppercase text-white/50 mb-1.5 font-bold">Store Name</label>
+              <label className="block text-[10px] tracking-widest uppercase text-[#3d2428]/50 mb-1.5 font-bold">Store Name</label>
               <input
                 type="text"
                 value={reapplyForm.store_name}
                 onChange={e => setReapplyForm({ ...reapplyForm, store_name: e.target.value })}
-                className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#C9A84C]"
+                className="w-full bg-white/95 border border-[#ffd5dd] rounded-xl px-4 py-2.5 text-xs text-[#3d2428] focus:outline-none focus:border-emerald-500"
                 required
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-[10px] tracking-widest uppercase text-white/50 mb-1.5 font-bold">PAN Card Number</label>
+                <label className="block text-[10px] tracking-widest uppercase text-[#3d2428]/50 mb-1.5 font-bold">PAN Card Number</label>
                 <input
                   type="text"
                   value={reapplyForm.pan_card}
                   onChange={e => setReapplyForm({ ...reapplyForm, pan_card: e.target.value })}
-                  className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#C9A84C]"
+                  className="w-full bg-white/95 border border-[#ffd5dd] rounded-xl px-4 py-2.5 text-xs text-[#3d2428] focus:outline-none focus:border-emerald-500"
                   required
                 />
               </div>
               <div>
-                <label className="block text-[10px] tracking-widest uppercase text-white/50 mb-1.5 font-bold">GST Number</label>
+                <label className="block text-[10px] tracking-widest uppercase text-[#3d2428]/50 mb-1.5 font-bold">GST Number</label>
                 <input
                   type="text"
                   value={reapplyForm.gst_number}
                   onChange={e => setReapplyForm({ ...reapplyForm, gst_number: e.target.value })}
-                  className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#C9A84C]"
+                  className="w-full bg-white/95 border border-[#ffd5dd] rounded-xl px-4 py-2.5 text-xs text-[#3d2428] focus:outline-none focus:border-emerald-500"
                   required
                 />
               </div>
@@ -1176,41 +1182,41 @@ export default function VendorDashboard() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-[10px] tracking-widest uppercase text-white/50 mb-1.5 font-bold">Aadhaar Number</label>
+                <label className="block text-[10px] tracking-widest uppercase text-[#3d2428]/50 mb-1.5 font-bold">Aadhaar Number</label>
                 <input
                   type="text"
                   value={reapplyForm.aadhar_number}
                   onChange={e => setReapplyForm({ ...reapplyForm, aadhar_number: e.target.value })}
-                  className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#C9A84C]"
+                  className="w-full bg-white/95 border border-[#ffd5dd] rounded-xl px-4 py-2.5 text-xs text-[#3d2428] focus:outline-none focus:border-emerald-500"
                   required
                 />
               </div>
               <div>
-                <label className="block text-[10px] tracking-widest uppercase text-white/50 mb-1.5 font-bold">Bank Account Number</label>
+                <label className="block text-[10px] tracking-widest uppercase text-[#3d2428]/50 mb-1.5 font-bold">Bank Account Number</label>
                 <input
                   type="text"
                   value={reapplyForm.bank_account}
                   onChange={e => setReapplyForm({ ...reapplyForm, bank_account: e.target.value })}
-                  className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#C9A84C]"
+                  className="w-full bg-white/95 border border-[#ffd5dd] rounded-xl px-4 py-2.5 text-xs text-[#3d2428] focus:outline-none focus:border-emerald-500"
                   required
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-[10px] tracking-widest uppercase text-white/50 mb-1.5 font-bold">New Store Logo (Optional)</label>
+              <label className="block text-[10px] tracking-widest uppercase text-[#3d2428]/50 mb-1.5 font-bold">New Store Logo (Optional)</label>
               <input
                 type="file"
                 accept="image/*"
                 onChange={e => setReapplyLogoFile(e.target.files[0])}
-                className="w-full text-xs text-white/40 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-white/10 file:text-white hover:file:bg-white/20 cursor-pointer"
+                className="w-full text-xs text-[#3d2428]/40 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-500/10 file:text-emerald-700 hover:file:bg-emerald-500/20 cursor-pointer"
               />
             </div>
 
             <button
               type="submit"
               disabled={reapplyLoading}
-              className="w-full mt-2 py-3 bg-[#C9A84C] hover:bg-[#b8952e] text-white rounded-xl text-xs font-bold tracking-widest uppercase transition-all duration-300 shadow-md"
+              className="btn-gold w-full mt-2 py-3 text-white rounded-xl text-xs font-bold tracking-widest uppercase transition-all duration-300 shadow-md"
             >
               {reapplyLoading ? "Submitting Application..." : "Submit Reapplication 🔄"}
             </button>
@@ -1222,7 +1228,7 @@ export default function VendorDashboard() {
                 await insforge.auth.signOut();
                 navigate("/login");
               }}
-              className="px-6 py-2.5 rounded-xl text-xs tracking-widest uppercase text-white/50 hover:text-white border border-white/10 hover:bg-white/5 transition-all"
+              className="px-6 py-2.5 rounded-xl text-xs tracking-widest uppercase text-[#3d2428]/50 hover:text-[#3d2428] border border-[#ffd5dd] hover:bg-pink-500/5 transition-all"
             >
               🚪 Sign Out
             </button>
@@ -1235,17 +1241,17 @@ export default function VendorDashboard() {
   // Handle case where seller application is still pending
   if (vendorData && vendorData.status === "pending") {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center pt-24 px-6 text-white font-sans">
-        <div className="max-w-md w-full bg-[#111] border border-white/10 rounded-2xl p-8 text-center shadow-2xl animate-fade-in">
-          <div className="w-20 h-20 bg-yellow-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-yellow-500/20 animate-pulse">
-            <span className="text-3xl text-yellow-500">⏳</span>
+      <div className="dashboard-pink-theme min-h-screen bg-gradient-to-br from-[#fff0f3] via-[#fff5f6] to-[#ffe5ec] flex items-center justify-center pt-24 px-6 text-[#3d2428] font-sans">
+        <div className="max-w-md w-full bg-white/80 border border-[#ffd5dd] rounded-2xl p-8 text-center shadow-2xl animate-fade-in">
+          <div className="w-20 h-20 bg-orange-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-orange-500/20 animate-pulse">
+            <span className="text-3xl text-orange-500">⏳</span>
           </div>
-          <h2 className="display text-2xl font-bold mb-4 uppercase tracking-wider">Application Under Review</h2>
-          <p className="text-white/60 mb-6 text-sm leading-relaxed">
+          <h2 className="display text-2xl font-bold mb-4 uppercase tracking-wider text-[#3d2428]">Application Under Review</h2>
+          <p className="text-[#3d2428]/60 mb-6 text-sm leading-relaxed">
             Your application for store <span className="gold font-semibold">"{vendorData.store_name}"</span> is currently pending review. 
             Our administrators are checking your business documents (PAN, GSTIN, Aadhaar).
           </p>
-          <div className="p-4 bg-white/5 rounded-xl border border-white/5 text-xs text-white/40 mb-6 font-semibold">
+          <div className="p-4 bg-white/50 rounded-xl border border-[#ffd5dd] text-xs text-[#3d2428]/50 mb-6 font-semibold">
             Registered Email: {user?.email}<br />
             Commission Setup: {vendorData.commission_rate}% Platform Fee
           </div>
@@ -1254,7 +1260,7 @@ export default function VendorDashboard() {
               await insforge.auth.signOut();
               navigate("/login");
             }}
-            className="btn-outline px-6 py-2.5 rounded-xl text-xs tracking-widest uppercase text-white/70 hover:text-white border border-white/10 hover:bg-white/5 transition-all"
+            className="btn-outline px-6 py-2.5 rounded-xl text-xs tracking-widest uppercase text-[#3d2428]/70 hover:text-emerald-700 border border-[#ffd5dd] hover:bg-pink-500/5 transition-all"
           >
             🚪 Sign Out & Return Home
           </button>
@@ -1264,20 +1270,49 @@ export default function VendorDashboard() {
   }
 
   // Styling variable bindings based on theme toggle
-  const themeBg = isDarkMode ? "bg-[#0a0a0a] text-white" : "bg-[#f5f6f8] text-[#0a0a0a]";
-  const cardBg = isDarkMode ? "bg-[#111] border-white/5" : "bg-white border-black/5 shadow-md shadow-black/[0.02]";
-  const inputBg = isDarkMode ? "bg-white/[0.04] border-white/10" : "bg-black/[0.02] border-black/10 text-black";
-  const borderLight = isDarkMode ? "border-white/5" : "border-black/5";
-  const textSubtle = isDarkMode ? "text-white/40" : "text-black/40";
-  const textTitle = isDarkMode ? "text-white" : "text-black";
+  const themeBg = "bg-[var(--bg-gradient)] text-[var(--text-primary)] min-h-screen";
+  const cardBg = "bg-[var(--card-bg)] border-[var(--card-border)] shadow-xl shadow-pink-100/10";
+  const inputBg = "bg-[var(--input-bg)] border-[var(--input-border)] text-[var(--input-text)]";
+  const borderLight = "border-[var(--card-border)]";
+  const textSubtle = "text-[var(--text-secondary)]";
+  const textTitle = "text-[var(--text-primary)] font-bold";
+
+  // Calculate monthly revenue Recharts data
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const monthlyMap = {};
+  const todayVal = new Date();
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(todayVal.getFullYear(), todayVal.getMonth() - i, 1);
+    const key = `${months[d.getMonth()]} ${d.getFullYear().toString().slice(-2)}`;
+    monthlyMap[key] = 0;
+  }
+  
+  const commRateVal = parseFloat(vendorData?.commission_rate || 10.00);
+  orderItems.forEach(item => {
+    const orderStatus = item.orders?.order_status;
+    if (orderStatus && orderStatus !== "Cancelled" && orderStatus !== "Returned" && item.orders?.created_at) {
+      const date = new Date(item.orders.created_at);
+      const key = `${months[date.getMonth()]} ${date.getFullYear().toString().slice(-2)}`;
+      if (monthlyMap[key] !== undefined) {
+        const totalVal = item.price * item.quantity;
+        const netVal = totalVal * (1 - commRateVal / 100);
+        monthlyMap[key] += netVal;
+      }
+    }
+  });
+
+  const chartData = Object.keys(monthlyMap).map(key => ({
+    month: key,
+    Revenue: Math.round(monthlyMap[key])
+  }));
 
   return (
-    <div className={`min-h-screen pt-24 pb-16 flex flex-col lg:flex-row max-w-7xl mx-auto px-6 gap-8 transition-colors duration-300 ${themeBg}`}>
+    <div className={`dashboard-pink-theme min-h-screen pt-24 pb-16 flex flex-col lg:flex-row max-w-7xl mx-auto px-6 gap-8 transition-colors duration-300 ${themeBg}`}>
       
       {/* SIDEBAR MERCHANT PANEL */}
       <aside className={`w-full lg:w-64 flex-shrink-0 border p-6 rounded-2xl self-start shadow-xl ${cardBg}`}>
-        <div className="flex items-center gap-4 mb-8 pb-6 border-b border-white/5">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-[#d4af37] to-[#f5d26e] flex items-center justify-center font-bold text-[#0a0a0a] text-xl">
+        <div className={`flex items-center gap-4 mb-8 pb-6 border-b ${borderLight}`}>
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-emerald-500 to-orange-400 flex items-center justify-center font-bold text-white text-xl shadow-md shadow-orange-500/10">
             {vendorData?.store_name?.charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0">
@@ -1316,8 +1351,8 @@ export default function VendorDashboard() {
                 }}
                 className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all ${
                   activeTab === tab.id
-                    ? "bg-yellow-500/10 gold border border-yellow-500/20"
-                    : "text-white/50 hover:text-white hover:bg-white/5 border border-transparent"
+                    ? "bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 font-extrabold"
+                    : "text-[#3d2428]/65 hover:text-emerald-700 hover:bg-emerald-500/5 border border-transparent"
                 }`}
               >
                 <Icon size={14} />
@@ -1338,15 +1373,10 @@ export default function VendorDashboard() {
           </button>
         </nav>
 
-        {/* Local light/dark style toggle */}
-        <div className="mt-8 pt-4 border-t border-white/5 flex items-center justify-between">
-          <span className={`text-[9px] uppercase tracking-widest font-bold ${textSubtle}`}>Style Theme</span>
-          <button 
-            onClick={() => setIsDarkMode(!isDarkMode)}
-            className="w-8 h-8 rounded-lg border border-white/10 flex items-center justify-center hover:bg-white/5"
-          >
-            {isDarkMode ? <Sun size={14} className="text-yellow-400" /> : <Moon size={14} className="text-slate-500" />}
-          </button>
+        {/* Theme badge */}
+        <div className={`mt-8 pt-4 border-t flex items-center justify-between ${borderLight}`}>
+          <span className={`text-[9px] uppercase tracking-widest font-bold ${textSubtle}`}>Theme</span>
+          <span className="text-[9px] font-bold text-pink-400 bg-pink-500/10 px-2 py-1 rounded-lg border border-pink-500/15">Blossom</span>
         </div>
       </aside>
 
@@ -1354,9 +1384,9 @@ export default function VendorDashboard() {
       <main className="flex-1 min-w-0 space-y-6">
         
         {/* HEADER TOOLBAR WITH COMMAND PALETTE TRIGGER */}
-        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/5">
+        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#ffd5dd]/60">
           <div className="relative w-full sm:max-w-xs">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#3d2428]/30" />
             <input
               type="text"
               readOnly
@@ -1366,7 +1396,7 @@ export default function VendorDashboard() {
             />
           </div>
           
-          <div className="flex items-center gap-4 text-xs font-semibold text-white/40 self-end">
+          <div className="flex items-center gap-4 text-xs font-semibold text-[#3d2428]/40 self-end">
             <span>Merchant ID: {user?.id?.slice(0, 8)}</span>
             <span>RLS Active</span>
           </div>
@@ -1402,7 +1432,7 @@ export default function VendorDashboard() {
                 <div key={idx} className={`border rounded-2xl p-5 shadow-lg relative overflow-hidden group ${cardBg}`}>
                   <div className="absolute top-0 right-0 w-20 h-20 rounded-full bg-white/5 blur-xl group-hover:bg-[#d4af37]/5 transition-all" />
                   <div className={`text-[10px] uppercase tracking-widest font-bold mb-2 ${textSubtle}`}>{stat.title}</div>
-                  <div className={`text-xl lg:text-2xl font-black ${stat.color === 'gold' ? 'text-white' : stat.color}`}>
+                  <div className={`text-xl lg:text-2xl font-black ${stat.color === 'gold' ? 'text-emerald-700' : stat.color}`}>
                     {stat.val}
                   </div>
                   <p className={`text-[10px] mt-1.5 ${textSubtle}`}>{stat.desc}</p>
@@ -1413,67 +1443,40 @@ export default function VendorDashboard() {
             {/* Split layout: SVG Analytics Line Chart + low stock alerts */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               
-              {/* INTERACTIVE SVG GROWTH CHART */}
+              {/* MONTHLY REVENUE GROWTH CHART */}
               <div className={`border rounded-2xl p-6 shadow-xl lg:col-span-2 space-y-4 ${cardBg}`}>
-                <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                <div className="flex items-center justify-between border-b border-[#ffd5dd]/60 pb-4">
                   <h4 className={`font-bold text-xs uppercase tracking-wider flex items-center gap-2 ${textTitle}`}>
-                    <span>📈</span> Store Performance Index
+                    <span>📈</span> Monthly Revenue Analytics
                   </h4>
                   <span className="text-[10px] bg-green-500/10 text-green-400 border border-green-500/20 px-2 py-0.5 rounded-full font-bold uppercase">
-                    +15.4% Weekly
+                    Net Payouts
                   </span>
                 </div>
                 
-                {/* SVG Graph rendering */}
-                <div className="h-44 w-full relative pt-2">
-                  <svg className="w-full h-full overflow-visible" viewBox="0 0 500 120">
-                    {/* Grids lines */}
-                    <line x1="0" y1="100" x2="500" y2="100" stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
-                    <line x1="0" y1="60" x2="500" y2="60" stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
-                    <line x1="0" y1="20" x2="500" y2="20" stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
-                    
-                    {/* Line Area */}
-                    <path
-                      d="M 0 100 Q 80 50 160 80 T 320 20 T 500 40 L 500 100 L 0 100 Z"
-                      fill="url(#gradient-line-area)"
-                      opacity="0.1"
-                    />
-                    
-                    {/* Trend Line */}
-                    <path
-                      d="M 0 100 Q 80 50 160 80 T 320 20 T 500 40"
-                      fill="none"
-                      stroke="#d4af37"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                    />
-
-                    {/* Gradient Definition */}
-                    <defs>
-                      <linearGradient id="gradient-line-area" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#d4af37" />
-                        <stop offset="100%" stopColor="transparent" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
-                  
-                  {/* Graph labels */}
-                  <div className={`flex justify-between text-[9px] font-bold uppercase mt-2 ${textSubtle}`}>
-                    <span>Mon</span>
-                    <span>Tue</span>
-                    <span>Wed</span>
-                    <span>Thu</span>
-                    <span>Fri</span>
-                    <span>Sat</span>
-                    <span>Sun</span>
-                  </div>
+                {/* Recharts BarChart rendering */}
+                <div className="h-48 w-full pt-2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                      <XAxis dataKey="month" stroke="rgba(255,255,255,0.4)" fontSize={9} tickLine={false} />
+                      <YAxis stroke="rgba(255,255,255,0.4)" fontSize={9} tickLine={false} />
+                      <Tooltip 
+                        contentStyle={{ background: '#111', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
+                        labelStyle={{ color: '#d4af37', fontSize: 10, fontWeight: 'bold' }}
+                        itemStyle={{ color: '#fff', fontSize: 10 }}
+                        formatter={(value) => [`₹${value.toLocaleString()}`, 'Net Share']}
+                      />
+                      <Bar dataKey="Revenue" fill="#d4af37" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
               </div>
 
               {/* ACTION LOGS TRACKER */}
               <div className={`border rounded-2xl p-6 shadow-xl flex flex-col justify-between ${cardBg}`}>
                 <div className="space-y-4">
-                  <h4 className={`font-bold text-xs uppercase tracking-wider border-b border-white/5 pb-4 ${textTitle}`}>
+                  <h4 className={`font-bold text-xs uppercase tracking-wider border-b border-[#ffd5dd]/60 pb-4 ${textTitle}`}>
                     ⚡ Active Operational Feed
                   </h4>
                   <div className="space-y-3">
@@ -1486,13 +1489,41 @@ export default function VendorDashboard() {
                   </div>
                 </div>
                 
-                <div className="pt-4 border-t border-white/5 flex items-center justify-between text-[10px] text-white/35 font-semibold">
+                <div className="pt-4 border-t border-[#ffd5dd]/60 flex items-center justify-between text-[10px] text-[#3d2428]/35 font-semibold">
                   <span>Warehouse status: Active</span>
                   <span className="text-emerald-400">Online</span>
                 </div>
               </div>
 
             </div>
+
+            {/* Low Stock Alerts */}
+            {products.filter(p => p.stock < 5).length > 0 && (
+              <div className={`border rounded-2xl p-6 shadow-xl ${cardBg} space-y-4`}>
+                <h4 className={`font-bold text-xs uppercase tracking-wider border-b border-[#ffd5dd]/60 pb-4 flex items-center gap-2 ${textTitle}`}>
+                  <span>⚠️</span> Low Stock Product Alerts
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  {products.filter(p => p.stock < 5).map(p => (
+                    <div key={p.id} className="flex items-center justify-between gap-3 p-3 bg-red-500/5 border border-red-500/10 rounded-xl">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <img src={p.img} alt={p.name} className="w-10 h-10 rounded-lg object-cover border border-[#ffd5dd]" />
+                        <div className="min-w-0 flex-1">
+                          <p className={`font-bold text-xs truncate ${textTitle}`}>{p.name}</p>
+                          <p className="text-[10px] text-red-500 font-bold uppercase">{p.stock === 0 ? "Out of Stock" : `Only ${p.stock} units left`}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleEditProduct(p)}
+                        className="px-2.5 py-1.5 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all"
+                      >
+                        Restock
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1524,7 +1555,7 @@ export default function VendorDashboard() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
-                      <tr className="border-b border-white/10 bg-white/[0.01] text-white/50 tracking-wider uppercase font-semibold">
+                      <tr className="border-b border-[#ffd5dd] bg-pink-50/60 text-[#3d2428]/50 tracking-wider uppercase font-semibold">
                         <th className="px-6 py-4">Product details</th>
                         <th className="px-6 py-4">SKU / SKU Tag</th>
                         <th className="px-6 py-4">Original / Sale Price</th>
@@ -1536,9 +1567,20 @@ export default function VendorDashboard() {
                       {products.map(p => (
                         <tr key={p.id} className="hover:bg-white/[0.005] transition-colors">
                           <td className="px-6 py-4 flex items-center gap-3">
-                            <img src={p.img} alt={p.name} className="w-10 h-10 rounded-lg object-cover border border-white/10" />
+                            <img src={p.img} alt={p.name} className="w-10 h-10 rounded-lg object-cover border border-[#ffd5dd]" />
                             <div>
-                              <p className={`font-bold text-sm ${textTitle}`}>{p.name}</p>
+                              <div className="flex items-center gap-2">
+                                <p className={`font-bold text-sm ${textTitle}`}>{p.name}</p>
+                                <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase border ${
+                                  p.is_approved
+                                    ? 'text-green-400 bg-green-500/10 border-green-500/20'
+                                    : p.is_active === false
+                                      ? 'text-red-400 bg-red-500/10 border-red-500/20'
+                                      : 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20'
+                                }`}>
+                                  {p.is_approved ? 'Approved' : p.is_active === false ? 'Rejected' : 'Pending'}
+                                </span>
+                              </div>
                               <span className={`text-[9px] uppercase tracking-widest font-bold ${textSubtle}`}>{p.category}</span>
                             </div>
                           </td>
@@ -1552,17 +1594,17 @@ export default function VendorDashboard() {
                             )}
                           </td>
                           <td className="px-6 py-4 font-semibold">
-                            <span className={p.stock < 5 ? "text-yellow-400" : "text-white/60"}>
+                            <span className={p.stock < 5 ? "text-yellow-400" : "text-[#3d2428]/60"}>
                               {p.stock} units
                             </span>
                             {p.stock < 5 && <span className="text-[9px] block text-yellow-500 font-bold uppercase mt-0.5">⚠️ Low stock</span>}
                           </td>
                           <td className="px-6 py-4 text-center">
                             <div className="flex items-center justify-center gap-2">
-                              <button onClick={() => handleEditProduct(p)} className="p-2 border border-white/10 hover:border-yellow-500 rounded-lg hover:bg-yellow-500/5 transition-all text-xs" title="Edit Product">
+                              <button onClick={() => handleEditProduct(p)} className="p-2 border border-[#ffd5dd] hover:border-yellow-500 rounded-lg hover:bg-yellow-500/5 transition-all text-xs" title="Edit Product">
                                 ✏️
                               </button>
-                              <button onClick={() => handleDeleteProduct(p.id)} className="p-2 border border-white/10 hover:border-red-500 rounded-lg hover:bg-red-500/5 transition-all text-xs" title="Delete Product">
+                              <button onClick={() => handleDeleteProduct(p.id)} className="p-2 border border-[#ffd5dd] hover:border-red-500 rounded-lg hover:bg-red-500/5 transition-all text-xs" title="Delete Product">
                                 🗑️
                               </button>
                             </div>
@@ -1633,7 +1675,7 @@ export default function VendorDashboard() {
                     <select
                       value={productForm.badge}
                       onChange={e => setProductForm({ ...productForm, badge: e.target.value })}
-                      className={`input-field w-full px-4 py-3 rounded-xl text-xs bg-black/45`}
+                      className={`input-field w-full px-4 py-3 rounded-xl text-xs bg-white/90`}
                     >
                       <option value="">No Badge</option>
                       <option value="New">New</option>
@@ -1650,7 +1692,7 @@ export default function VendorDashboard() {
                     <select
                       value={productForm.category}
                       onChange={e => setProductForm({ ...productForm, category: e.target.value })}
-                      className={`input-field w-full px-4 py-3 rounded-xl text-xs bg-black/45`}
+                      className={`input-field w-full px-4 py-3 rounded-xl text-xs bg-white/90`}
                     >
                       {categories.map(cat => (
                         <option key={cat} value={cat}>{cat}</option>
@@ -1801,10 +1843,26 @@ export default function VendorDashboard() {
                       {uploadingImage ? "Uploading..." : "📷 Upload Gallery Images"}
                     </label>
                   </div>
+                  
+                  {/* Multiple image URLs manual input */}
+                  <div className="mb-3">
+                    <label className={`block text-[9px] tracking-widest uppercase mb-1 font-bold ${textSubtle}`}>Or Enter Additional Image URLs (Comma-separated)</label>
+                    <textarea
+                      value={(productForm.images || []).join(", ")}
+                      onChange={e => {
+                        const urls = e.target.value.split(",").map(url => url.trim()).filter(Boolean);
+                        setProductForm({ ...productForm, images: urls });
+                      }}
+                      placeholder="https://images.unsplash.com/photo-1, https://images.unsplash.com/photo-2"
+                      rows={2}
+                      className={`input-field w-full px-4 py-3 rounded-xl text-xs resize-none ${inputBg}`}
+                    />
+                  </div>
+
                   {productForm.images && productForm.images.length > 0 && (
-                    <div className="flex flex-wrap gap-3 p-3 bg-black/20 rounded-xl border border-white/5">
+                    <div className="flex flex-wrap gap-3 p-3 bg-pink-50/60 rounded-xl border border-[#ffd5dd]/60">
                       {productForm.images.map((url, index) => (
-                        <div key={index} className="relative group w-16 h-16 rounded-lg overflow-hidden border border-white/10">
+                        <div key={index} className="relative group w-16 h-16 rounded-lg overflow-hidden border border-[#ffd5dd]">
                           <img src={url} alt="Product Gallery Thumbnail" className="w-full h-full object-cover" />
                           <button
                             type="button"
@@ -1899,7 +1957,7 @@ export default function VendorDashboard() {
                 </div>
 
                 {/* SEO METADATA BLOCK */}
-                <div className="space-y-4 border-t border-white/5 pt-5 mt-5">
+                <div className="space-y-4 border-t border-[#ffd5dd]/60 pt-5 mt-5">
                   <span className="text-[10px] font-bold tracking-widest uppercase gold">Search Engine Optimization (SEO) Metadata</span>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -1925,7 +1983,7 @@ export default function VendorDashboard() {
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-white/5 flex gap-3">
+                <div className="pt-4 border-t border-[#ffd5dd]/60 flex gap-3">
                   <button type="button" onClick={() => { resetProductForm(); setActiveTab("products"); }} className="btn-outline flex-1 py-3 rounded-xl text-xs font-bold uppercase tracking-wider">
                     Cancel
                   </button>
@@ -1960,7 +2018,7 @@ export default function VendorDashboard() {
                     if (orderItemsForThisOrder.length === 0) return null;
                     return (
                       <div key={order.id} className="p-6 flex flex-col justify-between gap-4 hover:bg-white/[0.005] transition-colors">
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-3 border-b border-white/5">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-3 border-b border-[#ffd5dd]/60">
                           <div>
                             <div className="flex items-center gap-2 flex-wrap mb-1">
                               <span className="text-xs font-bold font-mono gold">{order.order_id}</span>
@@ -1969,7 +2027,7 @@ export default function VendorDashboard() {
                               </span>
                             </div>
                             <div className={`text-[10px] ${textSubtle}`}>
-                              <strong className="text-white/60">Shipping Destination:</strong> {order.shipping_address?.name}, {order.shipping_address?.line1}, {order.shipping_address?.city} - {order.shipping_address?.pincode}
+                              <strong className="text-[#3d2428]/60">Shipping Destination:</strong> {order.shipping_address?.name}, {order.shipping_address?.line1}, {order.shipping_address?.city} - {order.shipping_address?.pincode}
                             </div>
                           </div>
                           <div className="flex items-center gap-3 self-end sm:self-center">
@@ -1983,7 +2041,7 @@ export default function VendorDashboard() {
                                 </button>
                               )}
                               {order.order_status === "Confirmed" && (
-                                <button onClick={() => handleOpenShipmentModal(orderItemsForThisOrder[0])} className="btn-gold px-4 py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-widest flex items-center gap-1">
+                                <button onClick={() => handleOpenShipmentModal({ ...orderItemsForThisOrder[0], orders: order })} className="btn-gold px-4 py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-widest flex items-center gap-1">
                                   <Truck size={12} /> Dispatch Shipment
                                 </button>
                               )}
@@ -1999,7 +2057,7 @@ export default function VendorDashboard() {
                         <div className="space-y-3 pt-2">
                           {orderItemsForThisOrder.map(item => (
                             <div key={item.id} className="flex items-center gap-4 pl-2">
-                              <img src={item.image || item.products?.img} alt={item.name} className="w-10 h-10 rounded-lg object-cover border border-white/10" />
+                              <img src={item.image || item.products?.img} alt={item.name} className="w-10 h-10 rounded-lg object-cover border border-[#ffd5dd]" />
                               <div className="flex-1 min-w-0">
                                 <h4 className={`font-bold text-xs truncate ${textTitle}`}>{item.name}</h4>
                                 <div className={`text-[9px] flex gap-3 mt-0.5 ${textSubtle}`}>
@@ -2031,7 +2089,7 @@ export default function VendorDashboard() {
 
             <div className={`border rounded-2xl overflow-hidden shadow-xl ${cardBg}`}>
               {orderItems.filter(i => i.orders?.order_status === "Return Requested" || i.orders?.order_status === "Returned").length === 0 ? (
-                <div className="text-center py-20 text-white/40 text-xs">No return claims filed by customers.</div>
+                <div className="text-center py-20 text-[#3d2428]/40 text-xs">No return claims filed by customers.</div>
               ) : (
                 <div className="divide-y divide-white/5">
                   {orderItems.filter(i => i.orders?.order_status === "Return Requested" || i.orders?.order_status === "Returned").map(item => (
@@ -2044,7 +2102,7 @@ export default function VendorDashboard() {
                           </span>
                         </div>
                         <h4 className={`font-bold text-sm ${textTitle}`}>{item.name}</h4>
-                        <p className={`text-[10px] mt-1 ${textSubtle}`}>Reason: <strong className="text-white">{item.orders?.return_reason || "Not provided"}</strong></p>
+                        <p className={`text-[10px] mt-1 ${textSubtle}`}>Reason: <strong className="text-[#3d2428]">{item.orders?.return_reason || "Not provided"}</strong></p>
                       </div>
 
                       <div className="flex gap-2 self-end sm:self-center">
@@ -2131,7 +2189,7 @@ export default function VendorDashboard() {
             })()}
 
             {/* Filter and Search row */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-black/10 p-4 rounded-xl border border-white/5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-pink-50/40 p-4 rounded-xl border border-[#ffd5dd]/60">
               <div className="flex items-center gap-3 flex-wrap">
                 <input
                   type="text"
@@ -2198,7 +2256,7 @@ export default function VendorDashboard() {
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs border-collapse">
                       <thead>
-                        <tr className="border-b border-white/10 bg-white/[0.02] text-white/50 tracking-wider uppercase font-semibold">
+                        <tr className="border-b border-[#ffd5dd] bg-pink-50/60 text-[#3d2428]/50 tracking-wider uppercase font-semibold">
                           <th className="px-6 py-4">Order ID</th>
                           <th className="px-6 py-4">Customer Name</th>
                           <th className="px-6 py-4">Tracking Number</th>
@@ -2280,7 +2338,7 @@ export default function VendorDashboard() {
                                     setNewEventNote("");
                                     setShowEventModal(true);
                                   }}
-                                  className="px-3 py-1.5 border border-white/10 hover:border-yellow-500 rounded-lg hover:bg-yellow-500/5 transition-all text-[10px] font-bold uppercase tracking-wider text-yellow-500"
+                                  className="px-3 py-1.5 border border-[#ffd5dd] hover:border-yellow-500 rounded-lg hover:bg-yellow-500/5 transition-all text-[10px] font-bold uppercase tracking-wider text-yellow-500"
                                 >
                                   Append Event Note 📝
                                 </button>
@@ -2299,14 +2357,14 @@ export default function VendorDashboard() {
             {showEventModal && editingShipment && (
               <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-6 backdrop-blur-sm">
                 <div 
-                  className="bg-[#111] border border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 text-xs font-semibold"
+                  className="bg-white border border-[#ffd5dd] rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 text-xs font-semibold"
                   onClick={e => e.stopPropagation()}
                 >
-                  <div className="flex justify-between items-center pb-2 border-b border-white/5">
+                  <div className="flex justify-between items-center pb-2 border-b border-[#ffd5dd]/60">
                     <h3 className="font-bold text-sm uppercase tracking-wider text-[#d4af37]">Append Shipment Event</h3>
                     <button 
                       onClick={() => { setShowEventModal(false); setEditingShipment(null); }} 
-                      className="text-white/40 hover:text-white"
+                      className="text-[#3d2428]/40 hover:text-[#3d2428]"
                     >
                       ✕
                     </button>
@@ -2318,11 +2376,11 @@ export default function VendorDashboard() {
 
                   <form onSubmit={handleAppendShipmentEvent} className="space-y-3">
                     <div>
-                      <label className="block text-[10px] uppercase font-bold tracking-widest text-white/50 mb-1">Current Status</label>
+                      <label className="block text-[10px] uppercase font-bold tracking-widest text-[#3d2428]/50 mb-1">Current Status</label>
                       <select 
                         value={newEventStatus} 
                         onChange={e => setNewEventStatus(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl text-xs bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-gold"
+                        className="w-full px-4 py-3 rounded-xl text-xs bg-white/90 border border-[#ffd5dd] text-[#3d2428] focus:outline-none focus:border-gold"
                       >
                         <option value={editingShipment.status}>{editingShipment.status} (Current)</option>
                         <option value="pickup_scheduled">pickup_scheduled</option>
@@ -2335,32 +2393,32 @@ export default function VendorDashboard() {
                     </div>
 
                     <div>
-                      <label className="block text-[10px] uppercase font-bold tracking-widest text-white/50 mb-1">Location of Event</label>
+                      <label className="block text-[10px] uppercase font-bold tracking-widest text-[#3d2428]/50 mb-1">Location of Event</label>
                       <input 
                         type="text"
                         placeholder="e.g. Mumbai Airport Hub" 
                         value={newEventLocation}
                         onChange={e => setNewEventLocation(e.target.value)} 
-                        className="w-full px-4 py-3 rounded-xl text-xs bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-gold" 
+                        className="w-full px-4 py-3 rounded-xl text-xs bg-white/90 border border-[#ffd5dd] text-[#3d2428] focus:outline-none focus:border-gold" 
                       />
                     </div>
 
                     <div>
-                      <label className="block text-[10px] uppercase font-bold tracking-widest text-white/50 mb-1">Custom Event Description Note</label>
+                      <label className="block text-[10px] uppercase font-bold tracking-widest text-[#3d2428]/50 mb-1">Custom Event Description Note</label>
                       <textarea 
                         placeholder="e.g. Package arrived at local depot for scanning..."
                         value={newEventNote}
                         onChange={e => setNewEventNote(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl text-xs bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-gold resize-none h-20" 
+                        className="w-full px-4 py-3 rounded-xl text-xs bg-white/90 border border-[#ffd5dd] text-[#3d2428] focus:outline-none focus:border-gold resize-none h-20" 
                         required
                       />
                     </div>
 
-                    <div className="flex gap-3 pt-4 border-t border-white/5">
+                    <div className="flex gap-3 pt-4 border-t border-[#ffd5dd]/60">
                       <button 
                         type="button"
                         onClick={() => { setShowEventModal(false); setEditingShipment(null); }} 
-                        className="px-5 py-3 rounded-xl border border-white/10 hover:bg-white/5 text-xs font-bold uppercase tracking-wider flex-1"
+                        className="px-5 py-3 rounded-xl border border-[#ffd5dd] hover:bg-pink-50/60 text-xs font-bold uppercase tracking-wider flex-1"
                       >
                         Cancel
                       </button>
@@ -2393,7 +2451,7 @@ export default function VendorDashboard() {
               
               {/* Daily Revenue Chart */}
               <div className={`border rounded-2xl p-6 shadow-xl ${cardBg} space-y-4`}>
-                <h4 className={`font-bold text-xs uppercase tracking-wider border-b border-white/5 pb-4 ${textTitle}`}>
+                <h4 className={`font-bold text-xs uppercase tracking-wider border-b border-[#ffd5dd]/60 pb-4 ${textTitle}`}>
                   Daily Gross Sales Revenue (₹)
                 </h4>
                 <div className="h-44 w-full pt-2">
@@ -2421,7 +2479,7 @@ export default function VendorDashboard() {
 
               {/* Conversion charts */}
               <div className={`border rounded-2xl p-6 shadow-xl ${cardBg} space-y-4`}>
-                <h4 className={`font-bold text-xs uppercase tracking-wider border-b border-white/5 pb-4 ${textTitle}`}>
+                <h4 className={`font-bold text-xs uppercase tracking-wider border-b border-[#ffd5dd]/60 pb-4 ${textTitle}`}>
                   Monthly Store Traffic Visits
                 </h4>
                 <div className="h-44 w-full pt-2">
@@ -2479,7 +2537,7 @@ export default function VendorDashboard() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
-                    <tr className="border-b border-white/10 bg-white/[0.01] text-white/50 tracking-wider uppercase font-semibold">
+                    <tr className="border-b border-[#ffd5dd] bg-pink-50/60 text-[#3d2428]/50 tracking-wider uppercase font-semibold">
                       <th className="px-6 py-4">Product Info</th>
                       <th className="px-6 py-4">SKU / Code</th>
                       <th className="px-6 py-4">Category</th>
@@ -2491,17 +2549,17 @@ export default function VendorDashboard() {
                     {products.map(p => (
                       <tr key={p.id} className="hover:bg-white/[0.005] transition-colors">
                         <td className="px-6 py-4 flex items-center gap-3">
-                          <img src={p.img} alt={p.name} className="w-10 h-10 rounded-lg object-cover border border-white/10" />
+                          <img src={p.img} alt={p.name} className="w-10 h-10 rounded-lg object-cover border border-[#ffd5dd]" />
                           <span className={`font-bold ${textTitle}`}>{p.name}</span>
                         </td>
                         <td className="px-6 py-4 font-mono font-bold gold">{p.specs?.sku || "SKU-AUTO"}</td>
-                        <td className="px-6 py-4 capitalize text-white/60">{p.category}</td>
+                        <td className="px-6 py-4 capitalize text-[#3d2428]/60">{p.category}</td>
                         <td className="px-6 py-4 font-semibold">
-                          <span className={p.stock < 5 ? "text-yellow-500 font-bold" : "text-white/60"}>
+                          <span className={p.stock < 5 ? "text-yellow-500 font-bold" : "text-[#3d2428]/60"}>
                             {p.stock} units
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-white/40 font-medium">Block A / Shelf 4</td>
+                        <td className="px-6 py-4 text-[#3d2428]/40 font-medium">Block A / Shelf 4</td>
                       </tr>
                     ))}
                   </tbody>
@@ -2520,7 +2578,7 @@ export default function VendorDashboard() {
             </div>
 
             <div className={`border rounded-2xl p-6 shadow-xl ${cardBg} space-y-4`}>
-              <h4 className={`font-bold text-xs uppercase tracking-wider border-b border-white/5 pb-4 ${textTitle}`}>Create Store Coupon</h4>
+              <h4 className={`font-bold text-xs uppercase tracking-wider border-b border-[#ffd5dd]/60 pb-4 ${textTitle}`}>Create Store Coupon</h4>
               <div className="space-y-4 text-xs font-semibold">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -2562,7 +2620,7 @@ export default function VendorDashboard() {
                   <div className="flex justify-between items-start gap-4">
                     <div>
                       <h4 className={`font-bold text-xs ${textTitle}`}>{rev.name}</h4>
-                      <p className={`text-[10px] ${textSubtle}`}>Shopper: <strong className="text-white">{rev.user}</strong> · {rev.time}</p>
+                      <p className={`text-[10px] ${textSubtle}`}>Shopper: <strong className="text-[#3d2428]">{rev.user}</strong> · {rev.time}</p>
                     </div>
                     <div className="flex gap-0.5 text-yellow-500 font-bold">
                       {"★".repeat(rev.rating)}
@@ -2633,13 +2691,13 @@ export default function VendorDashboard() {
                   />
                 </div>
 
-                <p className="text-[10px] font-bold tracking-widest uppercase gold pt-6 border-t border-white/5">Tax & Settlement Credentials (Immutable)</p>
+                <p className="text-[10px] font-bold tracking-widest uppercase gold pt-6 border-t border-[#ffd5dd]/60">Tax & Settlement Credentials (Immutable)</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className={`block text-[9px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>PAN Card Number</label>
                     <input 
                       value={settingsForm.pan_card} 
-                      className={`input-field w-full px-4 py-3 rounded-xl text-xs bg-white/[0.01] ${textSubtle} cursor-not-allowed`} 
+                      className={`input-field w-full px-4 py-3 rounded-xl text-xs bg-pink-50/30 ${textSubtle} cursor-not-allowed`} 
                       disabled
                     />
                   </div>
@@ -2647,13 +2705,13 @@ export default function VendorDashboard() {
                     <label className={`block text-[9px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>GSTIN Number</label>
                     <input 
                       value={settingsForm.gst_number} 
-                      className={`input-field w-full px-4 py-3 rounded-xl text-xs bg-white/[0.01] ${textSubtle} cursor-not-allowed`} 
+                      className={`input-field w-full px-4 py-3 rounded-xl text-xs bg-pink-50/30 ${textSubtle} cursor-not-allowed`} 
                       disabled
                     />
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-white/5">
+                <div className="pt-4 border-t border-[#ffd5dd]/60">
                   <button type="submit" className="btn-gold px-8 py-3.5 rounded-xl text-xs font-bold tracking-widest uppercase">
                     Save settings changes
                   </button>
@@ -2675,7 +2733,7 @@ export default function VendorDashboard() {
               {/* Commission splits rate box */}
               <div className={`p-4 rounded-xl border ${cardBg}`}>
                 <span className="text-[8px] uppercase tracking-wider text-yellow-500 font-bold block">Your Platform Fee</span>
-                <span className={`text-lg font-black ${textTitle}`}>{vendorData?.commission_rate || "10.00"}% <span className="text-[9px] text-white/30 font-semibold">per Order</span></span>
+                <span className={`text-lg font-black ${textTitle}`}>{vendorData?.commission_rate || "10.00"}% <span className="text-[9px] text-[#3d2428]/30 font-semibold">per Order</span></span>
               </div>
             </div>
 
@@ -2698,7 +2756,7 @@ export default function VendorDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               
               <div className={`border rounded-2xl p-6 space-y-4 ${cardBg}`}>
-                <h4 className={`font-bold text-xs uppercase tracking-wider border-b border-white/5 pb-4 ${textTitle}`}>
+                <h4 className={`font-bold text-xs uppercase tracking-wider border-b border-[#ffd5dd]/60 pb-4 ${textTitle}`}>
                   Payout Withdrawal
                 </h4>
                 <form onSubmit={handleWithdrawalRequest} className="space-y-4 text-xs font-semibold">
@@ -2719,10 +2777,10 @@ export default function VendorDashboard() {
               </div>
 
               <div className={`border rounded-2xl p-6 ${cardBg} space-y-4`}>
-                <h4 className={`font-bold text-xs uppercase tracking-wider border-b border-white/5 pb-4 ${textTitle}`}>
+                <h4 className={`font-bold text-xs uppercase tracking-wider border-b border-[#ffd5dd]/60 pb-4 ${textTitle}`}>
                   Bank Payout Channel
                 </h4>
-                <div className="space-y-2 text-[10px] font-semibold text-white/40">
+                <div className="space-y-2 text-[10px] font-semibold text-[#3d2428]/40">
                   <div className="flex justify-between">
                     <span>Beneficiary bank:</span>
                     <strong className={textTitle}>{vendorData?.bank_account?.split(" / ")[0] || "HDFC Settlement Bank"}</strong>
@@ -2788,7 +2846,7 @@ export default function VendorDashboard() {
 
             {/* FAQs Accordion */}
             <div className={`border rounded-2xl p-6 ${cardBg} space-y-4`}>
-              <h4 className={`font-bold text-xs uppercase tracking-wider border-b border-white/5 pb-4 ${textTitle}`}>Frequently Asked Questions</h4>
+              <h4 className={`font-bold text-xs uppercase tracking-wider border-b border-[#ffd5dd]/60 pb-4 ${textTitle}`}>Frequently Asked Questions</h4>
               <div className="space-y-3 text-[11px] leading-relaxed">
                 {[
                   { q: "How are payout commission splits calculated?", a: "Platform fees are deducted automatically from the gross value of non-refunded shipped orders based on the commission rate set by administrators." },
@@ -2804,7 +2862,7 @@ export default function VendorDashboard() {
 
             {/* Create Help ticket form */}
             <div className={`border rounded-2xl p-6 shadow-xl ${cardBg} space-y-4`}>
-              <h4 className={`font-bold text-xs uppercase tracking-wider border-b border-white/5 pb-4 ${textTitle}`}>Create Help Support Ticket</h4>
+              <h4 className={`font-bold text-xs uppercase tracking-wider border-b border-[#ffd5dd]/60 pb-4 ${textTitle}`}>Create Help Support Ticket</h4>
               <form onSubmit={handleHelpDeskSubmit} className="space-y-4 text-xs font-semibold">
                 <div>
                   <label className={`block text-[9px] tracking-widest uppercase mb-1.5 font-bold ${textSubtle}`}>Subject</label>
@@ -2842,32 +2900,32 @@ export default function VendorDashboard() {
       {/* ─── COURIER ASSIGNMENT & AIRWAY BILL LABEL GENERATOR MODAL ─── */}
       {selectedShipment && (
         <div className="fixed inset-0 bg-black/85 z-50 flex items-center justify-center p-6 backdrop-blur-sm">
-          <div className="bg-[#111] border border-white/10 p-6 rounded-2xl max-w-lg w-full shadow-2xl space-y-4 slide-up text-xs">
-            <div className="flex justify-between items-center pb-3 border-b border-white/5">
+          <div className="bg-white border border-[#ffd5dd] p-6 rounded-2xl max-w-lg w-full shadow-2xl space-y-4 slide-up text-xs">
+            <div className="flex justify-between items-center pb-3 border-b border-[#ffd5dd]/60">
               <span className="font-bold text-sm uppercase tracking-wider gold flex items-center gap-1.5">
                 🚀 Intelligent Routing & Fulfill Shipment Configurator
               </span>
-              <button onClick={() => setSelectedShipment(null)} className="text-white/40 hover:text-white"><X size={16} /></button>
+              <button onClick={() => setSelectedShipment(null)} className="text-[#3d2428]/40 hover:text-[#3d2428]"><X size={16} /></button>
             </div>
 
             <form onSubmit={handleDispatchShipment} className="space-y-4 text-xs font-semibold">
               <div className="p-3.5 bg-yellow-500/[0.02] border border-yellow-500/10 rounded-xl space-y-1.5">
                 <span className="text-[8px] uppercase tracking-widest text-[#d4af37] font-black block">Origin & Destination Matrix</span>
-                <p className="text-white/80 font-bold text-[10.5px]">
+                <p className="text-[#3d2428]/80 font-bold text-[10.5px]">
                   Bhopal, Madhya Pradesh (Warehouse) → {selectedShipment.orders?.shipping_address?.city || 'Vidisha'}, {selectedShipment.orders?.shipping_address?.state || 'Madhya Pradesh'}
                 </p>
-                <p className="text-white/40 text-[9px]">
+                <p className="text-[#3d2428]/40 text-[9px]">
                   Fulfillment Node Route will be calculated dynamically based on Country access, road conditions, and urgency levels.
                 </p>
               </div>
 
               {/* LEVEL 3: DELIVERY MODE SELECTION */}
               <div>
-                <label className="block text-[9px] tracking-widest uppercase text-white/40 mb-1.5 font-bold">1. Select Delivery Mode</label>
+                <label className="block text-[9px] tracking-widest uppercase text-[#3d2428]/40 mb-1.5 font-bold">1. Select Delivery Mode</label>
                 <select
                   value={deliveryMode}
                   onChange={e => setDeliveryMode(e.target.value)}
-                  className="input-field w-full px-4 py-2.5 rounded-xl bg-neutral-900 text-white border border-white/10 text-xs [&>option]:bg-neutral-900 [&>option]:text-white"
+                  className="input-field w-full px-4 py-2.5 rounded-xl bg-white/90 text-[#3d2428] border border-[#ffd5dd] text-xs [&>option]:bg-white [&>option]:text-[#3d2428]"
                 >
                   <option value="hybrid">Hybrid (Optimized Multi-Stage Network - Recommended)</option>
                   <option value="air">Air Cargo (International / Premium SLA / Express)</option>
@@ -2879,7 +2937,7 @@ export default function VendorDashboard() {
 
               {/* CONTRACTOR NETWORK SELECTION */}
               <div>
-                <label className="block text-[9px] tracking-widest uppercase text-white/40 mb-1.5 font-bold">2. Assign Logistics Contractor</label>
+                <label className="block text-[9px] tracking-widest uppercase text-[#3d2428]/40 mb-1.5 font-bold">2. Assign Logistics Contractor</label>
                 <select
                   value={selectedContractorId}
                   onChange={e => {
@@ -2888,7 +2946,7 @@ export default function VendorDashboard() {
                     const matchVeh = vehiclesList.find(v => v.contractor_id === val);
                     if (matchVeh) setSelectedVehicleId(matchVeh.id);
                   }}
-                  className="input-field w-full px-4 py-2.5 rounded-xl bg-neutral-900 text-white border border-white/10 text-xs [&>option]:bg-neutral-900 [&>option]:text-white"
+                  className="input-field w-full px-4 py-2.5 rounded-xl bg-white/90 text-[#3d2428] border border-[#ffd5dd] text-xs [&>option]:bg-white [&>option]:text-[#3d2428]"
                 >
                   <option value="">Select a partner carrier...</option>
                   {contractorsList.map(c => (
@@ -2901,11 +2959,11 @@ export default function VendorDashboard() {
 
               {/* DRIVER / FLEET VEHICLE ALLOCATION */}
               <div>
-                <label className="block text-[9px] tracking-widest uppercase text-white/40 mb-1.5 font-bold">3. Allocate Fleet Driver & Vehicle Type</label>
+                <label className="block text-[9px] tracking-widest uppercase text-[#3d2428]/40 mb-1.5 font-bold">3. Allocate Fleet Driver & Vehicle Type</label>
                 <select
                   value={selectedVehicleId}
                   onChange={e => setSelectedVehicleId(e.target.value)}
-                  className="input-field w-full px-4 py-2.5 rounded-xl bg-neutral-900 text-white border border-white/10 text-xs [&>option]:bg-neutral-900 [&>option]:text-white"
+                  className="input-field w-full px-4 py-2.5 rounded-xl bg-white/90 text-[#3d2428] border border-[#ffd5dd] text-xs [&>option]:bg-white [&>option]:text-[#3d2428]"
                   disabled={!selectedContractorId}
                 >
                   <option value="">Select an available driver...</option>
@@ -2919,7 +2977,7 @@ export default function VendorDashboard() {
                 </select>
               </div>
 
-              <div className="p-3 bg-black/45 border border-white/5 rounded-xl text-[10px] text-white/45">
+              <div className="p-3 bg-pink-50/40 border border-[#ffd5dd]/60 rounded-xl text-[10px] text-[#3d2428]/45">
                 Executing the routing engine will automatically assign the sequence, generate a secure airway bill tracking code, and send the handoff verification OTP to the customer.
               </div>
 
@@ -2944,29 +3002,29 @@ export default function VendorDashboard() {
         >
           <div 
             onClick={e => e.stopPropagation()}
-            className="bg-[#111] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-slide-up"
+            className="bg-white border border-[#ffd5dd] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-slide-up"
           >
-            <div className="relative border-b border-white/10 p-4">
-              <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
+            <div className="relative border-b border-[#ffd5dd] p-4">
+              <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#3d2428]/30" />
               <input
                 type="text"
                 value={commandSearch}
                 onChange={e => setCommandSearch(e.target.value)}
                 placeholder="Jump to sections... (Esc to close)"
-                className="w-full bg-transparent pl-8 pr-4 text-sm text-white focus:outline-none placeholder-white/20"
+                className="w-full bg-transparent pl-8 pr-4 text-sm text-[#3d2428] focus:outline-none placeholder-[#3d2428]/20"
                 autoFocus
               />
             </div>
             
             <div className="max-h-60 overflow-y-auto p-2">
               {commandFilteredItems.length === 0 ? (
-                <p className="text-xs text-white/30 text-center py-4">No matching actions found.</p>
+                <p className="text-xs text-[#3d2428]/30 text-center py-4">No matching actions found.</p>
               ) : (
                 commandFilteredItems.map((cmd, idx) => (
                   <button
                     key={idx}
                     onClick={cmd.action}
-                    className="w-full text-left px-4 py-2.5 rounded-lg hover:bg-white/5 text-xs text-white/60 hover:text-[#d4af37] font-semibold transition-all flex items-center justify-between"
+                    className="w-full text-left px-4 py-2.5 rounded-lg hover:bg-pink-50/60 text-xs text-[#3d2428]/60 hover:text-[#d4af37] font-semibold transition-all flex items-center justify-between"
                   >
                     <span>{cmd.label}</span>
                     <ChevronRight size={14} className="opacity-40" />
@@ -2975,7 +3033,7 @@ export default function VendorDashboard() {
               )}
             </div>
             
-            <div className="bg-black/35 p-3 border-t border-white/5 flex justify-between text-[9px] text-white/20 uppercase tracking-widest font-bold">
+            <div className="bg-pink-50/60 p-3 border-t border-[#ffd5dd]/60 flex justify-between text-[9px] text-[#3d2428]/25 uppercase tracking-widest font-bold">
               <span>Spotlight Launcher</span>
               <span>Use arrows & Enter</span>
             </div>

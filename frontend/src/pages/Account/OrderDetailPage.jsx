@@ -650,7 +650,7 @@ export default function OrderDetailPage() {
             <div className="space-y-4">
               {order.orderItems.map((item, i) => (
                 <div key={i} className="flex items-center gap-4 pb-4 border-b border-[var(--card-border)]/5 last:border-0 last:pb-0">
-                  <img src={item.image} alt={item.name} className="w-16 h-16 rounded-xl object-cover border border-[var(--card-border)] flex-shrink-0" />
+                  <img src={item.image} alt={item.name} loading="lazy" width="64" height="64" className="w-16 h-16 rounded-xl object-cover border border-[var(--card-border)] flex-shrink-0" />
                   
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-sm text-[var(--text-primary)] truncate">{item.name}</p>

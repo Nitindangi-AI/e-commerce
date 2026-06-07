@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { insforge } from "../../lib/insforge";
 import ProductCard from "../../components/ProductCard";
 import { SkeletonGrid } from "../../components/SkeletonCard";
+import { toast } from "../../components/GlobalToast";
 
 export default function StorefrontView() {
   const { vendorId } = useParams();
@@ -61,12 +62,14 @@ export default function StorefrontView() {
           sizes: p.sizes || [],
           deliveryDays: p.delivery_days,
           seller: p.seller_id,
+          slug: p.slug,
         }));
 
         setProducts(normalized);
       }
     } catch (err) {
       console.error("Failed to load vendor storefront:", err);
+      toast.error("Failed to load merchant storefront.");
     } finally {
       setLoading(false);
     }
@@ -154,7 +157,7 @@ export default function StorefrontView() {
           {/* Logo container */}
           <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-2xl bg-white/70 border border-[#e8e4d5] backdrop-blur-md flex items-center justify-center font-bold text-[#7c5d1b] text-4xl shadow-2xl relative overflow-hidden flex-shrink-0">
             {vendor.store_logo ? (
-              <img src={vendor.store_logo} alt={vendor.store_name} className="w-full h-full object-cover" />
+              <img src={vendor.store_logo} alt={vendor.store_name} loading="lazy" width="144" height="144" className="w-full h-full object-cover" />
             ) : (
               vendor.store_name?.charAt(0).toUpperCase()
             )}

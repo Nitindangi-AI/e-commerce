@@ -753,3 +753,68 @@ main {
 .custom-toast {
   animation: toastSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
 }
+
+/* ─── Dashboard Permanent Pinkish+Green+Orange Theme ─── */
+.dashboard-pink-theme {
+  --bg-gradient: linear-gradient(135deg, #fff0f3 0%, #fff6f8 50%, #ffe5ec 100%);
+  --text-primary: #3d2428;
+  --text-secondary: rgba(61, 36, 40, 0.65);
+  --text-display: #3d2428;
+  --gold-text: #0f766e;
+  --gold-gradient: linear-gradient(135deg, #10b981 0%, #047857 100%);
+  --gold-bg: linear-gradient(135deg, #f97316, #ea580c);
+  --card-bg: rgba(255, 255, 255, 0.82);
+  --card-border: #ffd5dd;
+  --card-shadow: 0 8px 32px rgba(255, 182, 193, 0.22);
+  --input-bg: rgba(255, 255, 255, 0.95);
+  --input-border: #ffd5dd;
+  --input-text: #3d2428;
+  --scroll-track: #fff0f3;
+  --scroll-thumb: #10b981;
+}
+
+/* Override gold button and text inside dashboard pink theme */
+.dashboard-pink-theme .gold {
+  color: #0f766e !important;
+  background: linear-gradient(135deg, #10b981 0%, #047857 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+}
+
+.dashboard-pink-theme .btn-gold {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25) !important;
+}
+
+.dashboard-pink-theme .btn-gold:hover:not(:disabled) {
+  box-shadow: 0 6px 16px rgba(249, 115, 22, 0.35) !important;
+  filter: brightness(1.05);
+}
+
+/* ─── Performance Optimization & Accessibility Tweaks ─── */
+html {
+  scroll-behavior: smooth;
+}
+* {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: #C9A84C;
+  border-radius: 3px;
+}
+:focus-visible {
+  outline: 2px solid #C9A84C;
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -30,8 +30,6 @@ import {
   CheckCircle2,
   XCircle,
   Eye,
-  Sun,
-  Moon,
   ChevronRight,
   Database,
   Cpu,
@@ -48,7 +46,6 @@ export default function AdminDashboard() {
   // Navigation and UI state
   const [activeTab, setActiveTab] = useState("overview");
   const [loading, setLoading] = useState(true);
-  const [isDarkMode, setIsDarkMode] = useState(false);
 
   // Spotlight Command Palette
   const [showCommandPalette, setShowCommandPalette] = useState(false);
@@ -56,6 +53,7 @@ export default function AdminDashboard() {
 
   // Administrative Data State
   const [pendingVendors, setPendingVendors] = useState([]);
+  const [rejectionReasons, setRejectionReasons] = useState({});
   const [approvedVendors, setApprovedVendors] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
   const [platformOrders, setPlatformOrders] = useState([]);
@@ -151,24 +149,6 @@ export default function AdminDashboard() {
 
   const userRole = user?.profile?.role || user?.role;
 
-  useEffect(() => {
-    if (!user) return;
-    if (userRole !== "admin") {
-      toast.error("Access Denied: You do not have Administrator permissions.");
-      navigate("/");
-      return;
-    }
-    loadAdminData();
-  }, [user]);
-
-  if (loading || !user || userRole !== "admin") {
-    return (
-      <div className="min-h-screen pt-24 pb-16 flex items-center justify-center">
-        <Loader />
-      </div>
-    );
-  }
-
   const loadAdminData = async () => {
     setLoading(true);
     try {
@@ -195,7 +175,7 @@ export default function AdminDashboard() {
       // 3. Fetch all platform products
       const { data: products, error: pErr } = await insforge.database
         .from("products")
-        .select("*, vendors:seller_id(store_name)")
+        .select("*")
         .order("created_at", { ascending: false });
 
       if (pErr) throw pErr;
@@ -290,6 +270,24 @@ export default function AdminDashboard() {
     }
   };
 
+  useEffect(() => {
+    if (!user) return;
+    if (userRole !== "admin") {
+      toast.error("Access Denied: You do not have Administrator permissions.");
+      navigate("/");
+      return;
+    }
+    loadAdminData();
+  }, [user]);
+
+  if (loading || !user || userRole !== "admin") {
+    return (
+      <div className="min-h-screen pt-24 pb-16 flex items-center justify-center">
+        <Loader />
+      </div>
+    );
+  }
+
   const handleSelectShipment = async (ship) => {
     setLoadingLogistics(true);
     try {
@@ -318,15 +316,20 @@ export default function AdminDashboard() {
   };
 
   // Vendor actions
-  const handleVendorAction = async (vendorId, action) => {
+  const handleVendorAction = async (vendorId, action, rejectionReason = "") => {
     if (userRole !== "admin") {
       toast.error("Access Denied: You do not have Administrator permissions.");
       return;
     }
     try {
+      const updatePayload = { status: action, updated_at: new Date().toISOString() };
+      if (action === "rejected") {
+        updatePayload.rejection_reason = rejectionReason;
+      }
+      
       const { error } = await insforge.database
         .from("vendors")
-        .update({ status: action, updated_at: new Date().toISOString() })
+        .update(updatePayload)
         .eq("id", vendorId);
 
       if (error) throw error;
@@ -737,7 +740,7 @@ export default function AdminDashboard() {
     { label: "Shipments Management", action: () => { setActiveTab("shipments"); setShowCommandPalette(false); } },
     { label: "Security & Auditing Geolocation Logs", action: () => { setActiveTab("security"); setShowCommandPalette(false); } },
     { label: "Disputes Resolution Margins", action: () => { setActiveTab("disputes"); setShowCommandPalette(false); } },
-    { label: "Toggle Dark / Light Console Style", action: () => { setIsDarkMode(!isDarkMode); setShowCommandPalette(false); } }
+    { label: "Theme: Blossom Pink Active", action: () => { setShowCommandPalette(false); } }
   ].filter(c => c.label.toLowerCase().includes(commandSearch.toLowerCase()));
 
   const formatCurrency = (p) => `₹${(p || 0).toLocaleString("en-IN")}`;
@@ -753,20 +756,27 @@ export default function AdminDashboard() {
   };
 
   // Theme support
-  const themeBg = isDarkMode ? "bg-[#0a0a0a] text-white" : "bg-[#f5f6f8] text-[#0a0a0a]";
-  const cardBg = isDarkMode ? "bg-[#111] border-white/5" : "bg-white border-black/5 shadow-md shadow-black/[0.02]";
-  const inputBg = isDarkMode ? "bg-white/[0.04] border-white/10" : "bg-black/[0.02] border-black/10 text-black";
-  const borderLight = isDarkMode ? "border-white/5" : "border-black/5";
-  const textSubtle = isDarkMode ? "text-white/40" : "text-black/40";
-  const textTitle = isDarkMode ? "text-white" : "text-black";
+  const themeBg = "bg-[var(--bg-gradient)] text-[var(--text-primary)] min-h-screen";
+  const cardBg = "bg-[var(--card-bg)] border-[var(--card-border)] shadow-xl shadow-pink-100/10";
+  const inputBg = "bg-[var(--input-bg)] border-[var(--input-border)] text-[var(--input-text)]";
+  const borderLight = "border-[var(--card-border)]";
+  const textSubtle = "text-[var(--text-secondary)]";
+  const textTitle = "text-[var(--text-primary)] font-bold";
+
+  const vendorMap = {};
+  [...approvedVendors, ...pendingVendors].forEach(v => {
+    if (v.user_id) {
+      vendorMap[v.user_id] = v.store_name;
+    }
+  });
 
   return (
-    <div className={`min-h-screen pt-24 pb-16 flex flex-col lg:flex-row max-w-7xl mx-auto px-6 gap-8 transition-colors duration-300 ${themeBg}`}>
+    <div className={`dashboard-pink-theme min-h-screen pt-24 pb-16 flex flex-col lg:flex-row max-w-7xl mx-auto px-6 gap-8 transition-colors duration-300 ${themeBg}`}>
       
       {/* SIDEBAR ADMINISTRATIVE ACCESS */}
       <aside className={`w-full lg:w-64 flex-shrink-0 border p-6 rounded-2xl self-start shadow-xl ${cardBg}`}>
-        <div className="flex items-center gap-4 mb-8 pb-6 border-b border-white/5">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-[#d4af37] to-[#f5d26e] flex items-center justify-center font-bold text-[#0a0a0a] text-xl">
+        <div className={`flex items-center gap-4 mb-8 pb-6 border-b ${borderLight}`}>
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-emerald-500 to-orange-400 flex items-center justify-center font-bold text-white text-xl shadow-md shadow-orange-500/10">
             🛡️
           </div>
           <div>
@@ -810,8 +820,8 @@ export default function AdminDashboard() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all ${
                   activeTab === tab.id || (tab.id === "products" && activeTab === "add-product")
-                    ? "bg-yellow-500/10 gold border border-yellow-500/20"
-                    : "text-white/50 hover:text-white hover:bg-white/5 border border-transparent"
+                    ? "bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 font-extrabold"
+                    : "text-[#3d2428]/50 hover:text-[#3d2428] hover:bg-pink-50/60 border border-transparent"
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -839,15 +849,10 @@ export default function AdminDashboard() {
           </button>
         </nav>
 
-        {/* Local light/dark style toggle */}
-        <div className="mt-8 pt-4 border-t border-white/5 flex items-center justify-between">
-          <span className={`text-[9px] uppercase tracking-widest font-bold ${textSubtle}`}>Style Theme</span>
-          <button 
-            onClick={() => setIsDarkMode(!isDarkMode)}
-            className="w-8 h-8 rounded-lg border border-white/10 flex items-center justify-center hover:bg-white/5"
-          >
-            {isDarkMode ? <Sun size={14} className="text-yellow-400" /> : <Moon size={14} className="text-slate-500" />}
-          </button>
+        {/* Theme badge */}
+        <div className="mt-8 pt-4 border-t border-[#ffd5dd]/60 flex items-center justify-between">
+          <span className={`text-[9px] uppercase tracking-widest font-bold ${textSubtle}`}>Theme</span>
+          <span className="text-[9px] font-bold text-pink-400 bg-pink-500/10 px-2 py-1 rounded-lg border border-pink-500/15">Blossom</span>
         </div>
       </aside>
 
@@ -855,9 +860,9 @@ export default function AdminDashboard() {
       <main className="flex-1 min-w-0 space-y-6">
         
         {/* HEADER TOOLBAR WITH COMMAND PALETTE SPOTLIGHT */}
-        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/5">
+        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#ffd5dd]/60">
           <div className="relative w-full sm:max-w-xs">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#3d2428]/30" />
             <input
               type="text"
               readOnly
@@ -867,7 +872,7 @@ export default function AdminDashboard() {
             />
           </div>
           
-          <div className="flex items-center gap-4 text-xs font-semibold text-white/40 self-end">
+          <div className="flex items-center gap-4 text-xs font-semibold text-[#3d2428]/40 self-end">
             <span>Control Gateway: Secured</span>
             <span>RLS Active</span>
           </div>
@@ -882,28 +887,53 @@ export default function AdminDashboard() {
             </div>
 
             {/* Split metrics panel */}
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-              {[
-                { title: "Gross Platform GTV", val: formatCurrency(analytics.grossRevenue), desc: "Total transactions value", col: "gold" },
-                { title: "Fee Commissions", val: formatCurrency(analytics.platformCommission), desc: "Aggregated service fee", col: "gold" },
-                { title: "Net Seller Share", val: formatCurrency(analytics.vendorPayout), desc: "Bank payout splits", col: "text-green-400" },
-                { title: "Active Platforms", val: approvedVendors.length + 1, desc: "Onboarded merchants", col: "text-blue-400" }
-              ].map((card, i) => (
-                <div key={i} className={`border rounded-2xl p-5 shadow-lg relative overflow-hidden group ${cardBg}`}>
-                  <div className="absolute top-0 right-0 w-20 h-20 bg-white/5 rounded-full blur-xl group-hover:bg-[#d4af37]/5 transition-all" />
-                  <div className={`text-[10px] uppercase tracking-widest font-bold mb-2 ${textSubtle}`}>{card.title}</div>
-                  <h4 className={`text-xl font-black ${card.col === 'gold' ? textTitle : card.col}`}>{card.val}</h4>
-                  <p className={`text-[9px] mt-1 ${textSubtle}`}>{card.desc}</p>
+            {(() => {
+              const todayStr = new Date().toDateString();
+              const gmvToday = platformOrders.reduce((sum, item) => {
+                const orderDate = item.orders?.created_at ? new Date(item.orders.created_at).toDateString() : "";
+                if (orderDate === todayStr && item.orders?.order_status !== "Cancelled" && item.orders?.order_status !== "Returned") {
+                  return sum + (item.price * item.quantity);
+                }
+                return sum;
+              }, 0);
+
+              const ordersTodaySet = new Set();
+              platformOrders.forEach(item => {
+                const orderDate = item.orders?.created_at ? new Date(item.orders.created_at).toDateString() : "";
+                if (orderDate === todayStr) {
+                  ordersTodaySet.add(item.order_id);
+                }
+              });
+              const ordersTodayCount = ordersTodaySet.size;
+              const lowStockAlertsCount = allProducts.filter(p => p.stock <= (p.low_stock_threshold || 5)).length;
+
+              const metrics = [
+                { title: "GMV Today", val: formatCurrency(gmvToday), desc: "Today's transaction volume", col: "text-emerald-400" },
+                { title: "Orders Today", val: ordersTodayCount, desc: "Total orders placed today", col: "text-[#d4af37]" },
+                { title: "Pending Vendors", val: pendingVendors.length, desc: "Awaiting approval review", col: "text-yellow-500" },
+                { title: "Low Stock Alerts", val: lowStockAlertsCount, desc: "Products running low/out of stock", col: "text-red-400" }
+              ];
+
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                  {metrics.map((card, i) => (
+                    <div key={i} className={`border rounded-2xl p-5 shadow-lg relative overflow-hidden group ${cardBg}`}>
+                      <div className="absolute top-0 right-0 w-20 h-20 bg-white/5 rounded-full blur-xl group-hover:bg-[#d4af37]/5 transition-all" />
+                      <div className={`text-[10px] uppercase tracking-widest font-bold mb-2 ${textSubtle}`}>{card.title}</div>
+                      <h4 className={`text-xl font-black ${card.col}`}>{card.val}</h4>
+                      <p className={`text-[9px] mt-1 ${textSubtle}`}>{card.desc}</p>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              );
+            })()}
 
             {/* Simulated Server Health telemetry charts */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               
               {/* Server health telemetry */}
               <div className={`border rounded-2xl p-6 shadow-xl lg:col-span-2 space-y-5 ${cardBg}`}>
-                <h4 className={`font-bold text-xs uppercase tracking-wider border-b border-white/5 pb-4 ${textTitle}`}>
+                <h4 className={`font-bold text-xs uppercase tracking-wider border-b border-[#ffd5dd]/60 pb-4 ${textTitle}`}>
                   🖥️ Server Telemetry Health Monitors
                 </h4>
                 
@@ -916,7 +946,7 @@ export default function AdminDashboard() {
                   ].map((sys, idx) => {
                     const Icon = sys.icon;
                     return (
-                      <div key={idx} className="p-4 bg-black/[0.02] border border-white/5 rounded-xl">
+                      <div key={idx} className="p-4 bg-pink-50/40 border border-[#ffd5dd]/60 rounded-xl">
                         <div className="flex justify-center mb-2">
                           <Icon size={18} className={sys.col} />
                         </div>
@@ -930,7 +960,7 @@ export default function AdminDashboard() {
 
               {/* Platform Splits SVG Chart */}
               <div className={`border rounded-2xl p-6 shadow-xl space-y-4 ${cardBg}`}>
-                <h4 className={`font-bold text-xs uppercase tracking-wider border-b border-white/5 pb-4 ${textTitle}`}>
+                <h4 className={`font-bold text-xs uppercase tracking-wider border-b border-[#ffd5dd]/60 pb-4 ${textTitle}`}>
                   Platformsplits Ledger
                 </h4>
                 <div className="h-32 w-full pt-1 flex justify-center items-center">
@@ -985,7 +1015,7 @@ export default function AdminDashboard() {
                           </p>
 
                           {/* document preview checker */}
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-5 p-4 bg-white/[0.01] border border-white/5 rounded-xl">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-5 p-4 bg-pink-50/30 border border-[#ffd5dd]/60 rounded-xl">
                             {[
                               { label: "PAN CARD ID", code: vendor.pan_card || "N/A" },
                               { label: "GSTIN ID", code: vendor.gst_number || "N/A" },
@@ -1009,20 +1039,36 @@ export default function AdminDashboard() {
                           </div>
                         </div>
 
-                        <div className="flex sm:items-center gap-3 self-end lg:self-center">
-                          <button
-                            onClick={() => handleVendorAction(vendor.id, "rejected")}
-                            className="border border-red-500/20 text-red-400 hover:text-red-300 hover:bg-red-500/10 px-5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all"
-                          >
-                            Reject Onboarding ❌
-                          </button>
-                          <button
-                            onClick={() => handleVendorAction(vendor.id, "approved")}
-                            className="btn-gold px-5 py-3 rounded-xl text-xs font-bold uppercase tracking-widest"
-                          >
-                            Approve Merchant ✓
-                          </button>
-                        </div>
+                         <div className="flex flex-col gap-2 w-full lg:w-auto">
+                           <input
+                             type="text"
+                             placeholder="Rejection reason (required to reject)"
+                             value={rejectionReasons[vendor.id] || ""}
+                             onChange={e => setRejectionReasons({ ...rejectionReasons, [vendor.id]: e.target.value })}
+                             className={`input-field px-4 py-2.5 rounded-xl text-xs ${inputBg} w-full`}
+                           />
+                           <div className="flex sm:items-center gap-3 w-full justify-end">
+                             <button
+                               onClick={() => {
+                                 const reason = rejectionReasons[vendor.id] || "";
+                                 if (!reason.trim()) {
+                                   toast.error("Please enter a rejection reason");
+                                   return;
+                                 }
+                                 handleVendorAction(vendor.id, "rejected", reason);
+                               }}
+                               className="border border-red-500/20 text-red-400 hover:text-red-300 hover:bg-red-500/10 px-5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all"
+                             >
+                               Reject Onboarding ❌
+                             </button>
+                             <button
+                               onClick={() => handleVendorAction(vendor.id, "approved")}
+                               className="btn-gold px-5 py-3 rounded-xl text-xs font-bold uppercase tracking-widest"
+                             >
+                               Approve Merchant ✓
+                             </button>
+                           </div>
+                         </div>
                       </div>
                     </div>
                   ))}
@@ -1047,7 +1093,7 @@ export default function AdminDashboard() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
-                      <tr className="border-b border-white/10 bg-white/[0.02] text-white/50 tracking-wider uppercase font-semibold">
+                      <tr className="border-b border-[#ffd5dd] bg-pink-50/60 text-[#3d2428]/50 tracking-wider uppercase font-semibold">
                         <th className="px-6 py-4">Merchant brand info</th>
                         <th className="px-6 py-4">Seller Owner</th>
                         <th className="px-6 py-4">PAN / GST Details</th>
@@ -1080,7 +1126,7 @@ export default function AdminDashboard() {
                                 type="number"
                                 defaultValue={vendor.commission_rate}
                                 id={`comm-${vendor.id}`}
-                                className="w-16 px-2 py-1 rounded bg-black/45 border border-yellow-500 text-xs text-white"
+                                className="w-16 px-2 py-1 rounded bg-white/90 border border-[#ffd5dd] text-xs text-[#3d2428]"
                                 onKeyDown={(e) => {
                                   if (e.key === "Enter") {
                                     handleUpdateCommission(vendor.id, e.target.value);
@@ -1105,7 +1151,7 @@ export default function AdminDashboard() {
                             ) : (
                               <button
                                 onClick={() => setEditingCommRate(prev => ({ ...prev, [vendor.id]: true }))}
-                                className="p-1.5 border border-white/10 hover:border-yellow-500 rounded-lg hover:bg-yellow-500/5 transition-all text-xs"
+                                className="p-1.5 border border-[#ffd5dd] hover:border-yellow-500 rounded-lg hover:bg-yellow-500/5 transition-all text-xs"
                                 title="Edit Split Margin"
                               >
                                 ✏️ Splits
@@ -1134,7 +1180,7 @@ export default function AdminDashboard() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
-                    <tr className="border-b border-white/10 bg-white/[0.02] text-white/50 tracking-wider uppercase font-semibold">
+                    <tr className="border-b border-[#ffd5dd] bg-pink-50/60 text-[#3d2428]/50 tracking-wider uppercase font-semibold">
                       <th className="px-6 py-4">Shopper profile</th>
                       <th className="px-6 py-4">Phone Number</th>
                       <th className="px-6 py-4">System Role</th>
@@ -1159,7 +1205,7 @@ export default function AdminDashboard() {
                           <select
                             value={profile.role === 'vendor' ? 'merchant' : (profile.role === 'customer' ? 'user' : (profile.role || 'user'))}
                             onChange={e => handleUpdateUserRole(profile.id, e.target.value)}
-                            className="bg-black/45 border border-white/10 rounded px-2.5 py-1 text-[10px] text-white focus:outline-none focus:border-yellow-500 uppercase font-extrabold"
+                            className="bg-white/90 border border-[#ffd5dd] rounded px-2.5 py-1 text-[10px] text-[#3d2428] focus:outline-none focus:border-yellow-500 uppercase font-extrabold"
                           >
                             <option value="user">User</option>
                             <option value="merchant">Merchant</option>
@@ -1189,6 +1235,74 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* ─── TAB: GLOBAL STOCK / INVENTORY ALERTS ─── */}
+        {activeTab === "inventory" && (
+          <div className="space-y-6 animate-fade-in">
+            <div>
+              <h2 className={`display text-3xl font-black mb-1 ${textTitle}`}>Global Stock Alerts</h2>
+              <p className={`text-xs ${textSubtle}`}>List of products that are currently low stock or out of stock across all merchants.</p>
+            </div>
+
+            <div className={`border rounded-2xl shadow-xl overflow-hidden ${cardBg}`}>
+              {allProducts.filter(p => p.stock_status === 'low_stock' || p.stock_status === 'out_of_stock' || p.stock <= (p.low_stock_threshold || 5)).length === 0 ? (
+                <div className="text-center py-20">
+                  <span className="text-4xl block mb-4">✅</span>
+                  <h4 className="font-bold text-base mb-2">Inventory Levels Healthy</h4>
+                  <p className={`text-xs max-w-xs mx-auto ${textSubtle}`}>No products are currently low stock or out of stock.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-[#ffd5dd] bg-pink-50/60 text-[#3d2428]/50 tracking-wider uppercase font-semibold">
+                        <th className="px-6 py-4">Product Name</th>
+                        <th className="px-6 py-4">SKU / Brand</th>
+                        <th className="px-6 py-4">Current Stock</th>
+                        <th className="px-6 py-4">Threshold</th>
+                        <th className="px-6 py-4 text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5 font-medium">
+                      {allProducts.filter(p => p.stock_status === 'low_stock' || p.stock_status === 'out_of_stock' || p.stock <= (p.low_stock_threshold || 5)).map(p => (
+                        <tr key={p.id} className="hover:bg-white/[0.005] transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <img src={p.img} alt={p.name} className="w-10 h-10 object-cover rounded-lg border border-white/10" />
+                              <div>
+                                <span className={`font-bold block ${textTitle}`}>{p.name}</span>
+                                <span className={`text-[10px] ${textSubtle}`}>{p.category}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="font-mono text-white/70 block">{p.sku || p.specs?.sku || 'N/A'}</span>
+                            <span className={`text-[10px] ${textSubtle}`}>{p.brand}</span>
+                          </td>
+                          <td className="px-6 py-4 text-sm font-bold text-white">
+                            {p.stock} units
+                          </td>
+                          <td className="px-6 py-4 text-white/50">
+                            {p.low_stock_threshold || 5} units
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className={`text-[9px] font-bold px-2 py-1 rounded-full uppercase border ${
+                              p.stock === 0 || p.stock_status === 'out_of_stock'
+                                ? 'text-red-400 bg-red-500/10 border-red-500/20'
+                                : 'text-orange-400 bg-orange-500/10 border-orange-500/20'
+                            }`}>
+                              {p.stock === 0 || p.stock_status === 'out_of_stock' ? 'Out of Stock' : 'Low Stock'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ─── TAB: CATALOG AUDITING ─── */}
         {activeTab === "products" && (
           <div className="space-y-6 animate-fade-in">
@@ -1213,7 +1327,7 @@ export default function AdminDashboard() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
-                    <tr className="border-b border-white/10 bg-white/[0.02] text-white/50 tracking-wider uppercase font-semibold">
+                    <tr className="border-b border-[#ffd5dd] bg-pink-50/60 text-[#3d2428]/50 tracking-wider uppercase font-semibold">
                       <th className="px-6 py-4">Product Detail</th>
                       <th className="px-6 py-4">Merchant Storefront</th>
                       <th className="px-6 py-4">Pricing splits</th>
@@ -1225,16 +1339,16 @@ export default function AdminDashboard() {
                     {allProducts.map(p => (
                       <tr key={p.id} className="hover:bg-white/[0.005] transition-colors">
                         <td className="px-6 py-4 flex items-center gap-3">
-                          <img src={p.img} alt={p.name} className="w-10 h-10 rounded-lg object-cover border border-white/10" />
+                          <img src={p.img} alt={p.name} className="w-10 h-10 rounded-lg object-cover border border-[#ffd5dd]" />
                           <div>
                             <p className={`font-bold text-sm ${textTitle}`}>{p.name}</p>
                             <span className={`text-[9px] font-mono ${textSubtle}`}>ID: {p.id.slice(0, 8)}</span>
                           </div>
                         </td>
                         <td className="px-6 py-4 font-bold text-yellow-500 uppercase tracking-widest">
-                          {p.vendors?.store_name || "Trendz Admin"}
+                          {vendorMap[p.seller_id] || "Trendz Admin"}
                         </td>
-                        <td className="px-6 py-4 font-semibold text-white/60">
+                        <td className="px-6 py-4 font-semibold text-[#3d2428]/60">
                           Sale: ₹{p.price.toLocaleString()}<br />
                           Cost: ₹{p.original_price?.toLocaleString()}
                         </td>
@@ -1243,7 +1357,7 @@ export default function AdminDashboard() {
                           <div className="flex items-center justify-center gap-2">
                             <button
                               onClick={() => handleEditProduct(p)}
-                              className="px-3 py-1.5 border border-white/10 hover:border-yellow-500 rounded-lg hover:bg-yellow-500/5 transition-all text-[10px] font-bold uppercase tracking-wider text-yellow-500"
+                              className="px-3 py-1.5 border border-[#ffd5dd] hover:border-yellow-500 rounded-lg hover:bg-yellow-500/5 transition-all text-[10px] font-bold uppercase tracking-wider text-yellow-500"
                             >
                               Edit ✏️
                             </button>
@@ -1300,11 +1414,11 @@ export default function AdminDashboard() {
                     <select
                       value={productForm.seller_id || user?.id}
                       onChange={e => setProductForm({ ...productForm, seller_id: e.target.value })}
-                      className={`input-field w-full px-4 py-3 rounded-xl text-xs bg-black/45 ${inputBg}`}
+                      className={`input-field w-full px-4 py-3 rounded-xl text-xs bg-white/90 ${inputBg}`}
                     >
-                      <option value={user?.id} className="bg-[#111] text-white">Admin Seller ({user?.email})</option>
+                      <option value={user?.id} className="bg-white text-[#3d2428]">Admin Seller ({user?.email})</option>
                       {approvedVendors.filter(v => v.status === "approved").map(v => (
-                        <option key={v.user_id} value={v.user_id} className="bg-[#111] text-white">
+                        <option key={v.user_id} value={v.user_id} className="bg-white text-[#3d2428]">
                           {v.store_name} ({v.profiles?.first_name} {v.profiles?.last_name})
                         </option>
                       ))}
@@ -1339,13 +1453,13 @@ export default function AdminDashboard() {
                     <select
                       value={productForm.badge}
                       onChange={e => setProductForm({ ...productForm, badge: e.target.value })}
-                      className={`input-field w-full px-4 py-3 rounded-xl text-xs bg-black/45 ${inputBg}`}
+                      className={`input-field w-full px-4 py-3 rounded-xl text-xs bg-white/90 ${inputBg}`}
                     >
-                      <option value="" className="bg-[#111] text-white">No Badge</option>
-                      <option value="New" className="bg-[#111] text-white">New</option>
-                      <option value="Hot" className="bg-[#111] text-white">Hot</option>
-                      <option value="Sale" className="bg-[#111] text-white">Sale</option>
-                      <option value="Best Seller" className="bg-[#111] text-white">Best Seller</option>
+                      <option value="" className="bg-white text-[#3d2428]">No Badge</option>
+                      <option value="New" className="bg-white text-[#3d2428]">New</option>
+                      <option value="Hot" className="bg-white text-[#3d2428]">Hot</option>
+                      <option value="Sale" className="bg-white text-[#3d2428]">Sale</option>
+                      <option value="Best Seller" className="bg-white text-[#3d2428]">Best Seller</option>
                     </select>
                   </div>
                 </div>
@@ -1356,10 +1470,10 @@ export default function AdminDashboard() {
                     <select
                       value={productForm.category}
                       onChange={e => setProductForm({ ...productForm, category: e.target.value })}
-                      className={`input-field w-full px-4 py-3 rounded-xl text-xs bg-black/45 ${inputBg}`}
+                      className={`input-field w-full px-4 py-3 rounded-xl text-xs bg-white/90 ${inputBg}`}
                     >
                       {categories.map(cat => (
-                        <option key={cat} value={cat} className="bg-[#111] text-white">{cat}</option>
+                        <option key={cat} value={cat} className="bg-white text-[#3d2428]">{cat}</option>
                       ))}
                     </select>
                   </div>
@@ -1468,7 +1582,7 @@ export default function AdminDashboard() {
                       />
                       <label
                         htmlFor="admin-image-file"
-                        className="btn-outline px-4 py-3.5 rounded-xl text-[9px] font-bold uppercase tracking-wider block cursor-pointer border border-white/10 hover:border-[#C9A84C] text-center"
+                        className="btn-outline px-4 py-3.5 rounded-xl text-[9px] font-bold uppercase tracking-wider block cursor-pointer border border-[#ffd5dd] hover:border-[#C9A84C] text-center"
                       >
                         {uploadingImage ? "Uploading..." : "📷 Upload"}
                       </label>
@@ -1502,15 +1616,15 @@ export default function AdminDashboard() {
                     />
                     <label
                       htmlFor="admin-multiple-images"
-                      className="btn-outline px-4 py-3 rounded-xl text-[9px] font-bold uppercase tracking-wider block cursor-pointer border border-white/10 hover:border-[#C9A84C]"
+                      className="btn-outline px-4 py-3 rounded-xl text-[9px] font-bold uppercase tracking-wider block cursor-pointer border border-[#ffd5dd] hover:border-[#C9A84C]"
                     >
                       {uploadingImage ? "Uploading..." : "📷 Upload Gallery Images"}
                     </label>
                   </div>
                   {productForm.images && productForm.images.length > 0 && (
-                    <div className="flex flex-wrap gap-3 p-3 bg-black/20 rounded-xl border border-white/5">
+                    <div className="flex flex-wrap gap-3 p-3 bg-pink-50/60 rounded-xl border border-[#ffd5dd]/60">
                       {productForm.images.map((url, index) => (
-                        <div key={index} className="relative group w-16 h-16 rounded-lg overflow-hidden border border-white/10">
+                        <div key={index} className="relative group w-16 h-16 rounded-lg overflow-hidden border border-[#ffd5dd]">
                           <img src={url} alt="Product Thumbnail" className="w-full h-full object-cover" />
                           <button
                             type="button"
@@ -1605,7 +1719,7 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* SEO METADATA BLOCK */}
-                <div className="space-y-4 border-t border-white/5 pt-5 mt-5">
+                <div className="space-y-4 border-t border-[#ffd5dd]/60 pt-5 mt-5">
                   <span className="text-[10px] font-bold tracking-widest uppercase gold">Search Engine Optimization (SEO) Metadata</span>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -1631,8 +1745,8 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-white/5 flex gap-3">
-                  <button type="button" onClick={() => { resetProductForm(); setActiveTab("products"); }} className="btn-outline flex-1 py-3 rounded-xl text-xs font-bold uppercase tracking-wider border border-white/10 text-center">
+                <div className="pt-4 border-t border-[#ffd5dd]/60 flex gap-3">
+                  <button type="button" onClick={() => { resetProductForm(); setActiveTab("products"); }} className="btn-outline flex-1 py-3 rounded-xl text-xs font-bold uppercase tracking-wider border border-[#ffd5dd] text-center">
                     Cancel
                   </button>
                   <button type="submit" className="btn-gold flex-1 py-3 rounded-xl text-xs font-bold uppercase tracking-wider">
@@ -1654,7 +1768,7 @@ export default function AdminDashboard() {
 
             {/* Geolocation IP attempts table */}
             <div className={`border rounded-2xl p-6 ${cardBg} space-y-4 shadow-xl`}>
-              <div className="flex items-center justify-between border-b border-white/5 pb-4">
+              <div className="flex items-center justify-between border-b border-[#ffd5dd]/60 pb-4">
                 <h4 className={`font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 ${textTitle}`}>
                   <ShieldAlert size={14} className="text-red-500" /> Active Session Device Logs
                 </h4>
@@ -1669,8 +1783,8 @@ export default function AdminDashboard() {
                   { user: "seller1@trendz.com", ip: "42.102.5.19", geo: "Delhi, IN", device: "Safari 17 / iPhone 15", time: "1 hour ago", status: "Successful Credentials Login" },
                   { user: "unknown_user", ip: "198.51.100.4", geo: "California, US", device: "Firefox / Linux Desktop", time: "3 hours ago", status: "Failed Login: Unauthorized Role Card" }
                 ].map((log, idx) => (
-                  <div key={idx} className="p-4 bg-black/[0.02] border border-white/5 rounded-xl text-[10px] font-semibold text-white/40 space-y-1.5 relative">
-                    <div className="absolute top-4 right-4 text-[8px] bg-white/5 border border-white/10 px-2 py-0.5 rounded-full uppercase tracking-wider font-extrabold text-white">
+                  <div key={idx} className="p-4 bg-pink-50/40 border border-[#ffd5dd]/60 rounded-xl text-[10px] font-semibold text-[#3d2428]/40 space-y-1.5 relative">
+                    <div className="absolute top-4 right-4 text-[8px] bg-pink-50/60 border border-[#ffd5dd] px-2 py-0.5 rounded-full uppercase tracking-wider font-extrabold text-[#3d2428]/50">
                       {log.time}
                     </div>
                     <div className="flex justify-between w-3/4">
@@ -1755,7 +1869,7 @@ export default function AdminDashboard() {
             })()}
 
             {/* Filter and Bulk Actions row */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-black/10 p-4 rounded-xl border border-white/5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-pink-50/40 p-4 rounded-xl border border-[#ffd5dd]/60">
               <div className="flex items-center gap-3 flex-wrap">
                 <input
                   type="text"
@@ -1860,7 +1974,7 @@ export default function AdminDashboard() {
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs border-collapse">
                       <thead>
-                        <tr className="border-b border-white/10 bg-white/[0.02] text-white/50 tracking-wider uppercase font-semibold">
+                        <tr className="border-b border-[#ffd5dd] bg-pink-50/60 text-[#3d2428]/50 tracking-wider uppercase font-semibold">
                           <th className="px-6 py-4 w-12 text-center">
                             <input
                               type="checkbox"
@@ -1961,7 +2075,7 @@ export default function AdminDashboard() {
                                     setModalEstDelivery(s.estimated_delivery ? new Date(s.estimated_delivery).toISOString().slice(0, 10) : "");
                                     setShowUpdateModal(true);
                                   }}
-                                  className="px-3 py-1.5 border border-white/10 hover:border-yellow-500 rounded-lg hover:bg-yellow-500/5 transition-all text-[10px] font-bold uppercase tracking-wider text-yellow-500"
+                                  className="px-3 py-1.5 border border-[#ffd5dd] hover:border-yellow-500 rounded-lg hover:bg-yellow-500/5 transition-all text-[10px] font-bold uppercase tracking-wider text-yellow-500"
                                 >
                                   Update status ✏️
                                 </button>
@@ -1980,14 +2094,14 @@ export default function AdminDashboard() {
             {showUpdateModal && editingShipment && (
               <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-6 backdrop-blur-sm">
                 <div 
-                  className="bg-[#111111] border border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 text-xs font-semibold"
+                  className="bg-white border border-[#ffd5dd] rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 text-xs font-semibold"
                   onClick={e => e.stopPropagation()}
                 >
-                  <div className="flex justify-between items-center pb-2 border-b border-white/5">
+                  <div className="flex justify-between items-center pb-2 border-b border-[#ffd5dd]/60">
                     <h3 className="font-bold text-sm uppercase tracking-wider text-[#d4af37]">Update Shipment Parameters</h3>
                     <button 
                       onClick={() => { setShowUpdateModal(false); setEditingShipment(null); }} 
-                      className="text-white/40 hover:text-white"
+                      className="text-[#3d2428]/40 hover:text-[#3d2428]"
                     >
                       ✕
                     </button>
@@ -1999,59 +2113,59 @@ export default function AdminDashboard() {
 
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-[10px] uppercase font-bold tracking-widest text-white/50 mb-1">Fulfillment Status</label>
+                      <label className="block text-[10px] uppercase font-bold tracking-widest text-[#3d2428]/50 mb-1">Fulfillment Status</label>
                       <select 
                         value={modalStatus} 
                         onChange={e => setModalStatus(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl text-xs bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-gold"
+                        className="w-full px-4 py-3 rounded-xl text-xs bg-white/90 border border-[#ffd5dd] text-[#3d2428] focus:outline-none focus:border-gold"
                       >
-                        <option value="pending" className="bg-[#111] text-white">pending</option>
-                        <option value="pickup_scheduled" className="bg-[#111] text-white">pickup_scheduled</option>
-                        <option value="picked_up" className="bg-[#111] text-white">picked_up</option>
-                        <option value="in_transit" className="bg-[#111] text-white">in_transit</option>
-                        <option value="out_for_delivery" className="bg-[#111] text-white">out_for_delivery</option>
-                        <option value="delivered" className="bg-[#111] text-white">delivered</option>
-                        <option value="failed" className="bg-[#111] text-white">failed</option>
-                        <option value="returned" className="bg-[#111] text-white">returned</option>
+                        <option value="pending" className="bg-white text-[#3d2428]">pending</option>
+                        <option value="pickup_scheduled" className="bg-white text-[#3d2428]">pickup_scheduled</option>
+                        <option value="picked_up" className="bg-white text-[#3d2428]">picked_up</option>
+                        <option value="in_transit" className="bg-white text-[#3d2428]">in_transit</option>
+                        <option value="out_for_delivery" className="bg-white text-[#3d2428]">out_for_delivery</option>
+                        <option value="delivered" className="bg-white text-[#3d2428]">delivered</option>
+                        <option value="failed" className="bg-white text-[#3d2428]">failed</option>
+                        <option value="returned" className="bg-white text-[#3d2428]">returned</option>
                       </select>
                     </div>
 
                     <div>
-                      <label className="block text-[10px] uppercase font-bold tracking-widest text-white/50 mb-1">Current Geolocation / Hub</label>
+                      <label className="block text-[10px] uppercase font-bold tracking-widest text-[#3d2428]/50 mb-1">Current Geolocation / Hub</label>
                       <input 
                         type="text"
                         placeholder="e.g. Mumbai Airport Hub" 
                         value={modalLocation}
                         onChange={e => setModalLocation(e.target.value)} 
-                        className="w-full px-4 py-3 rounded-xl text-xs bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-gold" 
+                        className="w-full px-4 py-3 rounded-xl text-xs bg-white/90 border border-[#ffd5dd] text-[#3d2428] focus:outline-none focus:border-gold" 
                       />
                     </div>
 
                     <div>
-                      <label className="block text-[10px] uppercase font-bold tracking-widest text-white/50 mb-1">Estimated Delivery Date</label>
+                      <label className="block text-[10px] uppercase font-bold tracking-widest text-[#3d2428]/50 mb-1">Estimated Delivery Date</label>
                       <input 
                         type="date"
                         value={modalEstDelivery}
                         onChange={e => setModalEstDelivery(e.target.value)} 
-                        className="w-full px-4 py-3 rounded-xl text-xs bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-gold" 
+                        className="w-full px-4 py-3 rounded-xl text-xs bg-white/90 border border-[#ffd5dd] text-[#3d2428] focus:outline-none focus:border-gold" 
                       />
                     </div>
 
                     <div>
-                      <label className="block text-[10px] uppercase font-bold tracking-widest text-white/50 mb-1">Custom Event Description Note</label>
+                      <label className="block text-[10px] uppercase font-bold tracking-widest text-[#3d2428]/50 mb-1">Custom Event Description Note</label>
                       <textarea 
                         placeholder="e.g. Package arrived at local depot for scanning..."
                         value={modalNote}
                         onChange={e => setModalNote(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl text-xs bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-gold resize-none h-16" 
+                        className="w-full px-4 py-3 rounded-xl text-xs bg-white/90 border border-[#ffd5dd] text-[#3d2428] focus:outline-none focus:border-gold resize-none h-16" 
                       />
                     </div>
                   </div>
 
-                  <div className="flex gap-3 pt-4 border-t border-white/5">
+                  <div className="flex gap-3 pt-4 border-t border-[#ffd5dd]/60">
                     <button 
                       onClick={() => { setShowUpdateModal(false); setEditingShipment(null); }} 
-                      className="px-5 py-3 rounded-xl border border-white/10 hover:bg-white/5 text-xs font-bold uppercase tracking-wider flex-1"
+                      className="px-5 py-3 rounded-xl border border-[#ffd5dd] hover:bg-pink-50/60 text-xs font-bold uppercase tracking-wider flex-1"
                     >
                       Cancel
                     </button>
@@ -2162,7 +2276,7 @@ export default function AdminDashboard() {
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs border-collapse">
                       <thead>
-                        <tr className="border-b border-white/10 bg-white/[0.02] text-white/50 tracking-wider uppercase font-semibold">
+                        <tr className="border-b border-[#ffd5dd] bg-pink-50/60 text-[#3d2428]/50 tracking-wider uppercase font-semibold">
                           <th className="px-6 py-4">Order ID & Date</th>
                           <th className="px-6 py-4">Shopper / Customer</th>
                           <th className="px-6 py-4">Items count</th>
@@ -2219,7 +2333,7 @@ export default function AdminDashboard() {
                                   }`}>
                                     {order.payment_status || "pending"}
                                   </span>
-                                  <span className={`text-[10px] block mt-1 uppercase font-bold text-white/50`}>
+                                  <span className={`text-[10px] block mt-1 uppercase font-bold text-[#3d2428]/50`}>
                                     Mode: {order.payment_method || "COD"}
                                   </span>
                                 </td>
@@ -2231,11 +2345,11 @@ export default function AdminDashboard() {
                                     value={order.order_status}
                                     onChange={e => handleUpdateOrderStatus(order.id, e.target.value)}
                                     className={`px-2 py-1 rounded text-[10px] uppercase font-bold border focus:outline-none focus:ring-1 focus:ring-yellow-500 ${
-                                      statusColorMap[order.order_status] || "text-white bg-black/45 border-white/10"
+                                      statusColorMap[order.order_status] || "text-[#3d2428] bg-white/90 border-[#ffd5dd]"
                                     }`}
                                   >
                                     {Object.keys(statusColorMap).map(status => (
-                                      <option key={status} value={status} className="bg-[#111] text-white">
+                                      <option key={status} value={status} className="bg-white text-[#3d2428]">
                                         {status}
                                       </option>
                                     ))}
@@ -2244,7 +2358,7 @@ export default function AdminDashboard() {
                                 <td className="px-6 py-4 text-center">
                                   <button
                                     onClick={() => setExpandedOrders(prev => ({ ...prev, [order.id]: !prev[order.id] }))}
-                                    className="px-3 py-1.5 border border-white/10 hover:border-yellow-500 rounded-lg hover:bg-yellow-500/5 transition-all text-[10px] font-bold uppercase tracking-wider text-yellow-500"
+                                    className="px-3 py-1.5 border border-[#ffd5dd] hover:border-yellow-500 rounded-lg hover:bg-yellow-500/5 transition-all text-[10px] font-bold uppercase tracking-wider text-yellow-500"
                                   >
                                     {isExpanded ? "Hide Details" : "View Items"}
                                   </button>
@@ -2254,34 +2368,34 @@ export default function AdminDashboard() {
                               {/* Expandable Order Detail Area */}
                               {isExpanded && (
                                 <tr>
-                                  <td colSpan="7" className="px-6 py-4 bg-black/40 border-t border-b border-white/5">
+                                  <td colSpan="7" className="px-6 py-4 bg-pink-50/40 border-t border-b border-[#ffd5dd]/60">
                                     <div className="space-y-4 animate-fade-in text-xs font-semibold">
                                       {/* Subheader */}
-                                      <div className="flex flex-col sm:flex-row justify-between gap-4 border-b border-white/5 pb-3">
+                                      <div className="flex flex-col sm:flex-row justify-between gap-4 border-b border-[#ffd5dd]/60 pb-3">
                                         <div>
                                           <h4 className="font-bold text-sm text-[#d4af37] uppercase tracking-wider">Consignment Product List</h4>
-                                          <p className="text-[10px] text-white/40">Listing order items, price index guidelines, and merchant split rates.</p>
+                                          <p className="text-[10px] text-[#3d2428]/40">Listing order items, price index guidelines, and merchant split rates.</p>
                                         </div>
                                         <div className="text-right">
-                                          <p className="text-white/70">Shipping Method: <strong className="text-white uppercase font-bold">{order.payment_method === 'cod' ? 'Cash On Delivery' : 'Prepaid Premium Shipping'}</strong></p>
-                                          <p className="text-[10px] text-white/40">Coupon Applied: <strong className="text-white">{order.coupon_code || "None"}</strong></p>
+                                          <p className="text-[#3d2428]/70">Shipping Method: <strong className="text-[#3d2428] uppercase font-bold">{order.payment_method === 'cod' ? 'Cash On Delivery' : 'Prepaid Premium Shipping'}</strong></p>
+                                          <p className="text-[10px] text-[#3d2428]/40">Coupon Applied: <strong className="text-[#3d2428]">{order.coupon_code || "None"}</strong></p>
                                         </div>
                                       </div>
 
                                       {/* Products list */}
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         {order.items?.map((item, idx) => (
-                                          <div key={idx} className="flex gap-4 p-3 bg-white/[0.01] border border-white/5 rounded-xl hover:border-white/10 transition-all">
+                                          <div key={idx} className="flex gap-4 p-3 bg-pink-50/30 border border-[#ffd5dd]/60 rounded-xl hover:border-[#ffd5dd] transition-all">
                                             <img
                                               src={item.image || (item.products?.img)}
                                               alt={item.name}
-                                              className="w-14 h-14 rounded-lg object-cover border border-white/10 flex-shrink-0"
+                                              className="w-14 h-14 rounded-lg object-cover border border-[#ffd5dd] flex-shrink-0"
                                             />
                                             <div className="flex-1 min-w-0">
                                               <h5 className={`font-bold text-sm truncate ${textTitle}`}>{item.name}</h5>
-                                              <p className="text-[10px] text-white/40 mt-0.5">
-                                                Qty: <strong className="text-white font-bold">{item.quantity}</strong> | 
-                                                Price: <strong className="text-white font-bold">{formatCurrency(item.price)}</strong>
+                                              <p className="text-[10px] text-[#3d2428]/40 mt-0.5">
+                                                Qty: <strong className="text-[#3d2428] font-bold">{item.quantity}</strong> | 
+                                                Price: <strong className="text-[#3d2428] font-bold">{formatCurrency(item.price)}</strong>
                                               </p>
                                               <div className="flex items-center gap-2 mt-1 text-[9px] uppercase tracking-wider text-[#d4af37]">
                                                 {item.size && <span>Size: {item.size}</span>}
@@ -2294,17 +2408,17 @@ export default function AdminDashboard() {
                                       </div>
 
                                       {/* Shipping Address Box */}
-                                      <div className="bg-white/[0.005] border border-white/5 p-4 rounded-xl space-y-1">
+                                      <div className="bg-white/[0.005] border border-[#ffd5dd]/60 p-4 rounded-xl space-y-1">
                                         <span className="text-[9px] uppercase tracking-widest text-[#d4af37] block font-bold">Shopper Destination Address</span>
                                         <p className={`text-sm ${textTitle}`}>{shippingInfo.name || `${customer?.first_name || ""} ${customer?.last_name || ""}` || "No name details provided"}</p>
-                                        <p className="text-white/60">
+                                        <p className="text-[#3d2428]/60">
                                           {shippingInfo.line1 || shippingInfo.addressLine || shippingInfo.address || ""}
                                           {shippingInfo.city && `, ${shippingInfo.city}`}
                                           {shippingInfo.state && `, ${shippingInfo.state}`}
                                           {shippingInfo.pincode || shippingInfo.zip ? ` - ${shippingInfo.pincode || shippingInfo.zip}` : ""}
                                         </p>
                                         {(shippingInfo.phone || customer?.phone) && (
-                                          <p className="text-white/50 text-[10px] mt-1">Phone: {shippingInfo.phone || customer?.phone}</p>
+                                          <p className="text-[#3d2428]/50 text-[10px] mt-1">Phone: {shippingInfo.phone || customer?.phone}</p>
                                         )}
                                       </div>
                                     </div>
@@ -2446,14 +2560,14 @@ export default function AdminDashboard() {
                     </label>
                   </div>
 
-                  <div className="sm:col-span-3 flex justify-end gap-3 pt-4 border-t border-white/5">
+                  <div className="sm:col-span-3 flex justify-end gap-3 pt-4 border-t border-[#ffd5dd]/60">
                     <button
                       type="button"
                       onClick={() => {
                         setShowCouponForm(false);
                         setEditingCoupon(null);
                       }}
-                      className="px-5 py-3 rounded-xl border border-white/10 hover:bg-white/5 text-xs font-bold uppercase tracking-wider"
+                      className="px-5 py-3 rounded-xl border border-[#ffd5dd] hover:bg-pink-50/60 text-xs font-bold uppercase tracking-wider"
                     >
                       Cancel
                     </button>
@@ -2488,7 +2602,7 @@ export default function AdminDashboard() {
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs border-collapse">
                       <thead>
-                        <tr className="border-b border-white/10 bg-white/[0.02] text-white/50 tracking-wider uppercase font-semibold">
+                        <tr className="border-b border-[#ffd5dd] bg-pink-50/60 text-[#3d2428]/50 tracking-wider uppercase font-semibold">
                           <th className="px-6 py-4">Coupon Code</th>
                           <th className="px-6 py-4">Discount Rate / Amount</th>
                           <th className="px-6 py-4">Minimum Order</th>
@@ -2529,7 +2643,7 @@ export default function AdminDashboard() {
                               <div className="flex items-center justify-center gap-3">
                                 <button
                                   onClick={() => handleEditCoupon(coupon)}
-                                  className="p-1.5 border border-white/10 hover:border-yellow-500 rounded-lg hover:bg-yellow-500/5 transition-all text-xs"
+                                  className="p-1.5 border border-[#ffd5dd] hover:border-yellow-500 rounded-lg hover:bg-yellow-500/5 transition-all text-xs"
                                   title="Edit Coupon parameters"
                                 >
                                   ✏️ Edit
@@ -2560,24 +2674,24 @@ export default function AdminDashboard() {
       {/* ─── MOCK MANUAL KYC DOCUMENT PREVIEW CHECKER MODAL ─── */}
       {selectedKycDocument && (
         <div className="fixed inset-0 bg-black/85 z-50 flex items-center justify-center p-6 backdrop-blur-sm">
-          <div className="bg-[#111] border border-white/10 p-6 rounded-2xl max-w-md w-full shadow-2xl space-y-4 slide-up">
-            <div className="flex justify-between items-center pb-3 border-b border-white/5">
+          <div className="bg-white border border-[#ffd5dd] p-6 rounded-2xl max-w-md w-full shadow-2xl space-y-4 slide-up">
+            <div className="flex justify-between items-center pb-3 border-b border-[#ffd5dd]/60">
               <span className="font-bold text-xs uppercase tracking-wider gold flex items-center gap-1.5">
                 📁 manual KYC document preview checker
               </span>
-              <button onClick={() => setSelectedKycDocument(null)} className="text-white/40 hover:text-white"><XCircle size={16} /></button>
+              <button onClick={() => setSelectedKycDocument(null)} className="text-[#3d2428]/40 hover:text-[#3d2428]"><XCircle size={16} /></button>
             </div>
 
             <div className="space-y-4">
-              <div className="p-8 bg-white/[0.01] border border-white/5 rounded-xl text-center space-y-3 relative overflow-hidden">
+              <div className="p-8 bg-pink-50/30 border border-[#ffd5dd]/60 rounded-xl text-center space-y-3 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-24 h-24 bg-yellow-500/5 rounded-full blur-xl" />
                 <span className="text-4xl block">📄</span>
                 <span className="text-[10px] uppercase font-bold tracking-widest text-[#d4af37] block">{selectedKycDocument.label}</span>
-                <h3 className="font-mono font-bold text-lg tracking-wider text-white uppercase">{selectedKycDocument.code}</h3>
-                <p className="text-[9px] text-white/35">Onboarding Application filed under merchant: <br /><strong>"{selectedKycDocument.storeName}"</strong></p>
+                <h3 className="font-mono font-bold text-lg tracking-wider text-[#3d2428] uppercase">{selectedKycDocument.code}</h3>
+                <p className="text-[9px] text-[#3d2428]/35">Onboarding Application filed under merchant: <br /><strong>"{selectedKycDocument.storeName}"</strong></p>
               </div>
 
-              <div className="bg-black/45 border border-white/5 p-3 rounded-xl text-[10px] text-white/45">
+              <div className="bg-pink-50/40 border border-[#ffd5dd]/60 p-3 rounded-xl text-[10px] text-[#3d2428]/45">
                 Manual document reviews match central government tax registers. Verify character coordinates and names before final merchant onboarding approval.
               </div>
 
@@ -2597,29 +2711,29 @@ export default function AdminDashboard() {
         >
           <div 
             onClick={e => e.stopPropagation()}
-            className="bg-[#111] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-slide-up"
+            className="bg-white border border-[#ffd5dd] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-slide-up"
           >
-            <div className="relative border-b border-white/10 p-4">
-              <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
+            <div className="relative border-b border-[#ffd5dd] p-4">
+              <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#3d2428]/30" />
               <input
                 type="text"
                 value={commandSearch}
                 onChange={e => setCommandSearch(e.target.value)}
                 placeholder="Jump to administrative modules... (Esc to close)"
-                className="w-full bg-transparent pl-8 pr-4 text-sm text-white focus:outline-none placeholder-white/20"
+                className="w-full bg-transparent pl-8 pr-4 text-sm text-[#3d2428] focus:outline-none placeholder-[#3d2428]/20"
                 autoFocus
               />
             </div>
             
             <div className="max-h-60 overflow-y-auto p-2">
               {commandFilteredItems.length === 0 ? (
-                <p className="text-xs text-white/30 text-center py-4">No matching administrative modules found.</p>
+                <p className="text-xs text-[#3d2428]/30 text-center py-4">No matching administrative modules found.</p>
               ) : (
                 commandFilteredItems.map((cmd, idx) => (
                   <button
                     key={idx}
                     onClick={cmd.action}
-                    className="w-full text-left px-4 py-2.5 rounded-lg hover:bg-white/5 text-xs text-white/60 hover:text-[#d4af37] font-semibold transition-all flex items-center justify-between"
+                    className="w-full text-left px-4 py-2.5 rounded-lg hover:bg-pink-50/60 text-xs text-[#3d2428]/60 hover:text-[#d4af37] font-semibold transition-all flex items-center justify-between"
                   >
                     <span>{cmd.label}</span>
                     <ChevronRight size={14} className="opacity-40" />
@@ -2628,7 +2742,7 @@ export default function AdminDashboard() {
               )}
             </div>
             
-            <div className="bg-black/35 p-3 border-t border-white/5 flex justify-between text-[9px] text-white/20 uppercase tracking-widest font-bold">
+            <div className="bg-pink-50/60 p-3 border-t border-[#ffd5dd]/60 flex justify-between text-[9px] text-[#3d2428]/25 uppercase tracking-widest font-bold">
               <span>Admin Spotlight Launcher</span>
               <span>Use arrows & Enter</span>
             </div>

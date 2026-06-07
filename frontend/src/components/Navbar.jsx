@@ -2,11 +2,12 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useCartStore } from "../store/useCartStore";
 import { useWishlistStore } from "../store/useWishlistStore";
+import { useAuthStore } from "../store/useAuthStore";
 import { insforge } from "../lib/insforge";
 import { useThemeStore } from "../store/useThemeStore";
 import { useSearchStore } from "../store/useSearchStore";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, X, Heart, ShoppingBag, Menu, User, LogOut, ChevronRight, Sparkles, Sun, Moon, Home } from "lucide-react";
+import { Search, X, Heart, ShoppingBag, Menu, User, LogOut, ChevronRight, Sparkles, Sun, Moon, Home, Bell } from "lucide-react";
 import products from "../data/product";
 
 export default function Navbar() {
@@ -18,8 +19,16 @@ export default function Navbar() {
   const searchInputRef = useRef(null);
   const searchContainerRef = useRef(null);
 
+  const { user: storeUser, isLoggedIn: storeIsLoggedIn } = useAuthStore();
   const [user, setUser] = useState(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+
+  const activeUser = storeUser || user;
+  const avatarUrl = activeUser?.avatar_url || activeUser?.profile?.avatar_url;
+  const role = activeUser?.role || activeUser?.profile?.role;
+  const fullName = activeUser?.full_name || activeUser?.profile?.full_name || '';
+  const firstName = activeUser?.first_name || activeUser?.profile?.first_name || fullName.split(' ')[0] || 'User';
   
   const theme = useThemeStore((state) => state.theme);
   const setTheme = useThemeStore((state) => state.setTheme);
@@ -50,7 +59,7 @@ export default function Navbar() {
   useEffect(() => {
     setMobileMenuOpen(false);
     setSearchFocused(false);
-  }, [location.pathname]);
+  }, [location]);
 
   // Click-outside listener for profile dropdown
   useEffect(() => {
@@ -77,7 +86,7 @@ export default function Navbar() {
   }, [searchFocused]);
 
   useEffect(() => {
-    const handler = () => setScrolled(window.scrollY > 20);
+    const handler = () => setScrolled(window.scrollY > 60);
     window.addEventListener("scroll", handler);
     return () => window.removeEventListener("scroll", handler);
   }, []);
@@ -120,6 +129,39 @@ export default function Navbar() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!activeUser) {
+      setUnreadNotifications(0);
+      return;
+    }
+    const fetchNotifications = async () => {
+      try {
+        const { data, error } = await insforge.database
+          .from('user_notifications')
+          .select('id')
+          .eq('user_id', activeUser.id)
+          .eq('is_read', false);
+        if (!error && data) {
+          setUnreadNotifications(data.length);
+        }
+      } catch (err) {
+        // ignore
+      }
+    };
+    fetchNotifications();
+
+    const channel = insforge.database
+      .channel('public:user_notifications')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_notifications', filter: `user_id=eq.${activeUser.id}` }, () => {
+        fetchNotifications();
+      })
+      .subscribe();
+
+    return () => {
+      insforge.database.removeChannel(channel);
+    };
+  }, [activeUser]);
+
   const navLinks = [
     { name: "Shop", to: "/shop" },
     { name: "Watches", to: "/shop?category=Watches" },
@@ -147,10 +189,10 @@ export default function Navbar() {
   return (
     <>
       <nav
-        className={`sticky top-0 z-50 w-full transition-all duration-300 bg-white/80 dark:bg-[#0A0A0A]/80 backdrop-blur-md ${
+        className={`sticky top-0 z-50 w-full transition-all duration-300 ${
           scrolled
-            ? "border-b border-[#E8E8E8] dark:border-white/5 py-3 shadow-card"
-            : "border-b border-transparent py-5"
+            ? "bg-white/80 dark:bg-[#0A0A0A]/80 backdrop-blur-md border-b border-[#E8E8E8] dark:border-white/5 py-3 shadow-card"
+            : "bg-transparent border-b border-transparent py-5"
         }`}
       >
         <div className="max-w-7xl mx-auto px-6 md:px-8 flex items-center justify-between relative w-full">
@@ -193,11 +235,12 @@ export default function Navbar() {
             <form onSubmit={handleSearchSubmit} className="relative flex items-center">
               <div
                 ref={searchContainerRef}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-full border bg-[#FAFAF8] dark:bg-[#111111] border-transparent transition-all duration-300 ease-in-out ${
-                  searchFocused 
-                    ? "w-48 md:w-64 border-[#C9A84C] ring-2 ring-[#C9A84C]/10 bg-white dark:bg-black" 
-                    : "w-10 sm:w-36 md:w-44 hover:border-[#E8E8E8] dark:hover:border-white/10"
-                }`}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full border bg-[#FAFAF8] dark:bg-[#111111] border-transparent transition-all duration-300 ease-in-out`}
+                style={{
+                  maxWidth: searchFocused ? "240px" : "140px",
+                  opacity: searchFocused ? 1 : 0.85,
+                  transition: "max-width 0.3s ease-in-out, opacity 0.3s ease-in-out, border-color 0.3s, box-shadow 0.3s"
+                }}
               >
                 <Search
                   size={16}
@@ -273,13 +316,13 @@ export default function Navbar() {
                                   key={p.id}
                                   type="button"
                                   onClick={() => {
-                                    navigate(`/product/${p.id}`);
+                                    navigate(`/product/slug/${p.slug || p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`);
                                     setSearchFocused(false);
                                     setSearchVal("");
                                   }}
                                   className="flex items-center gap-3 w-full text-left p-1.5 rounded-lg hover:bg-[#FAFAF8] dark:hover:bg-[#1A1A18] transition-colors"
                                 >
-                                  <img src={p.img} alt={p.name} className="w-8 h-8 rounded object-cover border border-[#E8E8E8] dark:border-white/5" />
+                                  <img src={p.img} alt={p.name} loading="lazy" width="32" height="32" className="w-8 h-8 rounded object-cover border border-[#E8E8E8] dark:border-white/5" />
                                   <div className="flex-1 min-w-0">
                                     <p className="text-xs font-bold text-[#111111] dark:text-white truncate">{p.name}</p>
                                     <p className="text-[10px] text-[#6B6B6B] dark:text-gray-400">{p.category}</p>
@@ -298,6 +341,27 @@ export default function Navbar() {
                 )}
               </div>
             </form>
+
+            {/* Notifications */}
+            {activeUser && (
+              <Link to="/account" className="relative p-2 text-[#111111] dark:text-slate-100 hover:text-[#C9A84C] dark:hover:text-[#C9A84C] hover:scale-110 active:scale-90 transition-all">
+                <Bell size={20} strokeWidth={1.75} />
+                <AnimatePresence mode="popLayout">
+                  {unreadNotifications > 0 && (
+                    <motion.span
+                      key={unreadNotifications}
+                      initial={{ scale: 0.6, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.6, opacity: 0 }}
+                      transition={{ type: "spring", stiffness: 500, damping: 15 }}
+                      className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-[#C9A84C] text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-[0_2px_6px_rgba(201,168,76,0.4)]"
+                    >
+                      {unreadNotifications}
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+              </Link>
+            )}
 
             {/* Wishlist */}
             <Link to="/wishlist" className="relative p-2 text-[#111111] dark:text-slate-100 hover:text-[#C9A84C] dark:hover:text-[#C9A84C] hover:scale-110 active:scale-90 transition-all hidden sm:block">
@@ -347,22 +411,24 @@ export default function Navbar() {
             </button>
 
             {/* Profile Avatar / Dropdown */}
-            {user ? (
+            {activeUser ? (
               <div className="relative profile-dropdown-container">
                 <button 
                   onClick={() => setProfileOpen(!profileOpen)}
                   className="p-2 text-[#111111] dark:text-slate-100 hover:text-[#C9A84C] dark:hover:text-[#C9A84C] hover:scale-110 transition-all flex items-center justify-center focus:outline-none"
                   aria-label="Profile Menu"
                 >
-                  {user.profile?.avatar_url ? (
+                  {avatarUrl ? (
                     <img 
-                      src={user.profile.avatar_url} 
+                      src={avatarUrl} 
                       alt="Avatar" 
+                      width="24"
+                      height="24"
                       className="w-6 h-6 rounded-full border border-accent/40 object-cover shadow-sm" 
                     />
                   ) : (
                     <div className="w-6 h-6 rounded-full bg-[#C9A84C]/10 text-[#C9A84C] flex items-center justify-center font-bold text-xs">
-                      {user.profile?.first_name ? user.profile.first_name[0].toUpperCase() : "U"}
+                      {firstName[0]?.toUpperCase() || "U"}
                     </div>
                   )}
                 </button>
@@ -378,7 +444,7 @@ export default function Navbar() {
                       <div className="px-4 py-2.5 border-b border-[#E8E8E8] dark:border-white/5 bg-[#FAFAF8] dark:bg-white/[0.02]">
                         <p className="text-[9px] text-[#6B6B6B] dark:text-gray-400 tracking-wider uppercase font-semibold">Logged in as</p>
                         <p className="text-sm font-semibold text-[#C9A84C] truncate">
-                          {user.profile?.first_name ? `${user.profile.first_name}` : "User"}
+                          {firstName}
                         </p>
                       </div>
                       <Link 
@@ -395,7 +461,7 @@ export default function Navbar() {
                       >
                         📦 My Orders
                       </Link>
-                      {user.profile?.role === "vendor" && (
+                      {role === "vendor" && (
                         <Link 
                           to="/vendor/dashboard" 
                           className="flex items-center gap-2 px-4 py-2 text-sm text-[#C9A84C] font-semibold hover:bg-[#FAFAF8] dark:hover:bg-white/[0.02] transition-colors border-t border-[#E8E8E8] dark:border-white/5"
@@ -404,7 +470,7 @@ export default function Navbar() {
                           📈 Vendor Dashboard
                         </Link>
                       )}
-                      {user.profile?.role === "admin" && (
+                      {role === "admin" && (
                         <Link 
                           to="/admin/dashboard" 
                           className="flex items-center gap-2 px-4 py-2 text-sm text-[#C9A84C] font-semibold hover:bg-[#FAFAF8] dark:hover:bg-white/[0.02] transition-colors border-t border-[#E8E8E8] dark:border-white/5"
@@ -416,8 +482,11 @@ export default function Navbar() {
                       <button 
                         onClick={async () => {
                           setProfileOpen(false);
-                          await insforge.auth.signOut();
-                          navigate("/");
+                          // Sign out from both auth systems
+                          await insforge.auth.signOut().catch(() => {});
+                          await useAuthStore.getState().logout();
+                          sessionStorage.setItem("manual_logout", "true");
+                          navigate("/login");
                         }} 
                         className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:text-red-700 hover:bg-red-500/5 transition-colors text-left font-medium"
                       >
@@ -428,9 +497,27 @@ export default function Navbar() {
                 </AnimatePresence>
               </div>
             ) : (
-              <Link to="/login" className="p-2 text-[#6B6B6B] hover:text-[#111111] dark:text-slate-300 dark:hover:text-white transition-colors flex items-center justify-center hover:scale-110" aria-label="Sign In">
-                <User size={20} strokeWidth={1.75} />
-              </Link>
+              <div className="flex items-center gap-3">
+                <Link
+                  to="/login"
+                  className="hidden md:inline-flex px-4 py-2 border border-[#E8E8E8] dark:border-white/10 hover:border-[#C9A84C] dark:hover:border-[#C9A84C] text-[#0A0A0A] dark:text-white hover:text-[#C9A84C] dark:hover:text-[#C9A84C] rounded-full text-xs font-bold tracking-wider uppercase transition-all duration-300"
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/register"
+                  className="hidden md:inline-flex px-4 py-2 bg-[#C9A84C] hover:bg-[#b8952e] text-white rounded-full text-xs font-bold tracking-wider uppercase transition-all duration-300 shadow-md shadow-[#C9A84C]/10"
+                >
+                  Register
+                </Link>
+                <Link
+                  to="/login"
+                  className="md:hidden p-2 text-[#6B6B6B] hover:text-[#111111] dark:text-slate-300 dark:hover:text-white transition-colors flex items-center justify-center hover:scale-110"
+                  aria-label="Sign In"
+                >
+                  <User size={20} strokeWidth={1.75} />
+                </Link>
+              </div>
             )}
           </div>
         </div>
@@ -500,24 +587,27 @@ export default function Navbar() {
 
               {/* Drawer Footer */}
               <div className="border-t border-[#E8E8E8] dark:border-white/5 pt-4 mt-6">
-                {user ? (
+                {activeUser ? (
                   <div className="space-y-3">
                     <div className="flex items-center gap-3">
-                      {user.profile?.avatar_url ? (
+                      {avatarUrl ? (
                         <img
-                          src={user.profile.avatar_url}
+                          src={avatarUrl}
                           alt="Avatar"
+                          loading="lazy"
+                          width="32"
+                          height="32"
                           className="w-8 h-8 rounded-full border border-[#C9A84C] object-cover shadow-sm"
                         />
                       ) : (
                         <div className="w-8 h-8 rounded-full bg-[#C9A84C]/10 text-[#C9A84C] flex items-center justify-center font-bold text-sm">
-                          {user.profile?.first_name ? user.profile.first_name[0].toUpperCase() : "U"}
+                          {firstName[0]?.toUpperCase() || "U"}
                         </div>
                       )}
                       <div className="min-w-0">
                         <p className="text-[10px] text-[#6B6B6B]">Logged in as</p>
                         <p className="text-xs font-bold text-[#111111] dark:text-white truncate">
-                          {user.profile?.first_name || "User"}
+                          {firstName}
                         </p>
                       </div>
                     </div>
@@ -533,8 +623,10 @@ export default function Navbar() {
                       <button
                         onClick={async () => {
                           setMobileMenuOpen(false);
-                          await insforge.auth.signOut();
-                          navigate("/");
+                          await insforge.auth.signOut().catch(() => {});
+                          await useAuthStore.getState().logout();
+                          sessionStorage.setItem("manual_logout", "true");
+                          navigate("/login");
                         }}
                         className="flex items-center justify-center gap-1.5 py-2 border border-red-500/20 hover:bg-red-500/5 text-red-600 text-[10px] font-bold uppercase rounded-lg"
                       >

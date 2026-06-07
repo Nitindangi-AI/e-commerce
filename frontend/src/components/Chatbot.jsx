@@ -72,7 +72,7 @@ const KNOWLEDGE_BASE = [
   {
     topic: "order",
     q: "How do I apply a coupon code?",
-    a: 'Enter your coupon code at checkout in the "Apply Coupon" field. Active codes: **TRENDZ10** (10% off ₹5k+), **FIRST500** (₹500 off), **TRENDZ20** (20% off ₹15k+).',
+    a: 'Enter your coupon code at checkout in the "Apply Coupon" field. Active codes: **TRENDY10** (10% off ₹5k+), **FIRST500** (₹500 off), **TRENDY20** (20% off ₹15k+).',
     keywords: ["coupon", "code", "discount", "promo", "offer", "apply", "voucher", "promotional"],
   },
   {
@@ -98,7 +98,7 @@ const KNOWLEDGE_BASE = [
   {
     topic: "tracking",
     q: "My order is delayed, what should I do?",
-    a: "Deliveries typically arrive within 2-4 business days. If it's been longer, please check your order status in **Account → Orders** or contact us at support@trendz.com.",
+    a: "Deliveries typically arrive within 2-4 business days. If it's been longer, please check your order status in **Account → Orders** or contact us at support@trendy.com.",
     keywords: ["delay", "delayed", "late", "not arrived", "not received", "still waiting", "taking long", "where is my order", "haven't received"],
   },
   {
@@ -208,7 +208,7 @@ const KNOWLEDGE_BASE = [
   {
     topic: "general",
     q: "How do I contact customer support?",
-    a: "You can reach us via:\n• **Email:** support@trendz.com\n• **Phone:** 1800-TRENDZ-HELP (toll-free)\n• **This chat** — available 24/7!",
+    a: "You can reach us via:\n• **Email:** support@trendy.com\n• **Phone:** 1800-TRENDY-HELP (toll-free)\n• **This chat** — available 24/7!",
     keywords: ["contact", "support", "help", "customer service", "email", "phone", "call", "reach", "talk", "human", "agent", "speak"],
   },
 
@@ -216,7 +216,7 @@ const KNOWLEDGE_BASE = [
   {
     topic: "general",
     q: "Do you have any offers right now?",
-    a: "Yes! Here are our active coupon codes:\n• **TRENDZ10** — 10% off on orders above ₹5,000\n• **FIRST500** — ₹500 off on your first order\n• **TRENDZ20** — 20% off on orders above ₹15,000\n\nApply them at checkout!",
+    a: "Yes! Here are our active coupon codes:\n• **TRENDY10** — 10% off on orders above ₹5,000\n• **FIRST500** — ₹500 off on your first order\n• **TRENDY20** — 20% off on orders above ₹15,000\n\nApply them at checkout!",
     keywords: ["offer", "offers", "deal", "deals", "sale", "promotion", "discount", "any offer", "current offer"],
   },
   {

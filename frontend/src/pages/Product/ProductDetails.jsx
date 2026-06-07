@@ -8,6 +8,7 @@ import { useWishlistStore } from "../../store/useWishlistStore";
 import { useRecentlyViewedStore } from "../../store/useRecentlyViewedStore";
 import { insforge } from "../../lib/insforge";
 import toast from "react-hot-toast";
+import axios from "axios";
 
 const COLOR_HEX_MAP = {
   black: "#111111",
@@ -64,10 +65,11 @@ function StarRating({ rating, size = "w-4 h-4" }) {
 }
 
 export default function ProductDetails() {
-  const { id } = useParams();
+  const { slug } = useParams();
   const navigate = useNavigate();
 
   const [product, setProduct] = useState(null);
+  const [variants, setVariants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [reviews, setReviews] = useState([]);
   const [relatedProducts, setRelatedProducts] = useState([]);
@@ -107,13 +109,36 @@ export default function ProductDetails() {
   // Modal active image preview
   const [previewImage, setPreviewImage] = useState(null);
 
+  const activeVariant = product ? (variants || []).find(
+    (v) =>
+      v.color?.toLowerCase() === (product.colors?.[selectedColor] || "").toLowerCase() &&
+      v.size?.toLowerCase() === (product.sizes?.[selectedSize] || "").toLowerCase()
+  ) : null;
+
+  const displayedPrice = activeVariant ? product.price + (activeVariant.price_modifier || 0) : (product?.price || 0);
+  const displayedStock = activeVariant ? activeVariant.stock : (product?.stock || 0);
+
   const reviewsSectionRef = useRef(null);
 
   const fetchProductData = async () => {
     try {
-      const prodRes = await productAPI.getById(id);
-      if (prodRes.success) {
+      const prodRes = await productAPI.getBySlug(slug);
+      if (prodRes.success && prodRes.product) {
         setProduct(prodRes.product);
+
+        // Call POST /api/v1/products/:id/view on page load (track views)
+        axios.post(`/api/v1/products/${prodRes.product.id}/view`).catch(console.error);
+
+        // Fetch variants
+        try {
+          const { data: varData } = await insforge.database
+            .from("product_variants")
+            .select("*")
+            .eq("product_id", prodRes.product.id);
+          setVariants(varData || []);
+        } catch (varErr) {
+          console.error("Failed to load variants:", varErr);
+        }
 
         // Load vendor/seller info
         if (prodRes.product.seller) {
@@ -134,14 +159,16 @@ export default function ProductDetails() {
         const revRes = await reviewAPI.getForProduct(prodRes.product.id);
         if (revRes.success) setReviews(revRes.reviews || []);
 
-        // Load related products
-        const relRes = await productAPI.getRelated(prodRes.product.id);
+        // Load related products: Category=X & Limit=8
+        const relRes = await productAPI.getAll(`category=${prodRes.product.category}&limit=8`);
         if (relRes.success) {
-          setRelatedProducts(relRes.products || []);
+          const filteredRelated = (relRes.products || []).filter(p => p.id !== prodRes.product.id);
+          setRelatedProducts(filteredRelated);
         }
       }
     } catch (err) {
       console.error("Failed to load product data:", err);
+      toast.error("Failed to load product details.");
     } finally {
       setLoading(false);
     }
@@ -150,7 +177,7 @@ export default function ProductDetails() {
   useEffect(() => {
     setLoading(true);
     fetchProductData();
-  }, [id]);
+  }, [slug]);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -162,6 +189,7 @@ export default function ProductDetails() {
 
   useEffect(() => {
     if (product) {
+      // Store product in recently viewed store on load
       addToRecentlyViewed(product);
       setSelectedImage(0);
       setSelectedColor(0);
@@ -210,6 +238,7 @@ export default function ProductDetails() {
       if (revRes.success) setReviews(revRes.reviews || []);
     } catch (err) {
       console.error(err);
+      toast.error("Failed to mark review as helpful");
     }
   };
 
@@ -230,10 +259,15 @@ export default function ProductDetails() {
         (item.selectedSize || "") === sizeVal
     );
 
+    const productWithVariantPrice = {
+      ...product,
+      price: displayedPrice
+    };
+
     if (existingItem) {
       useCartStore.getState().updateQuantity(product.id, existingItem.quantity + qty, colorVal, sizeVal);
     } else {
-      addToCart(product, colorVal, sizeVal);
+      addToCart(productWithVariantPrice, colorVal, sizeVal);
       if (qty > 1) {
         useCartStore.getState().updateQuantity(product.id, qty, colorVal, sizeVal);
       }
@@ -380,6 +414,9 @@ export default function ProductDetails() {
                 key={selectedImage}
                 src={images[selectedImage]} 
                 alt={product.name} 
+                loading="eager"
+                width="600"
+                height="600"
                 className="w-full h-full object-cover animate-fade-in"
               />
               
@@ -407,13 +444,13 @@ export default function ProductDetails() {
               )}
 
               {/* Low Stock Warning */}
-              {product.stock > 0 && product.stock <= 5 && (
+              {displayedStock > 0 && displayedStock <= 5 && (
                 <div className="absolute bottom-4 left-4 bg-red-600/95 backdrop-blur-sm text-white text-[9px] tracking-widest uppercase font-bold px-3 py-1.5 rounded-full z-20 shadow-md animate-pulse">
-                  Only {product.stock} units left!
+                  Only {displayedStock} units left!
                 </div>
               )}
 
-              {product.stock === 0 && (
+              {displayedStock === 0 && (
                 <div className="absolute inset-0 bg-white/70 dark:bg-black/70 flex items-center justify-center backdrop-blur-[2px] z-20">
                   <span className="bg-[#0A0A0A] text-white text-xs tracking-[0.2em] uppercase font-bold px-6 py-3 rounded-full shadow-lg">
                     Out of Stock
@@ -434,7 +471,7 @@ export default function ProductDetails() {
                       : "border-[#E8E8E8] dark:border-white/5 hover:border-[#C9A84C]/50"
                   }`}
                 >
-                  <img src={img} alt={`${product.name} thumbnail ${i + 1}`} className="w-full h-full object-cover" />
+                  <img src={img} alt={`${product.name} thumbnail ${i + 1}`} loading="lazy" width="80" height="80" className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>
@@ -472,12 +509,12 @@ export default function ProductDetails() {
               <div className="border-y border-[#E8E8E8] dark:border-white/5 py-4 mb-6">
                 <div className="flex items-baseline gap-4">
                   <span className="text-[#111111] dark:text-white font-bold text-2xl tracking-tight">
-                    {formatPrice(product.price)}
+                    {formatPrice(displayedPrice)}
                   </span>
                   {product.originalPrice && (
                     <>
                       <span className="text-[#6B6B6B]/50 dark:text-gray-500 text-base line-through font-medium">
-                        {formatPrice(product.originalPrice)}
+                        {formatPrice(product.originalPrice + (activeVariant ? (activeVariant.price_modifier || 0) : 0))}
                       </span>
                       <span className="bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20 text-[10px] font-bold px-2.5 py-1 rounded-full">
                         SAVE {discount}%
@@ -494,7 +531,7 @@ export default function ProductDetails() {
                 >
                   <div className="w-10 h-10 rounded-xl bg-white dark:bg-[#111111] border border-[#E8E8E8] dark:border-white/5 flex items-center justify-center flex-shrink-0 overflow-hidden">
                     {vendorInfo.store_logo ? (
-                      <img src={vendorInfo.store_logo} alt={vendorInfo.store_name} className="w-full h-full object-cover" />
+                      <img src={vendorInfo.store_logo} alt={vendorInfo.store_name} loading="lazy" width="40" height="40" className="w-full h-full object-cover" />
                     ) : (
                       <span className="text-[#C9A84C] font-bold text-sm">{vendorInfo.store_name?.charAt(0).toUpperCase()}</span>
                     )}
@@ -583,7 +620,7 @@ export default function ProductDetails() {
                 <div className="flex items-center border border-[#E8E8E8] dark:border-white/10 rounded-xl bg-white dark:bg-[#111111] overflow-hidden w-32 h-12 mb-6">
                   <button 
                     onClick={() => setQty((q) => Math.max(1, q - 1))}
-                    disabled={product.stock === 0}
+                    disabled={displayedStock === 0}
                     className="px-4 h-full text-[#6B6B6B] hover:text-[#111111] dark:hover:text-white disabled:opacity-50 text-lg transition-colors font-semibold"
                   >
                     −
@@ -591,7 +628,7 @@ export default function ProductDetails() {
                   <span className="flex-1 text-sm font-bold text-center text-[#111111] dark:text-white">{qty}</span>
                   <button 
                     onClick={() => setQty((q) => q + 1)}
-                    disabled={product.stock === 0}
+                    disabled={displayedStock === 0}
                     className="px-4 h-full text-[#6B6B6B] hover:text-[#111111] dark:hover:text-white disabled:opacity-50 text-lg transition-colors font-semibold"
                   >
                     +
@@ -601,7 +638,7 @@ export default function ProductDetails() {
                 <div className="space-y-3">
                   <button 
                     onClick={handleAddToCart}
-                    disabled={product.stock === 0 || added}
+                    disabled={displayedStock === 0 || added}
                     className={`w-full py-4 rounded-xl text-xs tracking-[0.2em] uppercase font-bold transition-all duration-300 disabled:opacity-50 border-0 ${
                       added 
                         ? "bg-green-600 text-white" 
@@ -867,7 +904,7 @@ export default function ProductDetails() {
                               onClick={() => setPreviewImage(url)}
                               className="w-14 h-14 rounded-lg overflow-hidden border border-[#E8E8E8] dark:border-white/5 cursor-pointer hover:opacity-90 hover:scale-95 transition-all flex-shrink-0"
                             >
-                              <img src={url} alt="Review attachment" className="w-full h-full object-cover" />
+                              <img src={url} alt="Review attachment" loading="lazy" width="56" height="56" className="w-full h-full object-cover" />
                             </div>
                           ))}
                         </div>
@@ -1026,7 +1063,7 @@ export default function ProductDetails() {
                   <div className="flex flex-wrap gap-2.5 mt-3 bg-[#FAFAF8] dark:bg-[#0A0A0A] p-2.5 rounded-xl border border-[#E8E8E8] dark:border-white/5">
                     {mockPhotos.map((url, idx) => (
                       <div key={idx} className="relative w-12 h-12 rounded-lg overflow-hidden border border-[#E8E8E8] dark:border-white/5 group">
-                        <img src={url} alt="Review attachment preview" className="w-full h-full object-cover" />
+                        <img src={url} alt="Review attachment preview" loading="lazy" width="48" height="48" className="w-full h-full object-cover" />
                         <button
                           type="button"
                           onClick={(e) => {

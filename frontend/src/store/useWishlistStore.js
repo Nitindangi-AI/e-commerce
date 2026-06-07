@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { wishlistAPI } from '../services/api';
+import { toast } from '../components/GlobalToast';
 
 export const useWishlistStore = create((set, get) => ({
   wishlistItems: [],
@@ -14,6 +15,7 @@ export const useWishlistStore = create((set, get) => ({
       }
     } catch (err) {
       console.error("Failed to fetch wishlist:", err);
+      toast.error("Failed to fetch wishlist.");
     }
   },
 
@@ -32,6 +34,7 @@ export const useWishlistStore = create((set, get) => ({
       await wishlistAPI.toggle(productId);
     } catch (err) {
       console.error("Failed to toggle wishlist in DB:", err);
+      toast.error("Failed to update wishlist.");
       // Revert on error
       if (exists) {
         set({ wishlistItems: [...get().wishlistItems, product] });
@@ -51,6 +54,7 @@ export const useWishlistStore = create((set, get) => ({
       await wishlistAPI.clear();
     } catch (err) {
       console.error("Failed to clear wishlist in DB:", err);
+      toast.error("Failed to clear wishlist.");
     }
   },
 

@@ -15,6 +15,7 @@ const {
   createDeliverySlot,
   getDeliverySlots,
 } = require("../controllers/orderController");
+const { validateCoupon } = require("../controllers/couponController");
 const { protect, authorize, requireAdmin } = require("../middleware/auth");
 
 router.post("/", protect, createOrder);
@@ -29,14 +30,19 @@ router.get("/track/:trackingNumber", trackByNumber);
 // Specific named sub-routes — must be before /:id wildcard
 router.patch("/shipments/:id", protect, requireAdmin, updateShipment);
 
-// Order specific actions
+// Order specific actions (supporting both POST and PUT)
+router.post("/:id/cancel", protect, cancelOrder);
 router.put("/:id/cancel", protect, cancelOrder);
+router.post("/:id/return", protect, requestReturn);
 router.put("/:id/return", protect, requestReturn);
 router.put("/:id/status", protect, authorize("admin"), updateOrderStatus);
 router.put("/:id/return/handle", protect, authorize("admin"), handleReturn);
 router.get("/:id/shipment", protect, getShipmentByOrderId);
 router.post("/:id/slot", protect, createDeliverySlot);
 router.get("/:id/slots", protect, getDeliverySlots);
+
+// Coupon validation route
+router.post("/coupons/validate", protect, validateCoupon);
 
 // Single order by ID — keep last to avoid swallowing named routes
 router.get("/:id", protect, getOrder);

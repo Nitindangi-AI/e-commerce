@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useCartStore } from "../store/useCartStore";
 import { useWishlistStore } from "../store/useWishlistStore";
+import { insforge } from "../lib/insforge";
 import toast from "react-hot-toast";
 
 export default function ProductCard({ product }) {
@@ -11,25 +12,52 @@ export default function ProductCard({ product }) {
 
   const [added, setAdded] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [hoveredImg, setHoveredImg] = useState(null);
+  const navigate = useNavigate();
 
-  const handleAddToCart = (e) => {
+  const handleAddToCart = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    addToCart(product);
-    setAdded(true);
-    toast.success(`${product.name} added to cart!`);
-    setTimeout(() => setAdded(false), 1500);
+    try {
+      const { data: { user } } = await insforge.auth.getUser();
+      if (!user) {
+        toast.error("Please log in to add items to cart");
+        navigate(`/login?returnUrl=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+        return;
+      }
+      addToCart(product);
+      setAdded(true);
+      toast.success(`${product.name} added to cart!`);
+      setTimeout(() => setAdded(false), 1500);
+    } catch (err) {
+      toast.error("Failed to add item to cart");
+    }
   };
 
-  const handleToggleWishlist = (e) => {
+  const handleToggleWishlist = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    toggleWishlist(product);
-    setIsToggling(true);
-    setTimeout(() => setIsToggling(false), 400);
-    toast(isInWishlist ? "Removed from wishlist" : "Added to wishlist ♡", {
-      icon: isInWishlist ? "💔" : "❤️",
-    });
+    try {
+      const { data: { user } } = await insforge.auth.getUser();
+      if (!user) {
+        toast.error("Please log in to manage wishlist");
+        navigate(`/login?returnUrl=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+        return;
+      }
+      
+      const wasInWishlist = isInWishlist;
+      setIsToggling(true);
+      setTimeout(() => setIsToggling(false), 400);
+      
+      await toggleWishlist(product);
+      
+      toast(wasInWishlist ? "Removed from wishlist" : "Added to wishlist ♡", {
+        icon: wasInWishlist ? "💔" : "❤️",
+      });
+    } catch (err) {
+      toast.error("Failed to update wishlist");
+    }
   };
 
   const formatPrice = (price) => `₹${price.toLocaleString("en-IN")}`;
@@ -41,7 +69,7 @@ export default function ProductCard({ product }) {
   };
 
   return (
-    <Link to={`/product/${product.id}`} className="block group select-none">
+    <Link to={`/product/slug/${product.slug || product.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`} className="block group select-none">
       
       {/* Local styles for checkmark & heartbeat animations */}
       <style>{`
@@ -59,10 +87,14 @@ export default function ProductCard({ product }) {
       <div className="relative bg-white dark:bg-[#111111] rounded-2xl overflow-hidden border border-[#E8E8E8] dark:border-white/5 shadow-card hover:shadow-luxury hover:-translate-y-1 transition-all duration-300 ease-out flex flex-col h-full">
         {/* Image Container — 1:1 */}
         <div className="relative w-full aspect-square overflow-hidden bg-[#FAFAF8] dark:bg-white/[0.02]">
+          {!imageLoaded && (
+            <div className="absolute inset-0 bg-gray-200 dark:bg-neutral-800 animate-pulse z-10" />
+          )}
           <img
-            src={product.img}
+            src={hoveredImg || product.img}
             alt={product.name}
             loading="lazy"
+            onLoad={() => setImageLoaded(true)}
             className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
           />
 
@@ -114,6 +146,30 @@ export default function ProductCard({ product }) {
           <h3 className="font-semibold text-[#111111] dark:text-white text-sm leading-snug mb-2 line-clamp-1 group-hover:text-[#C9A84C] transition-colors duration-300">
             {product.name}
           </h3>
+
+          {/* Color Swatches */}
+          {product.colors && product.colors.length > 0 && (
+            <div className="flex gap-1.5 mb-2.5 flex-wrap z-30">
+              {product.colors.map((color, idx) => {
+                const variantImg = product.images && product.images[idx] ? product.images[idx] : product.img;
+                return (
+                  <button
+                    key={color}
+                    type="button"
+                    onMouseEnter={() => setHoveredImg(variantImg)}
+                    onMouseLeave={() => setHoveredImg(null)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    className="w-3.5 h-3.5 rounded-full border border-gray-300 dark:border-white/20 transition-transform hover:scale-125 focus:outline-none"
+                    style={{ backgroundColor: color.toLowerCase() }}
+                    title={color}
+                  />
+                );
+              })}
+            </div>
+          )}
 
           {/* Star Rating */}
           <div className="flex items-center gap-1 mb-2.5">

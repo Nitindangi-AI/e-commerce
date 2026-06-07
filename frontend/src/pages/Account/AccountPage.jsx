@@ -5,6 +5,7 @@ import { useWishlistStore } from "../../store/useWishlistStore";
 import { useRecentlyViewedStore } from "../../store/useRecentlyViewedStore";
 import { orderAPI, authAPI, paymentAPI, addressAPI, couponAPI } from "../../services/api";
 import toast from "react-hot-toast";
+import { insforge } from "../../lib/insforge";
 import AdminLocations from "../../components/AdminLocations";
 import { 
   User, 
@@ -44,6 +45,7 @@ export default function AccountPage() {
   // Orders State
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
+  const [orderFilter, setOrderFilter] = useState("All");
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [returnModal, setReturnModal] = useState(null);
   const [returnReason, setReturnReason] = useState("");
@@ -58,7 +60,23 @@ export default function AccountPage() {
   });
 
   // Profile Settings State
-  const [profile, setProfile] = useState({ firstName: "", lastName: "", email: "", phone: "" });
+  const [profile, setProfile] = useState({ 
+    firstName: "", 
+    lastName: "", 
+    displayName: "", 
+    email: "", 
+    phone: "", 
+    dateOfBirth: "", 
+    gender: "", 
+    avatarUrl: "" 
+  });
+  const [notificationPrefs, setNotificationPrefs] = useState({
+    email: true,
+    sms: false,
+    push: true,
+    order_updates: true,
+    promotions: false
+  });
   const [savingProfile, setSavingProfile] = useState(false);
   const [mfaEnabled, setMfaEnabled] = useState(false);
 
@@ -72,6 +90,16 @@ export default function AccountPage() {
   const [scratchedList, setScratchedList] = useState({});
 
   const isAdmin = user?.role === "admin";
+
+  const filteredOrders = orders.filter(order => {
+    if (orderFilter === "All") return true;
+    if (orderFilter === "Active") {
+      return !["Delivered", "Cancelled", "Returned"].includes(order.orderStatus);
+    }
+    if (orderFilter === "Delivered") return order.orderStatus === "Delivered";
+    if (orderFilter === "Cancelled") return order.orderStatus === "Cancelled";
+    return true;
+  });
   
   // Tabs list matching customer structure
   const TABS = [
@@ -94,9 +122,16 @@ export default function AccountPage() {
         setProfile({ 
           firstName: d.user.firstName || "", 
           lastName: d.user.lastName || "", 
+          displayName: d.user.display_name || "", 
           email: d.user.email || "", 
-          phone: d.user.phone || "" 
+          phone: d.user.phone || "",
+          dateOfBirth: d.user.date_of_birth ? d.user.date_of_birth.substring(0, 10) : "",
+          gender: d.user.gender || "",
+          avatarUrl: d.user.avatar_url || ""
         });
+        if (d.user.notification_preferences) {
+          setNotificationPrefs(d.user.notification_preferences);
+        }
         if (d.user.paymentAccount) setPaymentAccount(d.user.paymentAccount);
       })
       .catch(() => navigate("/login"))
@@ -108,8 +143,13 @@ export default function AccountPage() {
     if (!user) return;
     setOrdersLoading(true);
     orderAPI.getMyOrders()
-      .then(d => setOrders(d.orders || []))
-      .catch(() => {})
+      .then(d => {
+        const sorted = (d.orders || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        setOrders(sorted);
+      })
+      .catch((err) => {
+        toast.error("Failed to load orders.");
+      })
       .finally(() => setOrdersLoading(false));
   }, [user]);
 
@@ -119,7 +159,9 @@ export default function AccountPage() {
     setAddressesLoading(true);
     addressAPI.getAll()
       .then(d => setAddresses(d.addresses || []))
-      .catch(() => {})
+      .catch((err) => {
+        toast.error("Failed to load addresses.");
+      })
       .finally(() => setAddressesLoading(false));
   }, [user, activeTab]);
 
@@ -127,12 +169,54 @@ export default function AccountPage() {
   const handleSaveProfile = async () => {
     setSavingProfile(true);
     try {
-      await authAPI.updateProfile(profile);
+      await authAPI.updateProfile({
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        displayName: profile.displayName,
+        phone: profile.phone,
+        dateOfBirth: profile.dateOfBirth,
+        gender: profile.gender,
+        avatarUrl: profile.avatarUrl
+      });
       toast.success("Profile updated successfully!");
     } catch (err) {
       toast.error(err.message || "Failed to update profile");
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+      
+      const { data: uploadData, error: uploadErr } = await insforge.storage
+        .from('images')
+        .upload(filePath, file);
+
+      if (uploadErr) throw uploadErr;
+
+      const avatarUrl = uploadData?.url || '';
+      setProfile(prev => ({ ...prev, avatarUrl }));
+      toast.success("Avatar uploaded successfully!");
+    } catch (err) {
+      toast.error(err.message || "Failed to upload avatar");
+    }
+  };
+
+  const handleTogglePref = async (key) => {
+    const updated = { ...notificationPrefs, [key]: !notificationPrefs[key] };
+    setNotificationPrefs(updated);
+    try {
+      await authAPI.updateProfile({ notificationPreferences: updated });
+      toast.success("Notification preferences updated!");
+    } catch (err) {
+      toast.error(err.message || "Failed to update notification preferences");
     }
   };
 
@@ -296,12 +380,16 @@ export default function AccountPage() {
           
           {/* USER INFO DETAILS */}
           <div className="flex items-center gap-4 mb-8 pb-6 border-b border-white/5">
-            <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-[#d4af37] to-[#f5d26e] flex items-center justify-center font-bold text-[#0a0a0a] text-xl shadow-lg shadow-yellow-500/10">
-              {user?.firstName?.[0]?.toUpperCase() || "U"}
-            </div>
+            {profile.avatarUrl ? (
+              <img src={profile.avatarUrl} alt="Avatar" loading="lazy" width="56" height="56" className="w-14 h-14 rounded-full object-cover border border-[#d4af37]" />
+            ) : (
+              <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-[#d4af37] to-[#f5d26e] flex items-center justify-center font-bold text-[#0a0a0a] text-xl shadow-lg shadow-yellow-500/10">
+                {profile.displayName?.[0]?.toUpperCase() || profile.firstName?.[0]?.toUpperCase() || "U"}
+              </div>
+            )}
             <div className="min-w-0">
-              <h4 className={`font-bold text-sm truncate ${textTitle}`}>{user?.firstName} {user?.lastName}</h4>
-              <span className={`text-[10px] truncate block ${textSubtle}`}>{user?.email}</span>
+              <h4 className={`font-bold text-sm truncate ${textTitle}`}>{profile.displayName || `${profile.firstName} ${profile.lastName}`}</h4>
+              <span className={`text-[10px] truncate block ${textSubtle}`}>{profile.email}</span>
               {isAdmin && (
                 <span className="inline-block text-[8px] bg-[#d4af37]/10 border border-[#d4af37]/20 text-[#d4af37] font-extrabold px-2 py-0.5 rounded-full mt-1.5 uppercase tracking-widest">
                   Administrator
@@ -354,7 +442,7 @@ export default function AccountPage() {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <span className="text-[10px] tracking-[0.2em] uppercase text-yellow-500/70 font-bold block mb-1">CUSTOMER PORTAL</span>
-                  <h2 className={`display text-3xl font-black ${textTitle}`}>Welcome Back, {user?.firstName}!</h2>
+                  <h2 className={`display text-3xl font-black ${textTitle}`}>Welcome Back, {profile.displayName || profile.firstName}!</h2>
                   <p className={`text-xs ${textSubtle}`}>View your account highlights, track delivery timelines, and spend coupon rewards.</p>
                 </div>
                 
@@ -365,7 +453,12 @@ export default function AccountPage() {
                   </div>
                   <div>
                     <div className="text-[9px] uppercase tracking-wider text-yellow-500 font-bold">Loyalty Points</div>
-                    <div className={`text-lg font-black ${textTitle}`}>450 <span className="text-[10px] text-white/30 font-medium">pts</span></div>
+                    <div className={`text-lg font-black ${textTitle}`}>
+                      {user?.loyalty_points || 0} <span className="text-[10px] text-white/30 font-medium">pts</span>
+                    </div>
+                    <div className={`text-[9.5px] ${textSubtle}`}>
+                      ({user?.loyalty_points || 0} points = ₹{user?.loyalty_points || 0})
+                    </div>
                   </div>
                 </div>
               </div>
@@ -420,7 +513,7 @@ export default function AccountPage() {
                         <div key={order._id} className="flex items-center justify-between p-3.5 bg-black/[0.02] border border-white/5 rounded-xl hover:border-yellow-500/20 transition-all">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap mb-1">
-                              <span className="text-xs font-bold gold font-mono">{order.orderId}</span>
+                              <span className="text-xs font-bold gold font-mono">{order.orderNumber || order.orderId}</span>
                               <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase border ${statusColorMap[order.orderStatus]}`}>
                                 {order.orderStatus}
                               </span>
@@ -457,8 +550,8 @@ export default function AccountPage() {
                   ) : (
                     <div className="grid grid-cols-3 gap-3">
                       {wishlistItems.slice(0, 3).map(item => (
-                        <Link key={item.id} to={`/product/${item.id}`} className="block group">
-                          <img src={item.img} alt={item.name} className="w-full aspect-square object-cover rounded-xl border border-white/5 group-hover:border-[#d4af37]/35 transition-all mb-2" />
+                        <Link key={item.id} to={`/product/slug/${item.slug || item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`} className="block group">
+                          <img src={item.img} alt={item.name} loading="lazy" width="100" height="100" className="w-full aspect-square object-cover rounded-xl border border-white/5 group-hover:border-[#d4af37]/35 transition-all mb-2" />
                           <p className={`text-[10px] font-semibold truncate ${textTitle}`}>{item.name}</p>
                           <span className="gold text-[10px] font-bold">{formatCurrency(item.price)}</span>
                         </Link>
@@ -479,22 +572,39 @@ export default function AccountPage() {
                 <p className={`text-xs ${textSubtle}`}>Check the processing milestone events for active deliveries or request free return slips.</p>
               </div>
 
+              {/* Order Filter Tabs */}
+              <div className="flex flex-wrap gap-2 border-b border-white/5 pb-4">
+                {["All", "Active", "Delivered", "Cancelled"].map(tab => (
+                  <button
+                    key={tab}
+                    onClick={() => setOrderFilter(tab)}
+                    className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all ${
+                      orderFilter === tab
+                        ? "bg-[#d4af37]/10 gold border-[#d4af37]/20 shadow-md shadow-yellow-500/[0.02]"
+                        : "text-white/40 hover:text-white border-transparent"
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
+
               {ordersLoading ? (
                 <div className="space-y-4">
                   {[...Array(3)].map((_, i) => (
                     <div key={i} className="h-28 w-full bg-[#E8E8E8] dark:bg-white/5 rounded-2xl animate-pulse" />
                   ))}
                 </div>
-              ) : orders.length === 0 ? (
+              ) : filteredOrders.length === 0 ? (
                 <div className={`text-center py-20 border rounded-2xl ${cardBg}`}>
                   <span className="text-4xl block mb-4">🛒</span>
-                  <h4 className="font-bold text-lg mb-2">No orders yet</h4>
+                  <h4 className="font-bold text-lg mb-2">No orders match this filter</h4>
                   <p className={`text-xs max-w-xs mx-auto mb-6 ${textSubtle}`}>Fulfill your shopping carts to display items in the tracking ledger.</p>
                   <Link to="/shop" className="btn-gold px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider border-0">Shop Now</Link>
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {orders.map(order => {
+                  {filteredOrders.map(order => {
                     const currentStatusIdx = STATUS_FLOW.indexOf(order.orderStatus);
                     const isCancelled = order.orderStatus === "Cancelled";
                     const isReturned = order.orderStatus === "Returned" || order.orderStatus === "Return Requested";
@@ -504,8 +614,8 @@ export default function AccountPage() {
                         {/* Order info header */}
                         <div className="p-5 border-b border-white/5 bg-black/[0.01] flex flex-wrap items-center justify-between gap-4">
                           <div>
-                            <p className={`text-[10px] uppercase font-bold tracking-widest ${textSubtle}`}>Order ID</p>
-                            <span className="font-mono text-xs font-bold gold">{order.orderId}</span>
+                            <p className={`text-[10px] uppercase font-bold tracking-widest ${textSubtle}`}>Order Number</p>
+                            <span className="font-mono text-xs font-bold gold">{order.orderNumber || order.orderId}</span>
                             <span className={`text-[10px] ml-2 ${textSubtle}`}>
                               Placing: {new Date(order.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                             </span>
@@ -523,7 +633,7 @@ export default function AccountPage() {
                         <div className="p-5 border-b border-white/5 space-y-4">
                           {order.orderItems?.map((item, i) => (
                             <div key={i} className="flex items-center gap-4">
-                              <img src={item.image} alt={item.name} className="w-12 h-12 rounded-xl object-cover border border-white/10" />
+                              <img src={item.image} alt={item.name} loading="lazy" width="48" height="48" className="w-12 h-12 rounded-xl object-cover border border-white/10" />
                               <div className="flex-1 min-w-0">
                                 <h5 className={`font-bold text-xs truncate ${textTitle}`}>{item.name}</h5>
                                 <p className={`text-[10px] ${textSubtle}`}>
@@ -714,9 +824,9 @@ export default function AccountPage() {
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
                   {wishlistItems.map(p => (
                     <div key={p.id || p._id} className={`border rounded-2xl overflow-hidden p-4 group relative ${cardBg}`}>
-                      <Link to={`/product/${p.id || p._id}`} className="block">
+                      <Link to={`/product/slug/${p.slug || p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`} className="block">
                         <div className="overflow-hidden rounded-xl aspect-square border border-white/5 relative mb-4">
-                          <img src={p.img} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-all duration-500" />
+                          <img src={p.img} alt={p.name} loading="lazy" width="300" height="300" className="w-full h-full object-cover group-hover:scale-105 transition-all duration-500" />
                           {p.badge && (
                             <span className="absolute top-2.5 left-2.5 bg-black/80 backdrop-blur-md border border-white/10 text-[#d4af37] text-[8px] font-extrabold px-2 py-0.5 rounded-full tracking-wider uppercase">
                               {p.badge}
@@ -751,8 +861,8 @@ export default function AccountPage() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                   {recentlyViewed.map((p, idx) => (
                     <div key={idx} className={`border rounded-2xl p-4 relative ${cardBg}`}>
-                      <Link to={`/product/${p.id}`} className="block">
-                        <img src={p.img} alt={p.name} className="w-full aspect-square object-cover rounded-xl border border-white/5 mb-3" />
+                      <Link to={`/product/slug/${p.slug || p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`} className="block">
+                        <img src={p.img} alt={p.name} loading="lazy" width="200" height="200" className="w-full aspect-square object-cover rounded-xl border border-white/5 mb-3" />
                         <h4 className={`font-bold text-[11px] truncate ${textTitle}`}>{p.name}</h4>
                         <span className="gold text-xs font-bold">{formatCurrency(p.price)}</span>
                       </Link>
@@ -854,11 +964,39 @@ export default function AccountPage() {
           {activeTab === "Notifications" && (
             <div className="space-y-6 animate-fade-in">
               <div>
-                <h2 className={`display text-3xl font-black mb-1 ${textTitle}`}>Alert Center</h2>
-                <p className={`text-xs ${textSubtle}`}>System audit telemetry, order status logs, and developer alerts.</p>
+                <h2 className={`display text-3xl font-black mb-1 ${textTitle}`}>Alert Center & Preferences</h2>
+                <p className={`text-xs ${textSubtle}`}>Configure your notification preferences and view system alerts.</p>
+              </div>
+
+              {/* Notification Toggles */}
+              <div className={`border rounded-2xl p-6 space-y-4 shadow-md ${cardBg}`}>
+                <h3 className={`font-bold text-xs uppercase tracking-wider mb-2 ${textTitle}`}>Notification Preferences</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {[
+                    { key: "email", label: "Email Notifications", desc: "Receive newsletters and promotional updates." },
+                    { key: "sms", label: "SMS Alerts", desc: "Receive text messages for delivery alerts." },
+                    { key: "push", label: "Push Notifications", desc: "Receive immediate browser notifications." },
+                    { key: "order_updates", label: "Order Status Updates", desc: "Receive tracking, shipping, and delivery status alerts." },
+                    { key: "promotions", label: "Promotional Offers", desc: "Receive discount codes and sale notifications." }
+                  ].map(pref => (
+                    <div key={pref.key} className="flex items-center justify-between p-3 bg-black/[0.02] border border-white/5 rounded-xl">
+                      <div className="min-w-0 pr-4">
+                        <span className={`text-xs font-bold block ${textTitle}`}>{pref.label}</span>
+                        <p className={`text-[10px] ${textSubtle} leading-relaxed`}>{pref.desc}</p>
+                      </div>
+                      <button
+                        onClick={() => handleTogglePref(pref.key)}
+                        className={`w-10 h-5 flex-shrink-0 rounded-full p-0.5 transition-colors relative ${notificationPrefs[pref.key] ? 'bg-yellow-500' : 'bg-white/10'}`}
+                      >
+                        <div className={`w-4 h-4 bg-black rounded-full transition-transform ${notificationPrefs[pref.key] ? 'translate-x-5' : 'translate-x-0'}`} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="space-y-4">
+                <h3 className={`font-bold text-xs uppercase tracking-wider ${textTitle}`}>Alert Logs</h3>
                 {[
                   { title: "Delivery Confirmed", desc: "Your package containing Carbon Sunglasses was successfully delivered. Hope you love it!", type: "info", time: "2 hours ago" },
                   { title: "Early Release Active", desc: "Meridian Classic drops are now open for shoppers with gold badges.", type: "promo", time: "1 day ago" },
@@ -890,10 +1028,32 @@ export default function AccountPage() {
             <div className="space-y-6 animate-fade-in max-w-lg">
               <div>
                 <h2 className={`display text-3xl font-black mb-1 ${textTitle}`}>Personal Profile</h2>
-                <p className={`text-xs ${textSubtle}`}>Modify your account credentials, first/last names, and phone numbers.</p>
+                <p className={`text-xs ${textSubtle}`}>Modify your account credentials, avatar, display name, and other personal information.</p>
               </div>
 
               <div className={`border rounded-2xl p-6 space-y-6 shadow-xl ${cardBg}`}>
+                {/* Avatar upload section */}
+                <div className="flex items-center gap-6 pb-4 border-b border-white/5">
+                  <div className="relative group">
+                    {profile.avatarUrl ? (
+                      <img src={profile.avatarUrl} alt="Avatar" loading="lazy" width="80" height="80" className="w-20 h-20 rounded-full object-cover border-2 border-[#d4af37]" />
+                    ) : (
+                      <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-[#d4af37] to-[#f5d26e] flex items-center justify-center font-bold text-[#0a0a0a] text-2xl shadow-lg shadow-yellow-500/10">
+                        {profile.displayName?.[0]?.toUpperCase() || profile.firstName?.[0]?.toUpperCase() || "U"}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label className={`block text-[10px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>Profile Picture</label>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handleAvatarChange}
+                      className="text-xs text-white/50 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-[#d4af37]/10 file:text-[#d4af37] hover:file:bg-[#d4af37]/20 file:cursor-pointer" 
+                    />
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className={`block text-[10px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>First Name</label>
@@ -915,6 +1075,55 @@ export default function AccountPage() {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className={`block text-[10px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>Display Name</label>
+                    <input 
+                      type="text" 
+                      value={profile.displayName} 
+                      onChange={e => setProfile({...profile, displayName: e.target.value})} 
+                      className={`input-field w-full px-4 py-3 rounded-xl text-xs ${inputBg}`} 
+                      placeholder="E.g. Alex"
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-[10px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>Phone Number</label>
+                    <input 
+                      type="tel" 
+                      value={profile.phone} 
+                      onChange={e => setProfile({...profile, phone: e.target.value})} 
+                      className={`input-field w-full px-4 py-3 rounded-xl text-xs ${inputBg}`} 
+                      placeholder="+91 98765 00000"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className={`block text-[10px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>Date of Birth</label>
+                    <input 
+                      type="date" 
+                      value={profile.dateOfBirth} 
+                      onChange={e => setProfile({...profile, dateOfBirth: e.target.value})} 
+                      className={`input-field w-full px-4 py-3 rounded-xl text-xs ${inputBg}`} 
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-[10px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>Gender</label>
+                    <select 
+                      value={profile.gender} 
+                      onChange={e => setProfile({...profile, gender: e.target.value})} 
+                      className={`input-field w-full px-4 py-3 rounded-xl text-xs ${inputBg}`}
+                    >
+                      <option value="">Select Gender</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="non_binary">Non-Binary</option>
+                      <option value="prefer_not_to_say">Prefer Not To Say</option>
+                    </select>
+                  </div>
+                </div>
+
                 <div>
                   <label className={`block text-[10px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>Email Address (Immutable)</label>
                   <input 
@@ -922,17 +1131,6 @@ export default function AccountPage() {
                     value={profile.email} 
                     className={`input-field w-full px-4 py-3 rounded-xl text-xs bg-white/[0.01] ${textSubtle} cursor-not-allowed`} 
                     disabled 
-                  />
-                </div>
-
-                <div>
-                  <label className={`block text-[10px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>Phone Number</label>
-                  <input 
-                    type="tel" 
-                    value={profile.phone} 
-                    onChange={e => setProfile({...profile, phone: e.target.value})} 
-                    className={`input-field w-full px-4 py-3 rounded-xl text-xs ${inputBg}`} 
-                    placeholder="+91 98765 00000"
                   />
                 </div>
 
@@ -977,10 +1175,27 @@ export default function AccountPage() {
                     <div key={a._id || a.id} className={`border rounded-2xl p-5 relative shadow-md ${cardBg} ${a.isDefault ? 'border-[#d4af37]/35' : ''}`}>
                       <div className="flex items-center gap-2 mb-3">
                         <span className={`text-xs font-bold ${textTitle}`}>{a.label || "Address"}</span>
-                        {a.isDefault && (
+                        {a.isDefault ? (
                           <span className="text-[8px] bg-[#d4af37]/10 border border-[#d4af37]/20 text-[#d4af37] px-2 py-0.5 rounded-full font-extrabold uppercase tracking-wider">
                             Default
                           </span>
+                        ) : (
+                          <button
+                            onClick={async () => {
+                              try {
+                                await addressAPI.setDefault(a._id || a.id);
+                                toast.success("Default address updated!");
+                                // reload
+                                const d = await addressAPI.getAll();
+                                setAddresses(d.addresses || []);
+                              } catch (err) {
+                                toast.error(err.message || "Failed to set default address");
+                              }
+                            }}
+                            className="text-[9px] uppercase tracking-wider text-[#d4af37] font-bold hover:underline"
+                          >
+                            Set as Default
+                          </button>
                         )}
                       </div>
                       <p className={`text-xs font-semibold ${textTitle}`}>{a.name} · {a.phone}</p>
@@ -1084,7 +1299,7 @@ export default function AccountPage() {
                 </div>
                 <div className="text-right">
                   <p className="text-[10px] text-white/40 uppercase tracking-wider">Invoice / Receipt</p>
-                  <span className="font-mono font-bold text-white text-sm">{selectedInvoice.orderId}</span>
+                  <span className="font-mono font-bold text-white text-sm">{selectedInvoice.orderNumber || selectedInvoice.orderId}</span>
                   <p className="text-[10px] text-white/35">Date: {new Date(selectedInvoice.createdAt).toLocaleDateString()}</p>
                 </div>
               </div>

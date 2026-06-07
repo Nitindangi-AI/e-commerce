@@ -2,23 +2,32 @@ import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
 import HeroBanner from "../../components/HeroBanner";
 import Marquee from "../../components/Marquee";
-import FeaturedProducts from "../../components/FeaturedProducts";
 import FeatureStrip from "../../components/FeatureStrip";
 import Newsletter from "../../components/Newsletter";
-import DealOfTheDay from "../../components/DealOfTheDay";
 import ProductCard from "../../components/ProductCard";
 import { SkeletonGrid } from "../../components/SkeletonCard";
 import { useRecentlyViewedStore } from "../../store/useRecentlyViewedStore";
 import { productAPI } from "../../services/api";
 import localProducts from "../../data/product";
+import { toast } from "../../components/GlobalToast";
 
-const categories = [
-  { name: "Men", img: "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?q=80&w=600&auto=format&fit=crop" },
-  { name: "Women", img: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=600&auto=format&fit=crop" },
-  { name: "Accessories", img: "https://images.unsplash.com/photo-1627123424574-724758594e93?q=80&w=600&auto=format&fit=crop" },
-  { name: "Watches", img: "https://images.unsplash.com/photo-1524592094714-0f0654e20314?q=80&w=600&auto=format&fit=crop" },
-  { name: "Footwear", img: "https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?q=80&w=600&auto=format&fit=crop" },
-  { name: "Eyewear", img: "https://images.unsplash.com/photo-1511499767150-a48a237f0083?q=80&w=600&auto=format&fit=crop" },
+const categoryImages = {
+  Watches: "https://images.unsplash.com/photo-1524592094714-0f0654e20314?q=80&w=600&auto=format&fit=crop",
+  Shirts: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?q=80&w=600&auto=format&fit=crop",
+  Footwear: "https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?q=80&w=600&auto=format&fit=crop",
+  Grooming: "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?q=80&w=600&auto=format&fit=crop",
+  Accessories: "https://images.unsplash.com/photo-1627123424574-724758594e93?q=80&w=600&auto=format&fit=crop",
+  Apparel: "https://images.unsplash.com/photo-1483985988355-763728e1935b?q=80&w=600&auto=format&fit=crop",
+  Men: "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?q=80&w=600&auto=format&fit=crop",
+  Women: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=600&auto=format&fit=crop",
+};
+
+const defaultCategories = [
+  { name: "Men", img: categoryImages.Men },
+  { name: "Women", img: categoryImages.Women },
+  { name: "Accessories", img: categoryImages.Accessories },
+  { name: "Watches", img: categoryImages.Watches },
+  { name: "Footwear", img: categoryImages.Footwear },
 ];
 
 const testimonials = [
@@ -27,32 +36,90 @@ const testimonials = [
   { name: "Rahul Verma", role: "Tech Lead", text: "Finally, an Indian brand that delivers true luxury. The Noir Chronograph is my daily companion.", rating: 5 },
 ];
 
-const doubleCategories = [...categories, ...categories];
-
 export default function HomePage() {
   const recentItems = useRecentlyViewedStore(state => state.recentItems);
-  const [trendingProducts, setTrendingProducts] = useState(
-    [...localProducts].sort((a, b) => b.rating - a.rating).slice(0, 4)
-  );
+  const [categoriesList, setCategoriesList] = useState([]);
+  const [trendingProducts, setTrendingProducts] = useState([]);
+  const [newArrivals, setNewArrivals] = useState([]);
+  const [dealProduct, setDealProduct] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [timeLeft, setTimeLeft] = useState({ hours: 24, minutes: 0, seconds: 0 });
 
   useEffect(() => {
-    const fetchTrending = async () => {
+    const calculateTimeLeft = () => {
+      const now = new Date();
+      const endOfDay = new Date();
+      endOfDay.setHours(23, 59, 59, 999);
+      const difference = endOfDay - now;
+      
+      let tempTimeLeft = {};
+      if (difference > 0) {
+        tempTimeLeft = {
+          hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+          minutes: Math.floor((difference / 1000 / 60) % 60),
+          seconds: Math.floor((difference / 1000) % 60),
+        };
+      } else {
+        tempTimeLeft = { hours: 23, minutes: 59, seconds: 59 };
+      }
+      setTimeLeft(tempTimeLeft);
+    };
+
+    calculateTimeLeft();
+    const interval = setInterval(calculateTimeLeft, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const fetchHomeData = async () => {
+      setLoading(true);
       try {
-        const res = await productAPI.getAll("sort=rating&limit=4");
-        if (res.success && res.products?.length > 0) {
-          setTrendingProducts(res.products);
+        // 1. Fetch categories
+        const catRes = await productAPI.getCategories();
+        if (catRes.success && catRes.categories?.length > 0) {
+          const list = catRes.categories.map(name => ({
+            name,
+            img: categoryImages[name] || categoryImages.Apparel
+          }));
+          setCategoriesList(list);
+        } else {
+          setCategoriesList(defaultCategories);
         }
+
+        // 2. Fetch trending (top selling)
+        const trendRes = await productAPI.getTopSelling(8);
+        if (trendRes.success && trendRes.products?.length > 0) {
+          setTrendingProducts(trendRes.products);
+        } else {
+          setTrendingProducts(localProducts.slice(0, 8));
+        }
+
+        // 3. Fetch new arrivals
+        const newRes = await productAPI.getAll("sort=newest&limit=8");
+        if (newRes.success && newRes.products?.length > 0) {
+          setNewArrivals(newRes.products);
+        } else {
+          setNewArrivals(localProducts.slice(0, 8));
+        }
+
+        // 4. Fetch featured product for Deal of the Day
+        const featRes = await productAPI.getFeatured(1);
+        if (featRes.success && featRes.products?.length > 0) {
+          setDealProduct(featRes.products[0]);
+        } else {
+          setDealProduct(localProducts[0]);
+        }
+
       } catch (err) {
-        console.error(err);
+        console.error("Failed to load home page data:", err);
       } finally {
         setLoading(false);
       }
     };
-    // Simulate brief loading for skeleton demo
-    const timer = setTimeout(() => fetchTrending(), 600);
-    return () => clearTimeout(timer);
+    fetchHomeData();
   }, []);
+
+  const doubleCategories = [...categoriesList, ...categoriesList];
 
   return (
     <div className="overflow-x-hidden">
@@ -95,11 +162,65 @@ export default function HomePage() {
       {/* Marquee */}
       <Marquee />
 
-      {/* Deal of the Day */}
-      <DealOfTheDay />
+      {/* Deal of the Day Countdown section */}
+      {dealProduct && (
+        <section className="max-w-7xl mx-auto px-6 py-20 bg-gradient-to-br from-[#FAFAF8] to-[#F5F3EE] dark:from-[#111111] dark:to-[#0A0A0A] border-y border-[#E8E8E8] dark:border-white/5 rounded-3xl my-10 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-80 h-80 rounded-full bg-[#C9A84C]/5 blur-3xl" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center relative z-10">
+            <div className="space-y-6">
+              <span className="inline-block px-3 py-1 bg-[#C9A84C]/10 text-[#C9A84C] text-[10px] font-bold tracking-[0.2em] uppercase rounded-full">
+                ⏳ Deal of the Day
+              </span>
+              <h2 className="font-display text-4xl md:text-5xl font-bold text-[#111111] dark:text-white leading-tight">
+                Premium Design. <br />Limited Offer.
+              </h2>
+              <p className="text-[#6B6B6B] dark:text-gray-400 text-sm leading-relaxed max-w-md">
+                Experience luxury with our featured masterpiece {dealProduct.name}. Exclusive pricing ends soon.
+              </p>
+              
+              {/* Countdown timer */}
+              <div className="flex gap-4 select-none">
+                {[
+                  { label: "Hours", val: String(timeLeft.hours).padStart(2, "0") },
+                  { label: "Mins", val: String(timeLeft.minutes).padStart(2, "0") },
+                  { label: "Secs", val: String(timeLeft.seconds).padStart(2, "0") },
+                ].map((t) => (
+                  <div key={t.label} className="flex flex-col items-center p-3 bg-white dark:bg-[#1A1A18] border border-[#E8E8E8] dark:border-white/5 rounded-xl min-w-[70px] shadow-sm">
+                    <span className="text-2xl font-bold text-[#111111] dark:text-white font-mono">{t.val}</span>
+                    <span className="text-[9px] uppercase tracking-wider text-[#6B6B6B] dark:text-gray-400 mt-1">{t.label}</span>
+                  </div>
+                ))}
+              </div>
 
-      {/* Featured Products */}
-      <FeaturedProducts />
+              <div className="pt-4 flex items-center gap-6">
+                <div>
+                  {dealProduct.originalPrice && dealProduct.originalPrice > dealProduct.price && (
+                    <span className="text-xs text-[#6B6B6B] dark:text-gray-400 line-through">₹{dealProduct.originalPrice.toLocaleString()}</span>
+                  )}
+                  <p className="text-2xl font-bold text-[#C9A84C]">₹{dealProduct.price?.toLocaleString()}</p>
+                </div>
+                <Link
+                  to={`/product/slug/${dealProduct.slug || dealProduct.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`}
+                  className="btn-gold px-8 py-3.5 text-xs font-bold uppercase tracking-wider shadow-md hover:scale-105 transition-all"
+                >
+                  Claim Offer Now
+                </Link>
+              </div>
+            </div>
+
+            <div className="flex justify-center relative">
+              <div className="w-80 h-80 rounded-2xl overflow-hidden border border-[#E8E8E8] dark:border-white/5 shadow-luxury">
+                <img
+                  src={dealProduct.img}
+                  alt={dealProduct.name}
+                  loading="lazy"
+                  className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Trending Now */}
       <section className="max-w-7xl mx-auto px-6 py-20">
@@ -115,14 +236,60 @@ export default function HomePage() {
         {loading ? (
           <SkeletonGrid count={4} />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {trendingProducts.map(p => <ProductCard key={p.id} product={p} />)}
+          </div>
+        )}
+      </section>
+
+      {/* New Arrivals */}
+      <section className="max-w-7xl mx-auto px-6 py-20 border-t border-[#E8E8E8] dark:border-white/5">
+        <div className="flex items-end justify-between mb-10">
+          <div>
+            <p className="text-[10px] tracking-[0.3em] uppercase text-[#C9A84C] font-semibold mb-2">Fresh</p>
+            <h2 className="font-display text-3xl md:text-4xl font-bold text-[#111111] dark:text-white">New Arrivals</h2>
+          </div>
+          <Link to="/shop?sort=newest" className="text-[10px] tracking-[0.2em] uppercase text-[#6B6B6B] hover:text-[#C9A84C] transition-colors hidden sm:block font-bold">
+            View All →
+          </Link>
+        </div>
+        {loading ? (
+          <SkeletonGrid count={4} />
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {newArrivals.map(p => <ProductCard key={p.id} product={p} />)}
           </div>
         )}
       </section>
 
       {/* Feature Strip */}
       <FeatureStrip />
+
+      {/* Top Brands Marquee */}
+      <section className="py-16 bg-white dark:bg-[#0A0A0A] border-y border-[#E8E8E8] dark:border-white/5 overflow-hidden">
+        <div className="max-w-7xl mx-auto px-6 mb-8 text-center">
+          <p className="text-[10px] tracking-[0.3em] uppercase text-[#C9A84C] font-semibold mb-2">Heritage</p>
+          <h2 className="font-display text-2xl font-bold text-[#111111] dark:text-white">Curated Premium Brands</h2>
+        </div>
+        <div className="w-full overflow-hidden py-4 bg-gradient-to-r from-transparent via-[#FAFAF8] to-transparent dark:via-white/[0.02]">
+          <div className="flex gap-12 justify-around items-center max-w-5xl mx-auto flex-wrap px-6">
+            {[
+              { name: "Meridian", logo: "👑" },
+              { name: "Trendz Luxury", logo: "💎" },
+              { name: "Vogue Elite", logo: "✨" },
+              { name: "Obsidian", logo: "♠️" },
+              { name: "Aura India", logo: "🏵️" },
+            ].map((b) => (
+              <div key={b.name} className="flex items-center gap-2 hover:scale-105 transition-all select-none">
+                <span className="text-xl">{b.logo}</span>
+                <span className="font-display text-xs tracking-[0.35em] uppercase font-bold text-[#6B6B6B] dark:text-gray-300">
+                  {b.name}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* Testimonials */}
       <section className="max-w-7xl mx-auto px-6 py-20">

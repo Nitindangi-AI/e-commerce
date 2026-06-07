@@ -6,36 +6,49 @@ const morgan = require("morgan");
 const cookieParser = require("cookie-parser");
 const connectDatabase = require("./config/database");
 const errorHandler = require("./middleware/errorHandler");
+const { authLimiter, apiLimiter } = require("./middleware/rateLimiter");
+const sanitize = require("./middleware/sanitize");
 
 // Load env vars
 dotenv.config();
 
 const app = express();
 
-// Body parser
+// ── Security headers ──
+app.use(helmet());
+
+// ── Body parser ──
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-// Cookie parser
+// ── Cookie parser ──
 app.use(cookieParser());
 
-// Security headers
-app.use(helmet());
+// ── Input sanitization (XSS + NoSQL injection) ──
+app.use(sanitize);
 
-// CORS — allow frontend origin with credentials
+// ── CORS — read allowed origin from env, not hardcoded ──
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: process.env.CORS_ORIGIN || process.env.CLIENT_URL || "http://localhost:5173",
     credentials: true,
   })
 );
 
-// HTTP request logger (dev only)
+// ── HTTP request logger (dev only) ──
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
 
-// Health check
+// ── Global API rate limiter ──
+app.use("/api", apiLimiter);
+
+// ── Health check ──
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '1.0.0', service: 'trendy-backend' });
+});
+
+// Legacy health check (keep backward-compatible)
 app.get("/api/v1/health", (req, res) => {
   res.status(200).json({
     success: true,
@@ -44,8 +57,15 @@ app.get("/api/v1/health", (req, res) => {
   });
 });
 
-// Mount routes
+// ── Auth rate limiter — applied to login/register before routes ──
+app.use("/api/v1/auth/login", authLimiter);
+app.use("/api/v1/auth/register", authLimiter);
+
+// ── Mount routes ──
+app.use("/api/admin", require("./routes/adminRoutes"));
+app.use("/api/vendor", require("./routes/vendorRoutes"));
 app.use("/api/v1/auth", require("./routes/authRoutes"));
+app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/v1/products", require("./routes/productRoutes"));
 app.use("/api/v1/orders", require("./routes/orderRoutes"));
 app.use("/api/v1/reviews", require("./routes/reviewRoutes"));
@@ -55,7 +75,7 @@ app.use("/api/v1/coupons", require("./routes/couponRoutes"));
 app.use("/api/v1/payment", require("./routes/paymentRoutes"));
 app.use("/api/v1/locations", require("./routes/locationRoutes"));
 
-// 404 handler
+// ── 404 handler ──
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -63,7 +83,7 @@ app.use((req, res) => {
   });
 });
 
-// Global error handler
+// ── Global error handler ──
 app.use(errorHandler);
 
 // Auto-seed: populate DB if empty (for in-memory / fresh installs)

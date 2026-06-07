@@ -14,12 +14,14 @@ node_modules
 .roo
 .trae
 .windsurf
-
 # Environment files
-.env
-*.env
 backend/.env
+frontend/.env
+frontend/.env.local
+.insforge/project.json
+*.env
+*.env.local
 
-# Cookie files
+# Cookies / local auth files
 cookie.txt
 backend/cookie.txt

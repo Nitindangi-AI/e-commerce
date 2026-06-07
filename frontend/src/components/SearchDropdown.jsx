@@ -208,13 +208,16 @@ export default function SearchDropdown() {
                       {matchedProducts.map(p => (
                         <Link 
                           key={p.id} 
-                          to={`/product/${p.id}`} 
+                          to={`/product/slug/${p.slug || p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`} 
                           onClick={() => setSearchOpen(false)}
                           className="flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-[#F8F6F2] border border-transparent hover:border-[#E7E2D8]/40 transition-all group"
                         >
                           <img 
                             src={p.img} 
                             alt={p.name} 
+                            loading="lazy"
+                            width="48"
+                            height="48"
                             className="w-12 h-12 rounded-xl object-cover flex-shrink-0 border border-[#E7E2D8] bg-[#F5F3EE]" 
                           />
                           <div className="flex-1 min-w-0">
