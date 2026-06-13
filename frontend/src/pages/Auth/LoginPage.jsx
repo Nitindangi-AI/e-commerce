@@ -291,6 +291,10 @@ export default function LoginPage() {
 
             <button
               type="button"
+              onClick={async () => {
+                const res = await authService.loginWithGoogle();
+                if (!res.success) toast.error(res.message);
+              }}
               className="w-full py-3.5 bg-white border border-[#E8E8E8] hover:bg-gray-50 text-gray-700 rounded-xl text-xs font-bold tracking-widest uppercase transition-all duration-300 flex items-center justify-center gap-3"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24">

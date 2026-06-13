@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authService } from '../../services/authService';
 import { useAuthStore } from '../../store/useAuthStore';
+import { insforge } from '../../lib/insforge';
 import OTPInput from '../../components/OTPInput';
 import PasswordStrengthMeter from '../../components/PasswordStrengthMeter';
 import { toast } from '../../store/useToastStore';
@@ -89,9 +90,28 @@ export default function RegisterPage() {
         phone
       });
       if (res.success) {
-        toast.success(res.message || 'Verification code sent to your email.');
-        setStep(2);
-        setResendCooldown(60);
+        if (res.requireEmailVerification === false) {
+          // Log in and auto-login
+          const loginRes = await authService.login(email, password);
+          if (loginRes.success) {
+            setAuth(loginRes.user, loginRes.token);
+            // Update profile name
+            if (loginRes.user?.id) {
+              await insforge.database
+                .from('profiles')
+                .update({ full_name: fullName })
+                .eq('id', loginRes.user.id);
+            }
+            toast.success('Account created successfully!');
+            setStep(3);
+          } else {
+            setErrors({ submit: loginRes.message || 'Signup succeeded but login failed.' });
+          }
+        } else {
+          toast.success(res.message || 'Verification code sent to your email.');
+          setStep(2);
+          setResendCooldown(60);
+        }
       } else {
         // Handle existing account error message specifically
         if (res.message && (res.message.toLowerCase().includes('already exists') || res.message.toLowerCase().includes('duplicate') || res.message.toLowerCase().includes('registered'))) {
@@ -383,6 +403,35 @@ export default function RegisterPage() {
                 'Send Verification Code'
               )}
             </button>
+
+            {/* Social Sign In */}
+            <div className="space-y-6 mt-6">
+              <div className="relative flex items-center justify-center">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-[#E8E8E8]" />
+                </div>
+                <span className="relative px-4 text-xs font-bold tracking-wider text-gray-400 uppercase bg-white select-none">
+                  or
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  const res = await authService.loginWithGoogle();
+                  if (!res.success) toast.error(res.message);
+                }}
+                className="w-full py-3.5 bg-white border border-[#E8E8E8] hover:bg-gray-50 text-gray-700 rounded-xl text-xs font-bold tracking-widest uppercase transition-all duration-300 flex items-center justify-center gap-3"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24">
+                  <path
+                    fill="#EA4335"
+                    d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.114-5.136 4.114A5.56 5.56 0 0 1 8.4 12.96a5.56 5.56 0 0 1 5.59-5.557c1.496 0 2.864.542 3.924 1.436l3.14-3.14A9.87 9.87 0 0 0 13.99 3c-5.523 0-10 4.477-10 10s4.477 10 10 10c5.8 0 9.645-4.077 9.645-9.814 0-.66-.06-1.29-.175-1.9H12.24Z"
+                  />
+                </svg>
+                Continue with Google
+              </button>
+            </div>
 
             <p className="text-center text-sm font-medium text-gray-500 mt-4">
               Already have an account?{' '}

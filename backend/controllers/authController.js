@@ -6,22 +6,46 @@ const { generateOTP, hashOTP, verifyOTP } = require("../utils/otp");
 const { sendOTPSMS } = require("../utils/sms");
 const { sendOTPEmail } = require("../utils/email");
 const User = require("../models/User");
+const { createClient, createAdminClient } = require("@insforge/sdk");
+
+// Initialize InsForge standard and admin clients
+let insforge = null;
+let adminInsforge = null;
+
+try {
+  if (process.env.INSFORGE_URL && process.env.INSFORGE_ANON_KEY) {
+    insforge = createClient({
+      baseUrl: process.env.INSFORGE_URL,
+      anonKey: process.env.INSFORGE_ANON_KEY
+    });
+  }
+} catch (err) {
+  console.error("InsForge standard client initialization failed:", err.message);
+}
+
+try {
+  if (process.env.INSFORGE_URL && process.env.INSFORGE_SERVICE_ROLE_KEY) {
+    adminInsforge = createAdminClient({
+      baseUrl: process.env.INSFORGE_URL,
+      apiKey: process.env.INSFORGE_SERVICE_ROLE_KEY
+    });
+  }
+} catch (err) {
+  console.error("InsForge admin client initialization failed:", err.message);
+}
 
 /**
  * Safely get the InsForge client.
- * Returns null when @insforge/sdk is not installed or configured.
  */
 function getInsforge() {
-  try {
-    const { createClient } = require("@insforge/sdk");
-    if (!process.env.INSFORGE_URL || !process.env.INSFORGE_SERVICE_ROLE_KEY) return null;
-    return createClient(
-      process.env.INSFORGE_URL,
-      process.env.INSFORGE_SERVICE_ROLE_KEY
-    );
-  } catch {
-    return null;
-  }
+  return insforge;
+}
+
+/**
+ * Safely get the InsForge admin client.
+ */
+function getAdminInsforge() {
+  return adminInsforge;
 }
 
 async function handleFailedLogin(profile, identifier, req) {
@@ -209,7 +233,7 @@ exports.verifyOTPAndRegister = async (req, res) => {
       email: row.identifier_type === "email" ? cleanIdentifier : `${authUserId}@trendy.com`,
       phone: row.identifier_type === "phone" ? cleanIdentifier : "",
       password: password,
-      role: "user"
+      role: "customer"
     }).catch(() => {
       // In case MongoDB sync fails, do not block registration
     });
@@ -221,7 +245,7 @@ exports.verifyOTPAndRegister = async (req, res) => {
 
     const profileRes = await db.query(
       `INSERT INTO profiles (id, email, phone, full_name, first_name, last_name, phone_verified, email_verified, role, status, referral_code) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'user', 'active', $9) RETURNING *`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'customer', 'active', $9) RETURNING *`,
       [authUserId, emailVal, phoneVal, full_name, firstName, lastName, row.identifier_type === "phone", row.identifier_type === "email", referralCode]
     );
 
@@ -587,8 +611,13 @@ exports.forgotPasswordReset = async (req, res) => {
     // Update InsForge auth user password
     const insforge = getInsforge();
     if (insforge) {
-      const { error: resetErr } = await insforge.auth.admin.updateUserById(profile.id, { password: new_password });
-      if (resetErr) throw resetErr;
+      const salt = await bcrypt.genSalt(10);
+      const encryptedPassword = await bcrypt.hash(new_password, salt);
+
+      await db.query(
+        "UPDATE auth.users SET encrypted_password = $1 WHERE id = $2",
+        [encryptedPassword, profile.id]
+      );
     }
 
     // Sync MongoDB User password

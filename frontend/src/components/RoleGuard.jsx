@@ -44,20 +44,17 @@ export default function RoleGuard({ allowedRoles }) {
         }
 
         if (active) {
-          const userRole = profile?.role || 'user';
+          const userRole = profile?.role || 'customer';
           setUser({ ...authData.user, role: userRole });
 
           let isAuthorized = false;
 
-          if (allowedRoles.includes(userRole)) {
+          const normalizedUserRole = userRole === 'user' ? 'customer' : (userRole === 'merchant' ? 'vendor' : userRole);
+          const normalizedAllowedRoles = allowedRoles.map(r => r === 'user' ? 'customer' : (r === 'merchant' ? 'vendor' : r));
+
+          if (normalizedAllowedRoles.includes(normalizedUserRole)) {
             isAuthorized = true;
-          } else if (allowedRoles.includes('vendor') && (userRole === 'merchant' || userRole === 'vendor' || userRole === 'admin')) {
-            isAuthorized = true;
-          } else if (allowedRoles.includes('merchant') && (userRole === 'merchant' || userRole === 'vendor' || userRole === 'admin')) {
-            isAuthorized = true;
-          } else if (allowedRoles.includes('customer') && userRole === 'user') {
-            isAuthorized = true;
-          } else if (allowedRoles.includes('user') && userRole === 'customer') {
+          } else if (normalizedAllowedRoles.includes('vendor') && normalizedUserRole === 'admin') {
             isAuthorized = true;
           }
 

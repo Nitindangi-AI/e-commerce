@@ -344,7 +344,7 @@ export default function AdminDashboard() {
         if (vRecord) {
           await insforge.database
             .from("profiles")
-            .update({ role: "merchant", updated_at: new Date().toISOString() })
+            .update({ role: "vendor", updated_at: new Date().toISOString() })
             .eq("id", vRecord.user_id);
         }
       }
@@ -405,19 +405,19 @@ export default function AdminDashboard() {
   };
 
   // Block/unblock shoppers
-  const handleBlockProfile = async (id, currentRole) => {
+  const handleBlockProfile = async (id, currentStatus) => {
     if (userRole !== "admin") {
       toast.error("Access Denied: You do not have Administrator permissions.");
       return;
     }
-    const targetRole = currentRole === "blocked" ? "customer" : "blocked";
+    const targetStatus = currentStatus === "banned" ? "active" : "banned";
     try {
       const { error } = await insforge.database
         .from("profiles")
-        .update({ role: targetRole, updated_at: new Date().toISOString() })
+        .update({ status: targetStatus, updated_at: new Date().toISOString() })
         .eq("id", id);
       if (error) throw error;
-      toast.success(`Shopper account status updated to: ${targetRole}`);
+      toast.success(`Shopper account status updated to: ${targetStatus}`);
       loadAdminData();
     } catch (err) {
       toast.error("Failed to update shopper status");
@@ -1196,34 +1196,38 @@ export default function AdminDashboard() {
                             {profile.first_name?.charAt(0)}
                           </div>
                           <div>
-                            <p className={`font-bold text-sm ${textTitle}`}>{profile.first_name} {profile.last_name}</p>
+                            <p className={`font-bold text-sm ${textTitle}`}>
+                              {profile.first_name} {profile.last_name}
+                              {profile.status === 'banned' && (
+                                <span className="ml-2 text-[9px] bg-red-500/20 text-red-400 font-extrabold px-1.5 py-0.5 rounded border border-red-500/20 uppercase tracking-wider">Banned</span>
+                              )}
+                            </p>
                             <span className={`text-[9px] ${textSubtle}`}>{profile.id.slice(0, 12)}...</span>
                           </div>
                         </td>
                         <td className={`px-6 py-4 font-mono font-semibold ${textTitle}`}>{profile.phone || "N/A"}</td>
                         <td className="px-6 py-4">
                           <select
-                            value={profile.role === 'vendor' ? 'merchant' : (profile.role === 'customer' ? 'user' : (profile.role || 'user'))}
+                            value={profile.role}
                             onChange={e => handleUpdateUserRole(profile.id, e.target.value)}
                             className="bg-white/90 border border-[#ffd5dd] rounded px-2.5 py-1 text-[10px] text-[#3d2428] focus:outline-none focus:border-yellow-500 uppercase font-extrabold"
                           >
-                            <option value="user">User</option>
-                            <option value="merchant">Merchant</option>
+                            <option value="customer">Customer</option>
+                            <option value="vendor">Vendor</option>
                             <option value="admin">Admin</option>
-                            <option value="blocked">Blocked</option>
                           </select>
                         </td>
                         <td className={`px-6 py-4 ${textSubtle}`}>{new Date(profile.created_at).toLocaleDateString()}</td>
                         <td className="px-6 py-4 text-center">
                           <button
-                            onClick={() => handleBlockProfile(profile.id, profile.role)}
+                            onClick={() => handleBlockProfile(profile.id, profile.status)}
                             className={`px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase transition-all border ${
-                              profile.role === 'blocked'
+                              profile.status === 'banned'
                                 ? 'border-green-500/20 text-green-400 hover:bg-green-500/5'
                                 : 'border-red-500/20 text-red-400 hover:bg-red-500/5'
                             }`}
                           >
-                            {profile.role === "blocked" ? "Unblock Shopper" : "Block Shopper"}
+                            {profile.status === "banned" ? "Unblock Shopper" : "Block Shopper"}
                           </button>
                         </td>
                       </tr>

@@ -1,7 +1,83 @@
-const jwt = require("jsonwebtoken");
-const crypto = require("crypto");
+const { createClient } = require("@insforge/sdk");
 const db = require("../config/db");
 
+// ── InsForge client factory ──────────────────────────────────────────────
+// Each request gets the user's Bearer token injected via setAccessToken(),
+// so we create a single shared client instance and swap the token per-request.
+// This avoids creating a new SDK client on every HTTP request.
+let _insforge = null;
+
+function getInsforgeClient() {
+  if (!_insforge) {
+    _insforge = createClient({
+      baseUrl: process.env.INSFORGE_URL,
+      anonKey: process.env.INSFORGE_ANON_KEY,
+    });
+  }
+  return _insforge;
+}
+
+// ── Helper: resolve user profile from InsForge token ─────────────────────
+// 1. Sets the Bearer token on the SDK client
+// 2. Calls auth.getCurrentUser() to validate the token server-side
+// 3. Fetches the user's profile row from the profiles table
+// Returns { user, profile } on success or { error, status } on failure
+async function resolveUserFromToken(token) {
+  const client = getInsforgeClient();
+
+  // Inject the user's access token so the SDK sends it as Authorization header
+  client.setAccessToken(token);
+
+  try {
+    const { data: authData, error: authError } = await client.auth.getCurrentUser();
+
+    // Clear the token immediately after use so the shared client doesn't leak it
+    client.setAccessToken(null);
+
+    if (authError || !authData?.user) {
+      return { error: "Invalid or expired token. Please log in again.", status: 401 };
+    }
+
+    const userId = authData.user.id;
+
+    // Fetch profile from PostgreSQL profiles table
+    const profileRes = await db.query(
+      "SELECT * FROM profiles WHERE id = $1",
+      [userId]
+    );
+
+    if (profileRes.rows.length === 0) {
+      return { error: "User profile not found", status: 403 };
+    }
+
+    const profile = profileRes.rows[0];
+
+    // Check if account is active (banned users are blocked)
+    if (profile.status && profile.status !== "active") {
+      return { error: "Account is not active", status: 403 };
+    }
+
+    return {
+      user: {
+        id: profile.id,
+        _id: profile.id, // backward compat alias used by some controllers
+        email: profile.email,
+        phone: profile.phone,
+        role: profile.role,
+        full_name: profile.full_name,
+        avatar_url: profile.avatar_url,
+      },
+      profile,
+    };
+  } catch (err) {
+    // Ensure token is cleared even on unexpected errors
+    client.setAccessToken(null);
+    console.error("Auth middleware error:", err.message);
+    return { error: "Authentication failed. Please log in again.", status: 401 };
+  }
+}
+
+// ── Middleware: verifyToken (required auth) ──────────────────────────────
 const verifyToken = async (req, res, next) => {
   let token;
 
@@ -15,72 +91,35 @@ const verifyToken = async (req, res, next) => {
   }
 
   if (!token) {
-    return res.status(401).json({ error: 'Authentication required' });
+    return res.status(401).json({ error: "Authentication required" });
   }
 
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "fallback_secret");
-    
-    // Hash token
-    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+  const result = await resolveUserFromToken(token);
 
-    // Check user_sessions table: is_active = true AND expires_at > now()
-    const sessionRes = await db.query(
-      "SELECT * FROM user_sessions WHERE token_hash = $1 AND is_active = true AND expires_at > now()",
-      [tokenHash]
-    );
-
-    if (sessionRes.rows.length === 0) {
-      return res.status(401).json({ error: 'Session invalid. Please log in again.' });
-    }
-
-    // UPDATE user_sessions last_active_at
-    await db.query(
-      "UPDATE user_sessions SET last_active_at = now() WHERE token_hash = $1",
-      [tokenHash]
-    );
-
-    // Fetch profile
-    const profileRes = await db.query(
-      "SELECT * FROM profiles WHERE id = $1",
-      [decoded.id]
-    );
-
-    if (profileRes.rows.length === 0 || profileRes.rows[0].status !== 'active') {
-      return res.status(403).json({ error: 'Account is not active' });
-    }
-
-    const profile = profileRes.rows[0];
-
-    req.user = {
-      id: profile.id,
-      email: profile.email,
-      phone: profile.phone,
-      role: profile.role,
-      full_name: profile.full_name,
-      avatar_url: profile.avatar_url
-    };
-
-    next();
-  } catch (error) {
-    return res.status(401).json({ error: 'Session expired. Please log in again.' });
+  if (result.error) {
+    return res.status(result.status).json({ error: result.error });
   }
+
+  req.user = result.user;
+  next();
 };
 
+// ── Middleware: requireAdmin ─────────────────────────────────────────────
 const requireAdmin = async (req, res, next) => {
-  if (!req.user || req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Admin access required' });
+  if (!req.user || req.user.role !== "admin") {
+    return res.status(403).json({ error: "Admin access required" });
   }
   next();
 };
 
+// ── Middleware: requireVendor ────────────────────────────────────────────
 const requireVendor = async (req, res, next) => {
-  if (!req.user) return res.status(401).json({ error: 'Authentication required' });
-  
+  if (!req.user) return res.status(401).json({ error: "Authentication required" });
+
   try {
-    const vendorRes = await db.query('SELECT * FROM vendors WHERE user_id = $1', [req.user.id]);
-    if (vendorRes.rows.length === 0 || vendorRes.rows[0].status !== 'approved') {
-      return res.status(403).json({ error: 'Approved vendor account required' });
+    const vendorRes = await db.query("SELECT * FROM vendors WHERE user_id = $1", [req.user.id]);
+    if (vendorRes.rows.length === 0 || vendorRes.rows[0].status !== "approved") {
+      return res.status(403).json({ error: "Approved vendor account required" });
     }
     req.vendor = vendorRes.rows[0];
     next();
@@ -89,6 +128,7 @@ const requireVendor = async (req, res, next) => {
   }
 };
 
+// ── Middleware: optionalAuth (non-blocking auth) ─────────────────────────
 const optionalAuth = async (req, res, next) => {
   let token;
 
@@ -106,55 +146,26 @@ const optionalAuth = async (req, res, next) => {
     return next();
   }
 
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "fallback_secret");
-    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+  const result = await resolveUserFromToken(token);
 
-    const sessionRes = await db.query(
-      "SELECT * FROM user_sessions WHERE token_hash = $1 AND is_active = true AND expires_at > now()",
-      [tokenHash]
-    );
-
-    if (sessionRes.rows.length === 0) {
-      req.user = null;
-      return next();
-    }
-
-    const profileRes = await db.query(
-      "SELECT * FROM profiles WHERE id = $1",
-      [decoded.id]
-    );
-
-    if (profileRes.rows.length === 0 || profileRes.rows[0].status !== 'active') {
-      req.user = null;
-      return next();
-    }
-
-    const profile = profileRes.rows[0];
-    req.user = {
-      id: profile.id,
-      email: profile.email,
-      phone: profile.phone,
-      role: profile.role,
-      full_name: profile.full_name,
-      avatar_url: profile.avatar_url
-    };
-
-    next();
-  } catch (error) {
+  if (result.error) {
+    // Optional auth never blocks — just set user to null
     req.user = null;
-    next();
+    return next();
   }
+
+  req.user = result.user;
+  next();
 };
 
-// Aliases for backward compatibility
+// ── Aliases for backward compatibility ───────────────────────────────────
 const protect = verifyToken;
 
 const authorize = (...roles) => {
   return (req, res, next) => {
     if (!req.user || !roles.includes(req.user.role)) {
       return res.status(403).json({
-        error: `Role '${req.user?.role || ""}' is not authorized to access this resource`
+        error: `Role '${req.user?.role || ""}' is not authorized to access this resource`,
       });
     }
     next();
@@ -167,5 +178,6 @@ module.exports = {
   requireVendor,
   optionalAuth,
   protect,
-  authorize
+  authorize,
 };
+

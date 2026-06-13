@@ -3,10 +3,19 @@ import { insforge } from '../lib/insforge';
 export const authService = {
   signUp: async ({ email, password, name, phone }) => {
     try {
+      const names = name ? name.trim().split(/\s+/) : [];
+      const firstName = names[0] || '';
+      const lastName = names.slice(1).join(' ') || '';
       const { data, error } = await insforge.auth.signUp({
         email,
         password,
-        name
+        profile: {
+          first_name: firstName,
+          last_name: lastName,
+          full_name: name || '',
+          phone: phone || '',
+          role: 'customer'
+        }
       });
       if (error) return { success: false, message: error.message };
       return {
@@ -24,9 +33,13 @@ export const authService = {
       const { data, error } = await insforge.auth.verifyEmail({ email, otp });
       if (error) return { success: false, message: error.message };
 
-      // Save name and phone to the user profile
-      if (data?.user) {
-        await insforge.auth.setProfile({ name, phone });
+      // UPDATE profiles table with full_name after verification succeeds
+      // (the trigger only creates the row with empty defaults)
+      if (data?.user?.id) {
+        await insforge.database
+          .from('profiles')
+          .update({ full_name: name || '' })
+          .eq('id', data.user.id);
       }
 
       return {
@@ -51,6 +64,16 @@ export const authService = {
         user: data?.user,
         token: data?.accessToken
       };
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+  },
+
+  loginWithGoogle: async () => {
+    try {
+      const { data, error } = await insforge.auth.signInWithOAuth({ provider: 'google' });
+      if (error) return { success: false, message: error.message };
+      return { success: true };
     } catch (err) {
       return { success: false, message: err.message };
     }

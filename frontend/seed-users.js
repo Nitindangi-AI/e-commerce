@@ -5,6 +5,14 @@ const VITE_INSFORGE_ANON_KEY = 'ik_84619633df209ae1fafdaf404bfbd91a';
 
 const usersToSeed = [
   {
+    email: 'admin@trendy.com',
+    password: 'admin123',
+    firstName: 'Admin',
+    lastName: 'TRENDY',
+    phone: '+91 99999 00000',
+    role: 'admin'
+  },
+  {
     email: 'seller1@trendy.com',
     password: 'seller123',
     firstName: 'John',

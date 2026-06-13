@@ -45,7 +45,7 @@ exports.approveVendor = asyncHandler(async (req, res) => {
   }
 
   const userId = result.rows[0].user_id;
-  await db.query("UPDATE profiles SET role = 'merchant' WHERE id = $1", [userId]);
+  await db.query("UPDATE profiles SET role = 'vendor' WHERE id = $1", [userId]);
 
   await db.query(
     "INSERT INTO user_notifications (user_id, type, title, message, created_at) VALUES ($1, 'system', 'Vendor Approved', 'Your vendor account has been approved!', now())",

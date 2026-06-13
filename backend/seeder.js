@@ -39,7 +39,7 @@ const coupons = [
 
 const users = [
   { firstName: "Admin", lastName: "TRENDY", email: "admin@trendy.com", password: "admin123", role: "admin", phone: "+91 99999 00000" },
-  { firstName: "Alex", lastName: "Rivera", email: "alex@trendy.com", password: "test1234", role: "user", phone: "+91 98765 43210", addresses: [{ label: "Home", name: "Alex Rivera", phone: "+91 98765 43210", line1: "42, Park Street, Andheri West", city: "Mumbai", state: "Maharashtra", pincode: "400058", isDefault: true }, { label: "Office", name: "Alex Rivera", phone: "+91 98765 43210", line1: "Tech Park, Whitefield", city: "Bangalore", state: "Karnataka", pincode: "560066", isDefault: false }] },
+  { firstName: "Alex", lastName: "Rivera", email: "alex@trendy.com", password: "test1234", role: "customer", phone: "+91 98765 43210", addresses: [{ label: "Home", name: "Alex Rivera", phone: "+91 98765 43210", line1: "42, Park Street, Andheri West", city: "Mumbai", state: "Maharashtra", pincode: "400058", isDefault: true }, { label: "Office", name: "Alex Rivera", phone: "+91 98765 43210", line1: "Tech Park, Whitefield", city: "Bangalore", state: "Karnataka", pincode: "560066", isDefault: false }] },
 ];
 
 const { MongoMemoryServer } = require("mongodb-memory-server");
@@ -84,7 +84,7 @@ const importData = async () => {
     console.log(`✅ ${createdCoupons.length} coupons seeded`);
 
     // Seed some reviews for the first product
-    const testUser = createdUsers.find(u => u.role === "user");
+    const testUser = createdUsers.find(u => u.role === "customer");
     const firstProduct = createdProducts[0];
     if (testUser && firstProduct) {
       await Review.create([

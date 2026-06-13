@@ -25,11 +25,13 @@ CREATE TABLE IF NOT EXISTS profiles (
 );
 
 -- Auto-create a profile row when a new auth user signs up
+-- Safe fallback: no metadata field reads from auth.users trigger row
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
   INSERT INTO profiles (id, email, full_name)
-  VALUES (NEW.id, NEW.email, COALESCE(NEW.raw_user_meta_data->>'full_name', ''));
+  VALUES (NEW.id, NEW.email, '')
+  ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

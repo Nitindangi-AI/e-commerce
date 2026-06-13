@@ -150,15 +150,40 @@ export default function Navbar() {
     };
     fetchNotifications();
 
-    const channel = insforge.database
-      .channel('public:user_notifications')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_notifications', filter: `user_id=eq.${activeUser.id}` }, () => {
-        fetchNotifications();
-      })
-      .subscribe();
+    // Setup polling fallback
+    const intervalId = setInterval(fetchNotifications, 30000);
+
+    // Setup Realtime subscription
+    let isSubscribed = false;
+    const handleRealtimeChange = () => {
+      fetchNotifications();
+    };
+
+    try {
+      insforge.realtime.on('postgres_changes', handleRealtimeChange);
+      insforge.realtime.on('notification', handleRealtimeChange);
+      insforge.realtime.subscribe(`user_notifications`).then((res) => {
+        if (res && res.ok) {
+          isSubscribed = true;
+        }
+      }).catch(err => {
+        console.debug("Realtime connection/subscription failed, using polling fallback:", err);
+      });
+    } catch (err) {
+      console.debug("Realtime init failed:", err);
+    }
 
     return () => {
-      insforge.database.removeChannel(channel);
+      clearInterval(intervalId);
+      try {
+        insforge.realtime.off('postgres_changes', handleRealtimeChange);
+        insforge.realtime.off('notification', handleRealtimeChange);
+        if (isSubscribed) {
+          insforge.realtime.unsubscribe(`user_notifications`);
+        }
+      } catch (err) {
+        // ignore
+      }
     };
   }, [activeUser]);
 

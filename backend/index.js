@@ -64,6 +64,7 @@ app.use("/api/v1/auth/register", authLimiter);
 // ── Mount routes ──
 app.use("/api/admin", require("./routes/adminRoutes"));
 app.use("/api/vendor", require("./routes/vendorRoutes"));
+app.use("/api/vendor", require("./routes/vendor.auth"));
 app.use("/api/v1/auth", require("./routes/authRoutes"));
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/v1/products", require("./routes/productRoutes"));
@@ -101,7 +102,7 @@ async function autoSeed() {
 
     const users = [
       { firstName: "Admin", lastName: "TRENDY", email: "admin@trendy.com", password: "admin123", role: "admin", phone: "9999900000", paymentAccount: { upiId: "trendyadmin@upi", bankName: "HDFC Bank", accountHolder: "TRENDY Pvt Ltd", accountNumber: "XXXX1234", ifscCode: "HDFC0001234" } },
-      { firstName: "Alex", lastName: "Rivera", email: "alex@trendy.com", password: "test1234", role: "user", phone: "9876543210" },
+      { firstName: "Alex", lastName: "Rivera", email: "alex@trendy.com", password: "test1234", role: "customer", phone: "9876543210" },
     ];
 
     const coupons = [
@@ -111,7 +112,7 @@ async function autoSeed() {
     ];
 
     const createdUsers = await User.create(users);
-    const normalUser = createdUsers.find(u => u.role === "user");
+    const normalUser = createdUsers.find(u => u.role === "customer");
 
     // Seed location data
     const state = await require("./models/State").create({ name: "Maharashtra" });

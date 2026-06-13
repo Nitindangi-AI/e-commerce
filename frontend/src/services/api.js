@@ -1,6 +1,23 @@
 import axios from 'axios';
 import { insforge } from '../lib/insforge';
 
+// Axios request interceptor to automatically attach the InsForge access token
+axios.interceptors.request.use((config) => {
+  try {
+    const token = localStorage.getItem('auth-storage')
+      ? JSON.parse(localStorage.getItem('auth-storage'))?.state?.token
+      : null;
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  } catch (e) {
+    console.error("Failed to parse token from localStorage", e);
+  }
+  return config;
+}, (error) => {
+  return Promise.reject(error);
+});
+
 // ─── Auth API ────────────────────────────────────────────
 export const authAPI = {
   register: async ({ firstName, lastName, email, password, phone, role, storeName, storeLogoFile, panCard, gstNumber, bankAccount, aadharNumber }) => {
@@ -31,12 +48,12 @@ export const authAPI = {
         }
       }
 
-      // 2. Create profile row with 'user' role
+      // 2. Create profile row with 'customer' role
       await authAPI.createProfile(userId, {
         first_name: firstName,
         last_name: lastName,
         phone: phone || '',
-        role: 'user', // Set initially as 'user'
+        role: 'customer', // Set initially as 'customer'
         avatar_url: email,
       });
 
@@ -70,7 +87,7 @@ export const authAPI = {
       first_name,
       last_name,
       phone: phone || '',
-      role: role || 'user',
+      role: role || 'customer',
       avatar_url: avatar_url || '',
     }]);
     if (error) throw new Error(error.message);
@@ -129,7 +146,7 @@ export const authAPI = {
         first_name: nameParts[0] || 'User',
         last_name: nameParts.slice(1).join(' ') || '',
         phone: '',
-        role: 'user',
+        role: 'customer',
       };
       const { error: newProfileError } = await insforge.database.from('profiles').insert([newProfile]);
       if (newProfileError) throw new Error(newProfileError.message);

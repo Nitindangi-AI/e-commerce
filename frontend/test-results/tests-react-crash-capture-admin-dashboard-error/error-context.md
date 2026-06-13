@@ -1,0 +1,1165 @@
+# Instructions
+
+- Following Playwright test failed.
+- Explain why, be concise, respect Playwright best practices.
+- Provide a snippet of code with the fix, if possible.
+
+# Test info
+
+- Name: tests\react-crash.spec.js >> capture admin dashboard error
+- Location: tests\react-crash.spec.js:3:1
+
+# Error details
+
+```
+TimeoutError: page.waitForURL: Timeout 15000ms exceeded.
+=========================== logs ===========================
+waiting for navigation to "**/admin" until "load"
+  navigated to "http://localhost:5173/"
+  navigated to "http://localhost:5173/"
+  navigated to "http://localhost:5173/"
+============================================================
+```
+
+# Page snapshot
+
+```yaml
+- generic [ref=e4]:
+  - navigation [ref=e5]:
+    - generic [ref=e6]:
+      - generic [ref=e8]:
+        - link "Shop" [ref=e9] [cursor=pointer]:
+          - /url: /shop
+        - link "Watches" [ref=e10] [cursor=pointer]:
+          - /url: /shop?category=Watches
+        - link "Shirts" [ref=e11] [cursor=pointer]:
+          - /url: /shop?category=Shirts
+        - link "Footwear" [ref=e12] [cursor=pointer]:
+          - /url: /shop?category=Footwear
+        - link "Grooming" [ref=e13] [cursor=pointer]:
+          - /url: /shop?category=Grooming
+      - link "TRENDZ" [ref=e14] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e15]: TRENDZ
+      - generic [ref=e16]:
+        - generic [ref=e18]:
+          - img [ref=e19] [cursor=pointer]
+          - textbox "Search..." [ref=e22]
+        - link [ref=e23] [cursor=pointer]:
+          - /url: /account
+          - img [ref=e24]
+        - link [ref=e27] [cursor=pointer]:
+          - /url: /wishlist
+          - img [ref=e28]
+        - link [ref=e30] [cursor=pointer]:
+          - /url: /cart
+          - img [ref=e31]
+        - button "Toggle Theme" [ref=e34] [cursor=pointer]:
+          - img [ref=e35]
+        - button "Profile Menu" [ref=e42] [cursor=pointer]:
+          - generic [ref=e43]: U
+  - main [ref=e44]:
+    - generic [ref=e45]:
+      - generic [ref=e47]:
+        - paragraph [ref=e48]: Premium Fashion · Curated Collections
+        - heading "WEAR THE TREND." [level=1] [ref=e49]
+        - paragraph [ref=e50]: Premium fashion. Curated for you.
+        - generic [ref=e51]:
+          - link "Shop Now" [ref=e52] [cursor=pointer]:
+            - /url: /shop
+          - link "Explore Collections" [ref=e53] [cursor=pointer]:
+            - /url: /shop
+        - generic [ref=e55]: Scroll
+      - generic [ref=e57]:
+        - generic [ref=e58]:
+          - paragraph [ref=e59]: Browse
+          - heading "Shop by Category" [level=2] [ref=e60]
+        - generic [ref=e62]:
+          - link "Accessories Accessories Explore →" [ref=e63] [cursor=pointer]:
+            - /url: /shop?category=Accessories
+            - generic [ref=e64]:
+              - img "Accessories" [ref=e65]
+              - generic [ref=e67]:
+                - heading "Accessories" [level=3] [ref=e68]
+                - paragraph [ref=e69]: Explore →
+          - link "Watches Watches Explore →" [ref=e70] [cursor=pointer]:
+            - /url: /shop?category=Watches
+            - generic [ref=e71]:
+              - img "Watches" [ref=e72]
+              - generic [ref=e74]:
+                - heading "Watches" [level=3] [ref=e75]
+                - paragraph [ref=e76]: Explore →
+          - link "Footwear Footwear Explore →" [ref=e77] [cursor=pointer]:
+            - /url: /shop?category=Footwear
+            - generic [ref=e78]:
+              - img "Footwear" [ref=e79]
+              - generic [ref=e81]:
+                - heading "Footwear" [level=3] [ref=e82]
+                - paragraph [ref=e83]: Explore →
+          - link "Eyewear Eyewear Explore →" [ref=e84] [cursor=pointer]:
+            - /url: /shop?category=Eyewear
+            - generic [ref=e85]:
+              - img "Eyewear" [ref=e86]
+              - generic [ref=e88]:
+                - heading "Eyewear" [level=3] [ref=e89]
+                - paragraph [ref=e90]: Explore →
+          - link "Shirts Shirts Explore →" [ref=e91] [cursor=pointer]:
+            - /url: /shop?category=Shirts
+            - generic [ref=e92]:
+              - img "Shirts" [ref=e93]
+              - generic [ref=e95]:
+                - heading "Shirts" [level=3] [ref=e96]
+                - paragraph [ref=e97]: Explore →
+          - link "Grooming Grooming Explore →" [ref=e98] [cursor=pointer]:
+            - /url: /shop?category=Grooming
+            - generic [ref=e99]:
+              - img "Grooming" [ref=e100]
+              - generic [ref=e102]:
+                - heading "Grooming" [level=3] [ref=e103]
+                - paragraph [ref=e104]: Explore →
+          - link "Pants Pants Explore →" [ref=e105] [cursor=pointer]:
+            - /url: /shop?category=Pants
+            - generic [ref=e106]:
+              - img "Pants" [ref=e107]
+              - generic [ref=e109]:
+                - heading "Pants" [level=3] [ref=e110]
+                - paragraph [ref=e111]: Explore →
+          - link "Accessories Accessories Explore →" [ref=e112] [cursor=pointer]:
+            - /url: /shop?category=Accessories
+            - generic [ref=e113]:
+              - img "Accessories" [ref=e114]
+              - generic [ref=e116]:
+                - heading "Accessories" [level=3] [ref=e117]
+                - paragraph [ref=e118]: Explore →
+          - link "Watches Watches Explore →" [ref=e119] [cursor=pointer]:
+            - /url: /shop?category=Watches
+            - generic [ref=e120]:
+              - img "Watches" [ref=e121]
+              - generic [ref=e123]:
+                - heading "Watches" [level=3] [ref=e124]
+                - paragraph [ref=e125]: Explore →
+          - link "Footwear Footwear Explore →" [ref=e126] [cursor=pointer]:
+            - /url: /shop?category=Footwear
+            - generic [ref=e127]:
+              - img "Footwear" [ref=e128]
+              - generic [ref=e130]:
+                - heading "Footwear" [level=3] [ref=e131]
+                - paragraph [ref=e132]: Explore →
+          - link "Eyewear Eyewear Explore →" [ref=e133] [cursor=pointer]:
+            - /url: /shop?category=Eyewear
+            - generic [ref=e134]:
+              - img "Eyewear" [ref=e135]
+              - generic [ref=e137]:
+                - heading "Eyewear" [level=3] [ref=e138]
+                - paragraph [ref=e139]: Explore →
+          - link "Shirts Shirts Explore →" [ref=e140] [cursor=pointer]:
+            - /url: /shop?category=Shirts
+            - generic [ref=e141]:
+              - img "Shirts" [ref=e142]
+              - generic [ref=e144]:
+                - heading "Shirts" [level=3] [ref=e145]
+                - paragraph [ref=e146]: Explore →
+          - link "Grooming Grooming Explore →" [ref=e147] [cursor=pointer]:
+            - /url: /shop?category=Grooming
+            - generic [ref=e148]:
+              - img "Grooming" [ref=e149]
+              - generic [ref=e151]:
+                - heading "Grooming" [level=3] [ref=e152]
+                - paragraph [ref=e153]: Explore →
+          - link "Pants Pants Explore →" [ref=e154] [cursor=pointer]:
+            - /url: /shop?category=Pants
+            - generic [ref=e155]:
+              - img "Pants" [ref=e156]
+              - generic [ref=e158]:
+                - heading "Pants" [level=3] [ref=e159]
+                - paragraph [ref=e160]: Explore →
+      - generic [ref=e162]:
+        - generic [ref=e163]: FREE SHIPPING OVER ₹5000
+        - generic [ref=e164]: •
+        - generic [ref=e165]: AUTHENTIC LUXURY
+        - generic [ref=e166]: •
+        - generic [ref=e167]: 30-DAY RETURNS
+        - generic [ref=e168]: •
+        - generic [ref=e169]: EXCLUSIVE DROPS
+        - generic [ref=e170]: •
+        - generic [ref=e171]: SECURE CHECKOUT
+        - generic [ref=e172]: •
+        - generic [ref=e173]: HANDCRAFTED QUALITY
+        - generic [ref=e174]: •
+        - generic [ref=e175]: WORLDWIDE DELIVERY
+        - generic [ref=e176]: •
+        - generic [ref=e177]: MEMBER REWARDS
+        - generic [ref=e178]: •
+        - generic [ref=e179]: FREE SHIPPING OVER ₹5000
+        - generic [ref=e180]: •
+        - generic [ref=e181]: AUTHENTIC LUXURY
+        - generic [ref=e182]: •
+        - generic [ref=e183]: 30-DAY RETURNS
+        - generic [ref=e184]: •
+        - generic [ref=e185]: EXCLUSIVE DROPS
+        - generic [ref=e186]: •
+        - generic [ref=e187]: SECURE CHECKOUT
+        - generic [ref=e188]: •
+        - generic [ref=e189]: HANDCRAFTED QUALITY
+        - generic [ref=e190]: •
+        - generic [ref=e191]: WORLDWIDE DELIVERY
+        - generic [ref=e192]: •
+        - generic [ref=e193]: MEMBER REWARDS
+        - generic [ref=e194]: •
+      - generic [ref=e197]:
+        - generic [ref=e198]:
+          - generic [ref=e199]: ⏳ Deal of the Day
+          - heading "Premium Design. Limited Offer." [level=2] [ref=e200]:
+            - text: Premium Design.
+            - text: Limited Offer.
+          - paragraph [ref=e201]: Experience luxury with our featured masterpiece Noir Chronograph. Exclusive pricing ends soon.
+          - generic [ref=e202]:
+            - generic [ref=e203]:
+              - generic [ref=e204]: "03"
+              - generic [ref=e205]: Hours
+            - generic [ref=e206]:
+              - generic [ref=e207]: "46"
+              - generic [ref=e208]: Mins
+            - generic [ref=e209]:
+              - generic [ref=e210]: "27"
+              - generic [ref=e211]: Secs
+          - generic [ref=e212]:
+            - generic [ref=e213]:
+              - generic [ref=e214]: ₹45,000
+              - paragraph [ref=e215]: ₹34,900
+            - link "Claim Offer Now" [ref=e216] [cursor=pointer]:
+              - /url: /product/slug/noir-chronograph
+        - img "Noir Chronograph" [ref=e219]
+      - generic [ref=e220]:
+        - generic [ref=e221]:
+          - generic [ref=e222]:
+            - paragraph [ref=e223]: Popular
+            - heading "Trending Now" [level=2] [ref=e224]
+          - link "View All →" [ref=e225] [cursor=pointer]:
+            - /url: /shop
+        - generic [ref=e226]:
+          - link "Noir Chronograph Bestseller Toggle wishlist Quick Add Meridian Noir Chronograph Black Brown Navy (0) ₹34900.00 ₹45000.00" [ref=e227] [cursor=pointer]:
+            - /url: /product/slug/noir-chronograph-217754
+            - generic [ref=e228]:
+              - generic [ref=e229]:
+                - img "Noir Chronograph" [ref=e231]
+                - generic [ref=e232]: Bestseller
+                - button "Toggle wishlist" [ref=e233]:
+                  - img [ref=e234]
+                - button "Quick Add" [ref=e236]
+              - generic [ref=e237]:
+                - paragraph [ref=e238]: Meridian
+                - heading "Noir Chronograph" [level=3] [ref=e239]
+                - generic [ref=e240]:
+                  - button "Black" [ref=e241]
+                  - button "Brown" [ref=e242]
+                  - button "Navy" [ref=e243]
+                - generic [ref=e244]:
+                  - img [ref=e245]
+                  - img [ref=e247]
+                  - img [ref=e249]
+                  - img [ref=e251]
+                  - img [ref=e253]
+                  - generic [ref=e255]: (0)
+                - generic [ref=e256]:
+                  - generic [ref=e257]: ₹34900.00
+                  - generic [ref=e258]: ₹45000.00
+          - link "Carbon Sunglasses Limited Toggle wishlist Quick Add OpticaLux Carbon Sunglasses Matte Black Tortoise (0) ₹19900.00 ₹24900.00" [ref=e259] [cursor=pointer]:
+            - /url: /product/slug/carbon-sunglasses-c7696f
+            - generic [ref=e260]:
+              - generic [ref=e261]:
+                - img "Carbon Sunglasses" [ref=e263]
+                - generic [ref=e264]: Limited
+                - button "Toggle wishlist" [ref=e265]:
+                  - img [ref=e266]
+                - button "Quick Add" [ref=e268]
+              - generic [ref=e269]:
+                - paragraph [ref=e270]: OpticaLux
+                - heading "Carbon Sunglasses" [level=3] [ref=e271]
+                - generic [ref=e272]:
+                  - button "Matte Black" [ref=e273]
+                  - button "Tortoise" [ref=e274]
+                - generic [ref=e275]:
+                  - img [ref=e276]
+                  - img [ref=e278]
+                  - img [ref=e280]
+                  - img [ref=e282]
+                  - img [ref=e284]
+                  - generic [ref=e286]: (0)
+                - generic [ref=e287]:
+                  - generic [ref=e288]: ₹19900.00
+                  - generic [ref=e289]: ₹24900.00
+          - link "Gold Aviators Sale Toggle wishlist Quick Add OpticaLux Gold Aviators Gold Silver Rose Gold (0) ₹22000.00 ₹28000.00" [ref=e290] [cursor=pointer]:
+            - /url: /product/slug/gold-aviators-95e1ba
+            - generic [ref=e291]:
+              - generic [ref=e292]:
+                - img "Gold Aviators" [ref=e294]
+                - generic [ref=e295]: Sale
+                - button "Toggle wishlist" [ref=e296]:
+                  - img [ref=e297]
+                - button "Quick Add" [ref=e299]
+              - generic [ref=e300]:
+                - paragraph [ref=e301]: OpticaLux
+                - heading "Gold Aviators" [level=3] [ref=e302]
+                - generic [ref=e303]:
+                  - button "Gold" [ref=e304]
+                  - button "Silver" [ref=e305]
+                  - button "Rose Gold" [ref=e306]
+                - generic [ref=e307]:
+                  - img [ref=e308]
+                  - img [ref=e310]
+                  - img [ref=e312]
+                  - img [ref=e314]
+                  - img [ref=e316]
+                  - generic [ref=e318]: (0)
+                - generic [ref=e319]:
+                  - generic [ref=e320]: ₹22000.00
+                  - generic [ref=e321]: ₹28000.00
+          - link "Rose Gold Chronograph Premium Toggle wishlist Quick Add Aurelian Rose Gold Chronograph Rose Gold (0) ₹42000.00 ₹55000.00" [ref=e322] [cursor=pointer]:
+            - /url: /product/slug/rose-gold-chronograph-89cd54
+            - generic [ref=e323]:
+              - generic [ref=e324]:
+                - img "Rose Gold Chronograph" [ref=e326]
+                - generic [ref=e327]: Premium
+                - button "Toggle wishlist" [ref=e328]:
+                  - img [ref=e329]
+                - button "Quick Add" [ref=e331]
+              - generic [ref=e332]:
+                - paragraph [ref=e333]: Aurelian
+                - heading "Rose Gold Chronograph" [level=3] [ref=e334]
+                - button "Rose Gold" [ref=e336]
+                - generic [ref=e337]:
+                  - img [ref=e338]
+                  - img [ref=e340]
+                  - img [ref=e342]
+                  - img [ref=e344]
+                  - img [ref=e346]
+                  - generic [ref=e348]: (0)
+                - generic [ref=e349]:
+                  - generic [ref=e350]: ₹42000.00
+                  - generic [ref=e351]: ₹55000.00
+          - link "Titanium Diver Exclusive Toggle wishlist Quick Add Meridian Titanium Diver Silver Black (0) ₹52000.00" [ref=e352] [cursor=pointer]:
+            - /url: /product/slug/titanium-diver-e22269
+            - generic [ref=e353]:
+              - generic [ref=e354]:
+                - img "Titanium Diver" [ref=e356]
+                - generic [ref=e357]: Exclusive
+                - button "Toggle wishlist" [ref=e358]:
+                  - img [ref=e359]
+                - button "Quick Add" [ref=e361]
+              - generic [ref=e362]:
+                - paragraph [ref=e363]: Meridian
+                - heading "Titanium Diver" [level=3] [ref=e364]
+                - generic [ref=e365]:
+                  - button "Silver" [ref=e366]
+                  - button "Black" [ref=e367]
+                - generic [ref=e368]:
+                  - img [ref=e369]
+                  - img [ref=e371]
+                  - img [ref=e373]
+                  - img [ref=e375]
+                  - img [ref=e377]
+                  - generic [ref=e379]: (0)
+                - generic [ref=e381]: ₹52000.00
+          - link "Pilot Aviators Sale Toggle wishlist Quick Add Vistara Optics Pilot Aviators Gunmetal Gold (0) ₹12900.00 ₹15000.00" [ref=e382] [cursor=pointer]:
+            - /url: /product/slug/pilot-aviators-1bc341
+            - generic [ref=e383]:
+              - generic [ref=e384]:
+                - img "Pilot Aviators" [ref=e386]
+                - generic [ref=e387]: Sale
+                - button "Toggle wishlist" [ref=e388]:
+                  - img [ref=e389]
+                - button "Quick Add" [ref=e391]
+              - generic [ref=e392]:
+                - paragraph [ref=e393]: Vistara Optics
+                - heading "Pilot Aviators" [level=3] [ref=e394]
+                - generic [ref=e395]:
+                  - button "Gunmetal" [ref=e396]
+                  - button "Gold" [ref=e397]
+                - generic [ref=e398]:
+                  - img [ref=e399]
+                  - img [ref=e401]
+                  - img [ref=e403]
+                  - img [ref=e405]
+                  - img [ref=e407]
+                  - generic [ref=e409]: (0)
+                - generic [ref=e410]:
+                  - generic [ref=e411]: ₹12900.00
+                  - generic [ref=e412]: ₹15000.00
+          - link "Velvet Sneakers Hot Toggle wishlist Quick Add StrideX Velvet Sneakers White Black Grey (0) ₹25900.00" [ref=e413] [cursor=pointer]:
+            - /url: /product/slug/velvet-sneakers-871bd3
+            - generic [ref=e414]:
+              - generic [ref=e415]:
+                - img "Velvet Sneakers" [ref=e417]
+                - generic [ref=e418]: Hot
+                - button "Toggle wishlist" [ref=e419]:
+                  - img [ref=e420]
+                - button "Quick Add" [ref=e422]
+              - generic [ref=e423]:
+                - paragraph [ref=e424]: StrideX
+                - heading "Velvet Sneakers" [level=3] [ref=e425]
+                - generic [ref=e426]:
+                  - button "White" [ref=e427]
+                  - button "Black" [ref=e428]
+                  - button "Grey" [ref=e429]
+                - generic [ref=e430]:
+                  - img [ref=e431]
+                  - img [ref=e433]
+                  - img [ref=e435]
+                  - img [ref=e437]
+                  - img [ref=e439]
+                  - generic [ref=e441]: (0)
+                - generic [ref=e443]: ₹25900.00
+          - link "Suede Loafers Toggle wishlist Quick Add StrideX Suede Loafers Tan Navy Burgundy (0) ₹18500.00" [ref=e444] [cursor=pointer]:
+            - /url: /product/slug/suede-loafers-5809d1
+            - generic [ref=e445]:
+              - generic [ref=e446]:
+                - img "Suede Loafers" [ref=e448]
+                - button "Toggle wishlist" [ref=e449]:
+                  - img [ref=e450]
+                - button "Quick Add" [ref=e452]
+              - generic [ref=e453]:
+                - paragraph [ref=e454]: StrideX
+                - heading "Suede Loafers" [level=3] [ref=e455]
+                - generic [ref=e456]:
+                  - button "Tan" [ref=e457]
+                  - button "Navy" [ref=e458]
+                  - button "Burgundy" [ref=e459]
+                - generic [ref=e460]:
+                  - img [ref=e461]
+                  - img [ref=e463]
+                  - img [ref=e465]
+                  - img [ref=e467]
+                  - img [ref=e469]
+                  - generic [ref=e471]: (0)
+                - generic [ref=e473]: ₹18500.00
+          - link "Leather Derby New Toggle wishlist Quick Add StrideX Leather Derby Brown Black Oxblood (0) ₹21500.00" [ref=e474] [cursor=pointer]:
+            - /url: /product/slug/leather-derby-b321d7
+            - generic [ref=e475]:
+              - generic [ref=e476]:
+                - img "Leather Derby" [ref=e478]
+                - generic [ref=e479]: New
+                - button "Toggle wishlist" [ref=e480]:
+                  - img [ref=e481]
+                - button "Quick Add" [ref=e483]
+              - generic [ref=e484]:
+                - paragraph [ref=e485]: StrideX
+                - heading "Leather Derby" [level=3] [ref=e486]
+                - generic [ref=e487]:
+                  - button "Brown" [ref=e488]
+                  - button "Black" [ref=e489]
+                  - button "Oxblood" [ref=e490]
+                - generic [ref=e491]:
+                  - img [ref=e492]
+                  - img [ref=e494]
+                  - img [ref=e496]
+                  - img [ref=e498]
+                  - img [ref=e500]
+                  - generic [ref=e502]: (0)
+                - generic [ref=e504]: ₹21500.00
+          - link "Obsidian Wallet New Toggle wishlist Quick Add Artisan & Co. Obsidian Wallet Black Tan (0) ₹8900.00" [ref=e505] [cursor=pointer]:
+            - /url: /product/slug/obsidian-wallet-04c2e6
+            - generic [ref=e506]:
+              - generic [ref=e507]:
+                - img "Obsidian Wallet" [ref=e509]
+                - generic [ref=e510]: New
+                - button "Toggle wishlist" [ref=e511]:
+                  - img [ref=e512]
+                - button "Quick Add" [ref=e514]
+              - generic [ref=e515]:
+                - paragraph [ref=e516]: Artisan & Co.
+                - heading "Obsidian Wallet" [level=3] [ref=e517]
+                - generic [ref=e518]:
+                  - button "Black" [ref=e519]
+                  - button "Tan" [ref=e520]
+                - generic [ref=e521]:
+                  - img [ref=e522]
+                  - img [ref=e524]
+                  - img [ref=e526]
+                  - img [ref=e528]
+                  - img [ref=e530]
+                  - generic [ref=e532]: (0)
+                - generic [ref=e534]: ₹8900.00
+          - link "Leather Duffle Essential Toggle wishlist Quick Add Artisan & Co. Leather Duffle Brown Black (0) ₹29900.00 ₹35000.00" [ref=e535] [cursor=pointer]:
+            - /url: /product/slug/leather-duffle-37c8bc
+            - generic [ref=e536]:
+              - generic [ref=e537]:
+                - img "Leather Duffle" [ref=e539]
+                - generic [ref=e540]: Essential
+                - button "Toggle wishlist" [ref=e541]:
+                  - img [ref=e542]
+                - button "Quick Add" [ref=e544]
+              - generic [ref=e545]:
+                - paragraph [ref=e546]: Artisan & Co.
+                - heading "Leather Duffle" [level=3] [ref=e547]
+                - generic [ref=e548]:
+                  - button "Brown" [ref=e549]
+                  - button "Black" [ref=e550]
+                - generic [ref=e551]:
+                  - img [ref=e552]
+                  - img [ref=e554]
+                  - img [ref=e556]
+                  - img [ref=e558]
+                  - img [ref=e560]
+                  - generic [ref=e562]: (0)
+                - generic [ref=e563]:
+                  - generic [ref=e564]: ₹29900.00
+                  - generic [ref=e565]: ₹35000.00
+          - link "Titanium Cufflinks Sale Toggle wishlist Quick Add Meridian Titanium Cufflinks Silver Gunmetal (0) ₹6900.00 ₹9500.00" [ref=e566] [cursor=pointer]:
+            - /url: /product/slug/titanium-cufflinks-68c5aa
+            - generic [ref=e567]:
+              - generic [ref=e568]:
+                - img "Titanium Cufflinks" [ref=e570]
+                - generic [ref=e571]: Sale
+                - button "Toggle wishlist" [ref=e572]:
+                  - img [ref=e573]
+                - button "Quick Add" [ref=e575]
+              - generic [ref=e576]:
+                - paragraph [ref=e577]: Meridian
+                - heading "Titanium Cufflinks" [level=3] [ref=e578]
+                - generic [ref=e579]:
+                  - button "Silver" [ref=e580]
+                  - button "Gunmetal" [ref=e581]
+                - generic [ref=e582]:
+                  - img [ref=e583]
+                  - img [ref=e585]
+                  - img [ref=e587]
+                  - img [ref=e589]
+                  - img [ref=e591]
+                  - generic [ref=e593]: (0)
+                - generic [ref=e594]:
+                  - generic [ref=e595]: ₹6900.00
+                  - generic [ref=e596]: ₹9500.00
+          - link "Oxford Classic Shirt Bestseller Toggle wishlist Quick Add ThreadCraft Oxford Classic Shirt White Blue Pink (0) ₹4500.00 ₹5900.00" [ref=e597] [cursor=pointer]:
+            - /url: /product/slug/oxford-classic-shirt-d1cbba
+            - generic [ref=e598]:
+              - generic [ref=e599]:
+                - img "Oxford Classic Shirt" [ref=e601]
+                - generic [ref=e602]: Bestseller
+                - button "Toggle wishlist" [ref=e603]:
+                  - img [ref=e604]
+                - button "Quick Add" [ref=e606]
+              - generic [ref=e607]:
+                - paragraph [ref=e608]: ThreadCraft
+                - heading "Oxford Classic Shirt" [level=3] [ref=e609]
+                - generic [ref=e610]:
+                  - button "White" [ref=e611]
+                  - button "Blue" [ref=e612]
+                  - button "Pink" [ref=e613]
+                - generic [ref=e614]:
+                  - img [ref=e615]
+                  - img [ref=e617]
+                  - img [ref=e619]
+                  - img [ref=e621]
+                  - img [ref=e623]
+                  - generic [ref=e625]: (0)
+                - generic [ref=e626]:
+                  - generic [ref=e627]: ₹4500.00
+                  - generic [ref=e628]: ₹5900.00
+          - link "Linen Casual Shirt New Toggle wishlist Quick Add ThreadCraft Linen Casual Shirt Beige Olive White (0) ₹3800.00" [ref=e629] [cursor=pointer]:
+            - /url: /product/slug/linen-casual-shirt-cc6d8f
+            - generic [ref=e630]:
+              - generic [ref=e631]:
+                - img "Linen Casual Shirt" [ref=e633]
+                - generic [ref=e634]: New
+                - button "Toggle wishlist" [ref=e635]:
+                  - img [ref=e636]
+                - button "Quick Add" [ref=e638]
+              - generic [ref=e639]:
+                - paragraph [ref=e640]: ThreadCraft
+                - heading "Linen Casual Shirt" [level=3] [ref=e641]
+                - generic [ref=e642]:
+                  - button "Beige" [ref=e643]
+                  - button "Olive" [ref=e644]
+                  - button "White" [ref=e645]
+                - generic [ref=e646]:
+                  - img [ref=e647]
+                  - img [ref=e649]
+                  - img [ref=e651]
+                  - img [ref=e653]
+                  - img [ref=e655]
+                  - generic [ref=e657]: (0)
+                - generic [ref=e659]: ₹3800.00
+          - link "Silk Formal Shirt Premium Toggle wishlist Quick Add Aurelian Silk Formal Shirt Ivory Black Navy (0) ₹7200.00 ₹9000.00" [ref=e660] [cursor=pointer]:
+            - /url: /product/slug/silk-formal-shirt-c9ccea
+            - generic [ref=e661]:
+              - generic [ref=e662]:
+                - img "Silk Formal Shirt" [ref=e664]
+                - generic [ref=e665]: Premium
+                - button "Toggle wishlist" [ref=e666]:
+                  - img [ref=e667]
+                - button "Quick Add" [ref=e669]
+              - generic [ref=e670]:
+                - paragraph [ref=e671]: Aurelian
+                - heading "Silk Formal Shirt" [level=3] [ref=e672]
+                - generic [ref=e673]:
+                  - button "Ivory" [ref=e674]
+                  - button "Black" [ref=e675]
+                  - button "Navy" [ref=e676]
+                - generic [ref=e677]:
+                  - img [ref=e678]
+                  - img [ref=e680]
+                  - img [ref=e682]
+                  - img [ref=e684]
+                  - img [ref=e686]
+                  - generic [ref=e688]: (0)
+                - generic [ref=e689]:
+                  - generic [ref=e690]: ₹7200.00
+                  - generic [ref=e691]: ₹9000.00
+          - link "Slim Fit Chinos Bestseller Toggle wishlist Quick Add ThreadCraft Slim Fit Chinos Khaki Navy Olive Black (0) ₹3200.00 ₹4200.00" [ref=e692] [cursor=pointer]:
+            - /url: /product/slug/slim-fit-chinos-0ef0f7
+            - generic [ref=e693]:
+              - generic [ref=e694]:
+                - img "Slim Fit Chinos" [ref=e696]
+                - generic [ref=e697]: Bestseller
+                - button "Toggle wishlist" [ref=e698]:
+                  - img [ref=e699]
+                - button "Quick Add" [ref=e701]
+              - generic [ref=e702]:
+                - paragraph [ref=e703]: ThreadCraft
+                - heading "Slim Fit Chinos" [level=3] [ref=e704]
+                - generic [ref=e705]:
+                  - button "Khaki" [ref=e706]
+                  - button "Navy" [ref=e707]
+                  - button "Olive" [ref=e708]
+                  - button "Black" [ref=e709]
+                - generic [ref=e710]:
+                  - img [ref=e711]
+                  - img [ref=e713]
+                  - img [ref=e715]
+                  - img [ref=e717]
+                  - img [ref=e719]
+                  - generic [ref=e721]: (0)
+                - generic [ref=e722]:
+                  - generic [ref=e723]: ₹3200.00
+                  - generic [ref=e724]: ₹4200.00
+          - link "Wool Trousers Premium Toggle wishlist Quick Add Aurelian Wool Trousers Charcoal Navy Brown (0) ₹8500.00" [ref=e725] [cursor=pointer]:
+            - /url: /product/slug/wool-trousers-57a388
+            - generic [ref=e726]:
+              - generic [ref=e727]:
+                - img "Wool Trousers" [ref=e728]
+                - generic [ref=e729]: Premium
+                - button "Toggle wishlist" [ref=e730]:
+                  - img [ref=e731]
+                - button "Quick Add" [ref=e733]
+              - generic [ref=e734]:
+                - paragraph [ref=e735]: Aurelian
+                - heading "Wool Trousers" [level=3] [ref=e736]
+                - generic [ref=e737]:
+                  - button "Charcoal" [ref=e738]
+                  - button "Navy" [ref=e739]
+                  - button "Brown" [ref=e740]
+                - generic [ref=e741]:
+                  - img [ref=e742]
+                  - img [ref=e744]
+                  - img [ref=e746]
+                  - img [ref=e748]
+                  - img [ref=e750]
+                  - generic [ref=e752]: (0)
+                - generic [ref=e754]: ₹8500.00
+          - link "Denim Jeans Sale Toggle wishlist Quick Add StrideX Denim Jeans Indigo Black Light Wash (0) ₹4800.00 ₹6000.00" [ref=e755] [cursor=pointer]:
+            - /url: /product/slug/denim-jeans-1ebbba
+            - generic [ref=e756]:
+              - generic [ref=e757]:
+                - img "Denim Jeans" [ref=e758]
+                - generic [ref=e759]: Sale
+                - button "Toggle wishlist" [ref=e760]:
+                  - img [ref=e761]
+                - button "Quick Add" [ref=e763]
+              - generic [ref=e764]:
+                - paragraph [ref=e765]: StrideX
+                - heading "Denim Jeans" [level=3] [ref=e766]
+                - generic [ref=e767]:
+                  - button "Indigo" [ref=e768]
+                  - button "Black" [ref=e769]
+                  - button "Light Wash" [ref=e770]
+                - generic [ref=e771]:
+                  - img [ref=e772]
+                  - img [ref=e774]
+                  - img [ref=e776]
+                  - img [ref=e778]
+                  - img [ref=e780]
+                  - generic [ref=e782]: (0)
+                - generic [ref=e783]:
+                  - generic [ref=e784]: ₹4800.00
+                  - generic [ref=e785]: ₹6000.00
+          - link "Beard Oil Kit Bestseller Toggle wishlist Quick Add Noir Homme Beard Oil Kit (0) ₹1800.00 ₹2500.00" [ref=e786] [cursor=pointer]:
+            - /url: /product/slug/beard-oil-kit-eb8a9b
+            - generic [ref=e787]:
+              - generic [ref=e788]:
+                - img "Beard Oil Kit" [ref=e789]
+                - generic [ref=e790]: Bestseller
+                - button "Toggle wishlist" [ref=e791]:
+                  - img [ref=e792]
+                - button "Quick Add" [ref=e794]
+              - generic [ref=e795]:
+                - paragraph [ref=e796]: Noir Homme
+                - heading "Beard Oil Kit" [level=3] [ref=e797]
+                - generic [ref=e798]:
+                  - img [ref=e799]
+                  - img [ref=e801]
+                  - img [ref=e803]
+                  - img [ref=e805]
+                  - img [ref=e807]
+                  - generic [ref=e809]: (0)
+                - generic [ref=e810]:
+                  - generic [ref=e811]: ₹1800.00
+                  - generic [ref=e812]: ₹2500.00
+          - link "Luxury Perfume Set Limited Toggle wishlist Quick Add Aurelian Luxury Perfume Set (0) ₹12500.00 ₹16000.00" [ref=e813] [cursor=pointer]:
+            - /url: /product/slug/luxury-perfume-set-46b0dd
+            - generic [ref=e814]:
+              - generic [ref=e815]:
+                - img "Luxury Perfume Set" [ref=e816]
+                - generic [ref=e817]: Limited
+                - button "Toggle wishlist" [ref=e818]:
+                  - img [ref=e819]
+                - button "Quick Add" [ref=e821]
+              - generic [ref=e822]:
+                - paragraph [ref=e823]: Aurelian
+                - heading "Luxury Perfume Set" [level=3] [ref=e824]
+                - generic [ref=e825]:
+                  - img [ref=e826]
+                  - img [ref=e828]
+                  - img [ref=e830]
+                  - img [ref=e832]
+                  - img [ref=e834]
+                  - generic [ref=e836]: (0)
+                - generic [ref=e837]:
+                  - generic [ref=e838]: ₹12500.00
+                  - generic [ref=e839]: ₹16000.00
+      - generic [ref=e840]:
+        - generic [ref=e841]:
+          - generic [ref=e842]:
+            - paragraph [ref=e843]: Fresh
+            - heading "New Arrivals" [level=2] [ref=e844]
+          - link "View All →" [ref=e845] [cursor=pointer]:
+            - /url: /shop?sort=newest
+        - generic [ref=e846]:
+          - link "Carbon Sunglasses Limited Toggle wishlist Quick Add OpticaLux Carbon Sunglasses Matte Black Tortoise (0) ₹19900.00 ₹24900.00" [ref=e847] [cursor=pointer]:
+            - /url: /product/slug/carbon-sunglasses-c7696f
+            - generic [ref=e848]:
+              - generic [ref=e849]:
+                - img "Carbon Sunglasses" [ref=e850]
+                - generic [ref=e851]: Limited
+                - button "Toggle wishlist" [ref=e852]:
+                  - img [ref=e853]
+                - button "Quick Add" [ref=e855]
+              - generic [ref=e856]:
+                - paragraph [ref=e857]: OpticaLux
+                - heading "Carbon Sunglasses" [level=3] [ref=e858]
+                - generic [ref=e859]:
+                  - button "Matte Black" [ref=e860]
+                  - button "Tortoise" [ref=e861]
+                - generic [ref=e862]:
+                  - img [ref=e863]
+                  - img [ref=e865]
+                  - img [ref=e867]
+                  - img [ref=e869]
+                  - img [ref=e871]
+                  - generic [ref=e873]: (0)
+                - generic [ref=e874]:
+                  - generic [ref=e875]: ₹19900.00
+                  - generic [ref=e876]: ₹24900.00
+          - link "Gold Aviators Sale Toggle wishlist Quick Add OpticaLux Gold Aviators Gold Silver Rose Gold (0) ₹22000.00 ₹28000.00" [ref=e877] [cursor=pointer]:
+            - /url: /product/slug/gold-aviators-95e1ba
+            - generic [ref=e878]:
+              - generic [ref=e879]:
+                - img "Gold Aviators" [ref=e881]
+                - generic [ref=e882]: Sale
+                - button "Toggle wishlist" [ref=e883]:
+                  - img [ref=e884]
+                - button "Quick Add" [ref=e886]
+              - generic [ref=e887]:
+                - paragraph [ref=e888]: OpticaLux
+                - heading "Gold Aviators" [level=3] [ref=e889]
+                - generic [ref=e890]:
+                  - button "Gold" [ref=e891]
+                  - button "Silver" [ref=e892]
+                  - button "Rose Gold" [ref=e893]
+                - generic [ref=e894]:
+                  - img [ref=e895]
+                  - img [ref=e897]
+                  - img [ref=e899]
+                  - img [ref=e901]
+                  - img [ref=e903]
+                  - generic [ref=e905]: (0)
+                - generic [ref=e906]:
+                  - generic [ref=e907]: ₹22000.00
+                  - generic [ref=e908]: ₹28000.00
+          - link "Rose Gold Chronograph Premium Toggle wishlist Quick Add Aurelian Rose Gold Chronograph Rose Gold (0) ₹42000.00 ₹55000.00" [ref=e909] [cursor=pointer]:
+            - /url: /product/slug/rose-gold-chronograph-89cd54
+            - generic [ref=e910]:
+              - generic [ref=e911]:
+                - img "Rose Gold Chronograph" [ref=e912]
+                - generic [ref=e913]: Premium
+                - button "Toggle wishlist" [ref=e914]:
+                  - img [ref=e915]
+                - button "Quick Add" [ref=e917]
+              - generic [ref=e918]:
+                - paragraph [ref=e919]: Aurelian
+                - heading "Rose Gold Chronograph" [level=3] [ref=e920]
+                - button "Rose Gold" [ref=e922]
+                - generic [ref=e923]:
+                  - img [ref=e924]
+                  - img [ref=e926]
+                  - img [ref=e928]
+                  - img [ref=e930]
+                  - img [ref=e932]
+                  - generic [ref=e934]: (0)
+                - generic [ref=e935]:
+                  - generic [ref=e936]: ₹42000.00
+                  - generic [ref=e937]: ₹55000.00
+          - link "Titanium Diver Exclusive Toggle wishlist Quick Add Meridian Titanium Diver Silver Black (0) ₹52000.00" [ref=e938] [cursor=pointer]:
+            - /url: /product/slug/titanium-diver-e22269
+            - generic [ref=e939]:
+              - generic [ref=e940]:
+                - img "Titanium Diver" [ref=e941]
+                - generic [ref=e942]: Exclusive
+                - button "Toggle wishlist" [ref=e943]:
+                  - img [ref=e944]
+                - button "Quick Add" [ref=e946]
+              - generic [ref=e947]:
+                - paragraph [ref=e948]: Meridian
+                - heading "Titanium Diver" [level=3] [ref=e949]
+                - generic [ref=e950]:
+                  - button "Silver" [ref=e951]
+                  - button "Black" [ref=e952]
+                - generic [ref=e953]:
+                  - img [ref=e954]
+                  - img [ref=e956]
+                  - img [ref=e958]
+                  - img [ref=e960]
+                  - img [ref=e962]
+                  - generic [ref=e964]: (0)
+                - generic [ref=e966]: ₹52000.00
+          - link "Pilot Aviators Sale Toggle wishlist Quick Add Vistara Optics Pilot Aviators Gunmetal Gold (0) ₹12900.00 ₹15000.00" [ref=e967] [cursor=pointer]:
+            - /url: /product/slug/pilot-aviators-1bc341
+            - generic [ref=e968]:
+              - generic [ref=e969]:
+                - img "Pilot Aviators" [ref=e970]
+                - generic [ref=e971]: Sale
+                - button "Toggle wishlist" [ref=e972]:
+                  - img [ref=e973]
+                - button "Quick Add" [ref=e975]
+              - generic [ref=e976]:
+                - paragraph [ref=e977]: Vistara Optics
+                - heading "Pilot Aviators" [level=3] [ref=e978]
+                - generic [ref=e979]:
+                  - button "Gunmetal" [ref=e980]
+                  - button "Gold" [ref=e981]
+                - generic [ref=e982]:
+                  - img [ref=e983]
+                  - img [ref=e985]
+                  - img [ref=e987]
+                  - img [ref=e989]
+                  - img [ref=e991]
+                  - generic [ref=e993]: (0)
+                - generic [ref=e994]:
+                  - generic [ref=e995]: ₹12900.00
+                  - generic [ref=e996]: ₹15000.00
+          - link "Velvet Sneakers Hot Toggle wishlist Quick Add StrideX Velvet Sneakers White Black Grey (0) ₹25900.00" [ref=e997] [cursor=pointer]:
+            - /url: /product/slug/velvet-sneakers-871bd3
+            - generic [ref=e998]:
+              - generic [ref=e999]:
+                - img "Velvet Sneakers" [ref=e1000]
+                - generic [ref=e1001]: Hot
+                - button "Toggle wishlist" [ref=e1002]:
+                  - img [ref=e1003]
+                - button "Quick Add" [ref=e1005]
+              - generic [ref=e1006]:
+                - paragraph [ref=e1007]: StrideX
+                - heading "Velvet Sneakers" [level=3] [ref=e1008]
+                - generic [ref=e1009]:
+                  - button "White" [ref=e1010]
+                  - button "Black" [ref=e1011]
+                  - button "Grey" [ref=e1012]
+                - generic [ref=e1013]:
+                  - img [ref=e1014]
+                  - img [ref=e1016]
+                  - img [ref=e1018]
+                  - img [ref=e1020]
+                  - img [ref=e1022]
+                  - generic [ref=e1024]: (0)
+                - generic [ref=e1026]: ₹25900.00
+          - link "Suede Loafers Toggle wishlist Quick Add StrideX Suede Loafers Tan Navy Burgundy (0) ₹18500.00" [ref=e1027] [cursor=pointer]:
+            - /url: /product/slug/suede-loafers-5809d1
+            - generic [ref=e1028]:
+              - generic [ref=e1029]:
+                - img "Suede Loafers" [ref=e1031]
+                - button "Toggle wishlist" [ref=e1032]:
+                  - img [ref=e1033]
+                - button "Quick Add" [ref=e1035]
+              - generic [ref=e1036]:
+                - paragraph [ref=e1037]: StrideX
+                - heading "Suede Loafers" [level=3] [ref=e1038]
+                - generic [ref=e1039]:
+                  - button "Tan" [ref=e1040]
+                  - button "Navy" [ref=e1041]
+                  - button "Burgundy" [ref=e1042]
+                - generic [ref=e1043]:
+                  - img [ref=e1044]
+                  - img [ref=e1046]
+                  - img [ref=e1048]
+                  - img [ref=e1050]
+                  - img [ref=e1052]
+                  - generic [ref=e1054]: (0)
+                - generic [ref=e1056]: ₹18500.00
+          - link "Noir Chronograph Bestseller Toggle wishlist Quick Add Meridian Noir Chronograph Black Brown Navy (0) ₹34900.00 ₹45000.00" [ref=e1057] [cursor=pointer]:
+            - /url: /product/slug/noir-chronograph-217754
+            - generic [ref=e1058]:
+              - generic [ref=e1059]:
+                - img "Noir Chronograph" [ref=e1060]
+                - generic [ref=e1061]: Bestseller
+                - button "Toggle wishlist" [ref=e1062]:
+                  - img [ref=e1063]
+                - button "Quick Add" [ref=e1065]
+              - generic [ref=e1066]:
+                - paragraph [ref=e1067]: Meridian
+                - heading "Noir Chronograph" [level=3] [ref=e1068]
+                - generic [ref=e1069]:
+                  - button "Black" [ref=e1070]
+                  - button "Brown" [ref=e1071]
+                  - button "Navy" [ref=e1072]
+                - generic [ref=e1073]:
+                  - img [ref=e1074]
+                  - img [ref=e1076]
+                  - img [ref=e1078]
+                  - img [ref=e1080]
+                  - img [ref=e1082]
+                  - generic [ref=e1084]: (0)
+                - generic [ref=e1085]:
+                  - generic [ref=e1086]: ₹34900.00
+                  - generic [ref=e1087]: ₹45000.00
+      - generic [ref=e1089]:
+        - generic [ref=e1090]:
+          - generic [ref=e1091]: 🚚
+          - generic [ref=e1092]:
+            - heading "Express Delivery" [level=4] [ref=e1093]
+            - paragraph [ref=e1094]: 48-hour guaranteed delivery across India
+        - generic [ref=e1095]:
+          - generic [ref=e1096]: 🔒
+          - generic [ref=e1097]:
+            - heading "Secure Payments" [level=4] [ref=e1098]
+            - paragraph [ref=e1099]: 256-bit SSL encrypted checkout
+        - generic [ref=e1100]:
+          - generic [ref=e1101]: ↩️
+          - generic [ref=e1102]:
+            - heading "Easy Returns" [level=4] [ref=e1103]
+            - paragraph [ref=e1104]: Hassle-free 30-day return policy
+        - generic [ref=e1105]:
+          - generic [ref=e1106]: 💎
+          - generic [ref=e1107]:
+            - heading "Authentic Products" [level=4] [ref=e1108]
+            - paragraph [ref=e1109]: 100% genuine guaranteed items
+      - generic [ref=e1110]:
+        - generic [ref=e1111]:
+          - paragraph [ref=e1112]: Heritage
+          - heading "Curated Premium Brands" [level=2] [ref=e1113]
+        - generic [ref=e1115]:
+          - generic [ref=e1116]:
+            - generic [ref=e1117]: 👑
+            - generic [ref=e1118]: Meridian
+          - generic [ref=e1119]:
+            - generic [ref=e1120]: 💎
+            - generic [ref=e1121]: Trendz Luxury
+          - generic [ref=e1122]:
+            - generic [ref=e1123]: ✨
+            - generic [ref=e1124]: Vogue Elite
+          - generic [ref=e1125]:
+            - generic [ref=e1126]: ♠️
+            - generic [ref=e1127]: Obsidian
+          - generic [ref=e1128]:
+            - generic [ref=e1129]: 🏵️
+            - generic [ref=e1130]: Aura India
+      - generic [ref=e1131]:
+        - generic [ref=e1132]:
+          - paragraph [ref=e1133]: Testimonials
+          - heading "What Our Customers Say" [level=2] [ref=e1134]
+        - generic [ref=e1135]:
+          - generic [ref=e1136]:
+            - generic [ref=e1137]:
+              - img [ref=e1138]
+              - img [ref=e1140]
+              - img [ref=e1142]
+              - img [ref=e1144]
+              - img [ref=e1146]
+            - paragraph [ref=e1148]: "\"Trendz has completely changed how I shop for premium accessories. The quality is unmatched.\""
+            - generic [ref=e1149]:
+              - generic [ref=e1150]: A
+              - generic [ref=e1151]:
+                - paragraph [ref=e1152]: Arjun Mehta
+                - paragraph [ref=e1153]: Entrepreneur
+          - generic [ref=e1154]:
+            - generic [ref=e1155]:
+              - img [ref=e1156]
+              - img [ref=e1158]
+              - img [ref=e1160]
+              - img [ref=e1162]
+              - img [ref=e1164]
+            - paragraph [ref=e1166]: "\"I recommend Trendz to all my clients. The curation is impeccable — every piece tells a story.\""
+            - generic [ref=e1167]:
+              - generic [ref=e1168]: P
+              - generic [ref=e1169]:
+                - paragraph [ref=e1170]: Priya Sharma
+                - paragraph [ref=e1171]: Fashion Designer
+          - generic [ref=e1172]:
+            - generic [ref=e1173]:
+              - img [ref=e1174]
+              - img [ref=e1176]
+              - img [ref=e1178]
+              - img [ref=e1180]
+              - img [ref=e1182]
+            - paragraph [ref=e1184]: "\"Finally, an Indian brand that delivers true luxury. The Noir Chronograph is my daily companion.\""
+            - generic [ref=e1185]:
+              - generic [ref=e1186]: R
+              - generic [ref=e1187]:
+                - paragraph [ref=e1188]: Rahul Verma
+                - paragraph [ref=e1189]: Tech Lead
+      - generic [ref=e1192]:
+        - paragraph [ref=e1193]: Stay Ahead
+        - heading "Join the Inner Circle" [level=2] [ref=e1194]
+        - paragraph [ref=e1195]: Exclusive drops, early access, and member-only offers — straight to your inbox.
+        - generic [ref=e1196]:
+          - textbox "your@email.com" [ref=e1197]
+          - button "Subscribe" [ref=e1198] [cursor=pointer]
+        - paragraph [ref=e1199]: No spam. Unsubscribe anytime.
+  - contentinfo [ref=e1200]:
+    - generic [ref=e1202]:
+      - generic [ref=e1203]:
+        - link "TRENDZ" [ref=e1204] [cursor=pointer]:
+          - /url: /
+        - paragraph [ref=e1205]: Curated luxury for those who define their own standard. Timeless pieces, uncompromising craft, delivered to your doorstep.
+        - generic [ref=e1206]:
+          - link "Instagram" [ref=e1207] [cursor=pointer]:
+            - /url: "#"
+            - img [ref=e1208]
+          - link "Twitter" [ref=e1211] [cursor=pointer]:
+            - /url: "#"
+            - img [ref=e1212]
+          - link "Facebook" [ref=e1214] [cursor=pointer]:
+            - /url: "#"
+            - img [ref=e1215]
+          - link "Youtube" [ref=e1217] [cursor=pointer]:
+            - /url: "#"
+            - img [ref=e1218]
+      - generic [ref=e1221]:
+        - heading "Quick Links" [level=4] [ref=e1222]
+        - list [ref=e1223]:
+          - listitem [ref=e1224]:
+            - link "Shop All" [ref=e1225] [cursor=pointer]:
+              - /url: /shop
+          - listitem [ref=e1226]:
+            - link "About Us" [ref=e1227] [cursor=pointer]:
+              - /url: /
+          - listitem [ref=e1228]:
+            - link "Careers" [ref=e1229] [cursor=pointer]:
+              - /url: /
+          - listitem [ref=e1230]:
+            - link "Become a Seller" [ref=e1231] [cursor=pointer]:
+              - /url: /register
+      - generic [ref=e1232]:
+        - heading "Categories" [level=4] [ref=e1233]
+        - list [ref=e1234]:
+          - listitem [ref=e1235]:
+            - link "Watches" [ref=e1236] [cursor=pointer]:
+              - /url: /shop?category=Watches
+          - listitem [ref=e1237]:
+            - link "Eyewear" [ref=e1238] [cursor=pointer]:
+              - /url: /shop?category=Eyewear
+          - listitem [ref=e1239]:
+            - link "Footwear" [ref=e1240] [cursor=pointer]:
+              - /url: /shop?category=Footwear
+          - listitem [ref=e1241]:
+            - link "Accessories" [ref=e1242] [cursor=pointer]:
+              - /url: /shop?category=Accessories
+          - listitem [ref=e1243]:
+            - link "Shirts" [ref=e1244] [cursor=pointer]:
+              - /url: /shop?category=Shirts
+          - listitem [ref=e1245]:
+            - link "Grooming" [ref=e1246] [cursor=pointer]:
+              - /url: /shop?category=Grooming
+      - generic [ref=e1247]:
+        - heading "Newsletter" [level=4] [ref=e1248]
+        - paragraph [ref=e1249]: Subscribe to receive updates on new arrivals, collections, and exclusive member-only offers.
+        - generic [ref=e1250]:
+          - textbox "Your email address" [ref=e1251]
+          - button "Subscribe" [ref=e1252] [cursor=pointer]:
+            - img [ref=e1253]
+    - generic [ref=e1257]:
+      - paragraph [ref=e1258]: © 2025 TRENDZ. All rights reserved.
+      - generic [ref=e1259]:
+        - link "Privacy Policy" [ref=e1260] [cursor=pointer]:
+          - /url: "#"
+        - link "Terms of Service" [ref=e1261] [cursor=pointer]:
+          - /url: "#"
+        - link "Cookies Settings" [ref=e1262] [cursor=pointer]:
+          - /url: "#"
+  - button "Back to top" [ref=e1263] [cursor=pointer]:
+    - img [ref=e1264]
+  - button "Open chat" [ref=e1266] [cursor=pointer]:
+    - img [ref=e1267]
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - generic: T
+        - generic:
+          - heading "Trendz Support" [level=3]
+          - paragraph: Always online
+      - generic:
+        - button "New conversation":
+          - img
+        - button "Minimize chat":
+          - img
+    - generic:
+      - generic:
+        - textbox "Type your question..."
+        - button "Send message" [disabled]:
+          - img
+      - generic: Press Enter to send · Powered by Trendz
+```
+
+# Test source
+
+```ts
+  1  | import { test, expect } from '@playwright/test';
+  2  | 
+  3  | test('capture admin dashboard error', async ({ page }) => {
+  4  |   const errors = [];
+  5  |   const logs = [];
+  6  | 
+  7  |   page.on('pageerror', err => {
+  8  |     errors.push(err.message + '\n' + err.stack);
+  9  |   });
+  10 | 
+  11 |   page.on('console', msg => {
+  12 |     logs.push(`[${msg.type()}] ${msg.text()}`);
+  13 |   });
+  14 | 
+  15 |   try {
+  16 |     console.log("Navigating to login...");
+  17 |     await page.goto('http://localhost:5173/login');
+  18 |     
+  19 |     console.log("Entering email...");
+  20 |     await page.locator('input[type="email"]').fill('admin@trendy.com');
+  21 |     
+  22 |     console.log("Entering password...");
+  23 |     await page.locator('input[type="password"]').fill('admin123');
+  24 |     
+  25 |     console.log("Submitting login form...");
+  26 |     await page.locator('button[type="submit"]').click();
+  27 |     
+  28 |     console.log("Waiting for navigation to admin panel...");
+> 29 |     await page.waitForURL('**/admin', { timeout: 15000 });
+     |                ^ TimeoutError: page.waitForURL: Timeout 15000ms exceeded.
+  30 |     await page.waitForTimeout(4000);
+  31 |   } finally {
+  32 |     console.log("--- BROWSER CONSOLE LOGS ---");
+  33 |     console.log(logs.join('\n'));
+  34 | 
+  35 |     console.log("--- BROWSER ERRORS ---");
+  36 |     console.log(errors.join('\n\n'));
+  37 |   }
+  38 | });
+  39 | 
+```
