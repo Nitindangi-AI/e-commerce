@@ -45,9 +45,10 @@ export const useAuthStore = create(
         try {
           const { data, error } = await insforge.auth.getCurrentUser();
           if (!error && data?.user) {
+            const token = insforge.getHttpClient().getHeaders().Authorization?.split(' ')[1] || null;
             const profileRes = await insforge.auth.getProfile(data.user.id);
             const activeProfile = profileRes.data || data.user;
-            set({ user: activeProfile, isLoggedIn: true });
+            set({ user: activeProfile, token, isLoggedIn: true });
             useCartStore.getState().mergeCart();
           } else {
             set({ user: null, token: null, isLoggedIn: false });

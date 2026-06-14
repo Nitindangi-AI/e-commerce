@@ -337,10 +337,26 @@ exports.createProduct = asyncHandler(async (req, res) => {
 
 // @desc    Update product
 // @route   PUT /api/v1/products/:id
-// @access  Private/Admin
+// @access  Private/Admin/Vendor
 exports.updateProduct = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const updates = req.body;
+
+  // Verify ownership
+  const checkRes = await db.query("SELECT seller_id FROM products WHERE id = $1", [id]);
+  if (checkRes.rows.length === 0) {
+    return res.status(404).json({
+      success: false,
+      message: "Product not found",
+    });
+  }
+  
+  if (req.user.role !== "admin" && checkRes.rows[0].seller_id !== req.user._id.toString()) {
+    return res.status(403).json({
+      success: false,
+      message: "Not authorized to update this product",
+    });
+  }
   
   const keys = Object.keys(updates).filter(k => k !== "id" && k !== "created_at" && k !== "updated_at");
   if (keys.length === 0) {
@@ -372,9 +388,26 @@ exports.updateProduct = asyncHandler(async (req, res) => {
 
 // @desc    Soft delete product
 // @route   DELETE /api/v1/products/:id
-// @access  Private/Admin
+// @access  Private/Admin/Vendor
 exports.deleteProduct = asyncHandler(async (req, res) => {
   const { id } = req.params;
+
+  // Verify ownership
+  const checkRes = await db.query("SELECT seller_id FROM products WHERE id = $1", [id]);
+  if (checkRes.rows.length === 0) {
+    return res.status(404).json({
+      success: false,
+      message: "Product not found",
+    });
+  }
+  
+  if (req.user.role !== "admin" && checkRes.rows[0].seller_id !== req.user._id.toString()) {
+    return res.status(403).json({
+      success: false,
+      message: "Not authorized to delete this product",
+    });
+  }
+
   const result = await db.query("UPDATE products SET is_active = false WHERE id = $1 RETURNING *", [id]);
   
   if (result.rows.length === 0) {

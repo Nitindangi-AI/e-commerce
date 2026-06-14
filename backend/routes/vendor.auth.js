@@ -5,7 +5,8 @@ const { createClient } = require('@insforge/sdk');
 // Initialize InsForge client
 const insforge = createClient({
   baseUrl: process.env.INSFORGE_URL,
-  anonKey: process.env.INSFORGE_ANON_KEY
+  anonKey: process.env.INSFORGE_ANON_KEY,
+  isServerMode: true
 });
 
 router.post('/register', async (req, res) => {
@@ -140,8 +141,8 @@ router.post('/login', async (req, res) => {
 
     // 6. Return 200 on success
     return res.status(200).json({
-      access_token: authData.session.access_token,
-      refresh_token: authData.session.refresh_token,
+      access_token: authData.accessToken,
+      refresh_token: authData.refreshToken,
       user: {
         id: userId,
         email: authData.user.email,

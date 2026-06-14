@@ -1,16 +1,19 @@
 const asyncHandler = require("express-async-handler");
-const User = require("../models/User");
+const db = require("../config/db");
 
 // @desc    Get user wishlist
 // @route   GET /api/v1/wishlist
 // @access  Private
 exports.getWishlist = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id).populate("wishlist");
+  const result = await db.query(
+    "SELECT p.* FROM wishlist w JOIN products p ON w.product_id = p.id WHERE w.user_id = $1",
+    [req.user._id.toString()]
+  );
 
   res.status(200).json({
     success: true,
-    count: user.wishlist.length,
-    wishlist: user.wishlist,
+    count: result.rows.length,
+    wishlist: result.rows,
   });
 });
 
@@ -18,31 +21,41 @@ exports.getWishlist = asyncHandler(async (req, res) => {
 // @route   POST /api/v1/wishlist/:productId
 // @access  Private
 exports.toggleWishlist = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id);
   const productId = req.params.productId;
+  const userId = req.user._id.toString();
 
-  const index = user.wishlist.indexOf(productId);
+  const existing = await db.query(
+    "SELECT * FROM wishlist WHERE user_id = $1 AND product_id = $2",
+    [userId, productId]
+  );
 
   let action;
-  if (index > -1) {
+  if (existing.rows.length > 0) {
     // Remove from wishlist
-    user.wishlist.splice(index, 1);
+    await db.query(
+      "DELETE FROM wishlist WHERE user_id = $1 AND product_id = $2",
+      [userId, productId]
+    );
     action = "removed";
   } else {
     // Add to wishlist
-    user.wishlist.push(productId);
+    await db.query(
+      "INSERT INTO wishlist (user_id, product_id) VALUES ($1, $2)",
+      [userId, productId]
+    );
     action = "added";
   }
 
-  await user.save();
-
-  const updatedUser = await User.findById(req.user._id).populate("wishlist");
+  const updatedResult = await db.query(
+    "SELECT p.* FROM wishlist w JOIN products p ON w.product_id = p.id WHERE w.user_id = $1",
+    [userId]
+  );
 
   res.status(200).json({
     success: true,
     action,
     message: `Product ${action} ${action === "added" ? "to" : "from"} wishlist`,
-    wishlist: updatedUser.wishlist,
+    wishlist: updatedResult.rows,
   });
 });
 
@@ -50,9 +63,10 @@ exports.toggleWishlist = asyncHandler(async (req, res) => {
 // @route   DELETE /api/v1/wishlist
 // @access  Private
 exports.clearWishlist = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id);
-  user.wishlist = [];
-  await user.save();
+  await db.query(
+    "DELETE FROM wishlist WHERE user_id = $1",
+    [req.user._id.toString()]
+  );
 
   res.status(200).json({
     success: true,
@@ -60,3 +74,4 @@ exports.clearWishlist = asyncHandler(async (req, res) => {
     wishlist: [],
   });
 });
+

@@ -6,7 +6,8 @@ const db = require("../config/db");
 // @route   POST /api/v1/coupons/validate
 // @access  Private
 exports.validateCoupon = asyncHandler(async (req, res) => {
-  const { code, cartTotal } = req.body;
+  const { code } = req.body;
+  const cartTotal = parseFloat(req.body.cartTotal !== undefined ? req.body.cartTotal : req.body.orderValue);
   const userId = req.user._id.toString();
 
   if (!code) {

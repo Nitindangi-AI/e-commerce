@@ -12,6 +12,7 @@ function getInsforgeClient() {
     _insforge = createClient({
       baseUrl: process.env.INSFORGE_URL,
       anonKey: process.env.INSFORGE_ANON_KEY,
+      isServerMode: true,
     });
   }
   return _insforge;
@@ -91,40 +92,73 @@ const verifyToken = async (req, res, next) => {
   }
 
   if (!token) {
-    return res.status(401).json({ error: "Authentication required" });
+    return res.status(401).json({ error: "Authentication required", message: "Authentication required" });
   }
 
   const result = await resolveUserFromToken(token);
 
   if (result.error) {
-    return res.status(result.status).json({ error: result.error });
+    return res.status(result.status).json({ error: result.error, message: result.error });
   }
 
   req.user = result.user;
-  next();
+
+  // Enforce server-side role-based access control
+  const originalUrl = req.originalUrl || "";
+  const role = req.user.role;
+
+  if (role === 'admin') {
+    return next();
+  }
+
+  if (role === 'customer') {
+    if (originalUrl.startsWith('/api/vendor') || originalUrl.startsWith('/api/admin')) {
+      return res.status(403).json({ error: "Unauthorized role access", message: "Customer is not authorized to access this resource" });
+    }
+    return next();
+  }
+
+  if (role === 'vendor') {
+    const isProfileOrLogout = 
+      originalUrl.includes('/auth/profile') || 
+      originalUrl.includes('/auth/logout') || 
+      originalUrl.includes('/auth/me');
+
+    if (originalUrl.startsWith('/api/vendor') || isProfileOrLogout) {
+      return next();
+    }
+
+    return res.status(403).json({ error: "Unauthorized role access", message: "Vendor is not authorized to access this resource" });
+  }
+
+  return res.status(403).json({ error: "Unauthorized role access", message: "Role is not authorized to access this resource" });
 };
 
 // ── Middleware: requireAdmin ─────────────────────────────────────────────
 const requireAdmin = async (req, res, next) => {
   if (!req.user || req.user.role !== "admin") {
-    return res.status(403).json({ error: "Admin access required" });
+    return res.status(403).json({ error: "Admin access required", message: "Admin access required" });
   }
   next();
 };
 
 // ── Middleware: requireVendor ────────────────────────────────────────────
 const requireVendor = async (req, res, next) => {
-  if (!req.user) return res.status(401).json({ error: "Authentication required" });
+  if (!req.user) return res.status(401).json({ error: "Authentication required", message: "Authentication required" });
+
+  if (req.user.role === 'admin') {
+    return next(); // admin gets full access
+  }
 
   try {
     const vendorRes = await db.query("SELECT * FROM vendors WHERE user_id = $1", [req.user.id]);
     if (vendorRes.rows.length === 0 || vendorRes.rows[0].status !== "approved") {
-      return res.status(403).json({ error: "Approved vendor account required" });
+      return res.status(403).json({ error: "Approved vendor account required", message: "Approved vendor account required" });
     }
     req.vendor = vendorRes.rows[0];
     next();
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message, message: error.message });
   }
 };
 
@@ -164,8 +198,10 @@ const protect = verifyToken;
 const authorize = (...roles) => {
   return (req, res, next) => {
     if (!req.user || !roles.includes(req.user.role)) {
+      const msg = `Role '${req.user?.role || ""}' is not authorized to access this resource`;
       return res.status(403).json({
-        error: `Role '${req.user?.role || ""}' is not authorized to access this resource`,
+        error: msg,
+        message: msg
       });
     }
     next();

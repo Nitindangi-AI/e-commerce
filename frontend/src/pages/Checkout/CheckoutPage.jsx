@@ -253,7 +253,7 @@ export default function CheckoutPage() {
         shippingAddress: address,
         paymentMethod: payment,
         couponCode: appliedCoupon?.code || null,
-        discount: couponDiscount + loyaltyDiscount,
+        useLoyalty: useLoyalty,
         paymentDetails: finalDetails
       };
 

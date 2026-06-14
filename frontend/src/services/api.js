@@ -4,14 +4,12 @@ import { insforge } from '../lib/insforge';
 // Axios request interceptor to automatically attach the InsForge access token
 axios.interceptors.request.use((config) => {
   try {
-    const token = localStorage.getItem('auth-storage')
-      ? JSON.parse(localStorage.getItem('auth-storage'))?.state?.token
-      : null;
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    const authHeader = insforge.getHttpClient().getHeaders().Authorization;
+    if (authHeader) {
+      config.headers.Authorization = authHeader;
     }
   } catch (e) {
-    console.error("Failed to parse token from localStorage", e);
+    console.error("Failed to extract token from InsForge client", e);
   }
   return config;
 }, (error) => {
@@ -275,118 +273,24 @@ export const productAPI = {
 
 // ─── Orders API ──────────────────────────────────────────
 export const orderAPI = {
-  create: async ({ orderItems, shippingAddress, paymentMethod, couponCode, discount }) => {
-    const { data: userData } = await insforge.auth.getUser();
-    if (!userData?.user) throw new Error('Please login to place an order');
+  create: async ({ orderItems, shippingAddress, paymentMethod, couponCode, useLoyalty }) => {
+    const res = await axios.post('/api/v1/orders', {
+      orderItems,
+      shippingAddress,
+      paymentMethod,
+      couponCode,
+      useLoyalty,
+    });
 
-    // Validate products and calculate totals
-    let subtotal = 0;
-    let maxDeliveryDays = 0;
-    const validatedItems = [];
-
-    for (const item of orderItems) {
-      const { data: product, error } = await insforge.database
-        .from('products')
-        .select()
-        .eq('id', item.product)
-        .single();
-      if (error || !product) throw new Error(`Product not found: ${item.product}`);
-      if (product.stock < item.quantity) throw new Error(`Insufficient stock for ${product.name}`);
-
-      validatedItems.push({
-        name: product.name,
-        price: product.price,
-        quantity: item.quantity,
-        image: product.img,
-        color: item.color || '',
-        size: item.size || '',
-        product_id: product.id,
-      });
-
-      subtotal += product.price * item.quantity;
-      if (product.delivery_days > maxDeliveryDays) maxDeliveryDays = product.delivery_days;
+    if (res.data.success) {
+      const orderDetails = await orderAPI.getById(res.data.order.id);
+      return {
+        success: true,
+        order: orderDetails.order,
+      };
+    } else {
+      throw new Error(res.data.message || 'Failed to place order');
     }
-
-    const shippingCost = subtotal > 999 ? 0 : 99;
-    const discountAmount = discount || 0;
-    const totalAmount = subtotal + shippingCost - discountAmount;
-
-    const estimatedDelivery = new Date();
-    estimatedDelivery.setDate(estimatedDelivery.getDate() + (maxDeliveryDays || 3));
-
-    // Generate order ID
-    const orderId = `TRENDZ-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
-
-    // Generate transaction ID for non-COD
-    const selectedPayment = paymentMethod || 'cod';
-    let paymentDetails = {};
-    if (selectedPayment !== 'cod') {
-      paymentDetails.transactionId = `TXN${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-    }
-
-    // Create order
-    const { data: order, error: orderError } = await insforge.database
-      .from('orders')
-      .insert([{
-        user_id: userData.user.id,
-        order_id: orderId,
-        order_status: 'Processing',
-        shipping_address: shippingAddress,
-        payment_method: selectedPayment,
-        payment_status: selectedPayment === 'cod' ? 'pending' : 'paid',
-        payment_details: paymentDetails,
-        subtotal,
-        shipping_cost: shippingCost,
-        discount: discountAmount,
-        coupon_code: couponCode || null,
-        total_amount: totalAmount,
-        estimated_delivery: estimatedDelivery.toISOString(),
-      }])
-      .select()
-      .single();
-
-    if (orderError) throw new Error(orderError.message);
-
-    // Create order items
-    const itemsToInsert = validatedItems.map(item => ({
-      order_id: order.id,
-      product_id: item.product_id,
-      name: item.name,
-      price: item.price,
-      quantity: item.quantity,
-      image: item.image,
-      color: item.color,
-      size: item.size,
-    }));
-
-    const { error: itemsError } = await insforge.database.from('order_items').insert(itemsToInsert);
-    if (itemsError) throw new Error(`Failed to save order items: ${itemsError.message}`);
-
-    // Create initial status history
-    const { error: historyError } = await insforge.database.from('order_status_history').insert([{
-      order_id: order.id,
-      status: 'Processing',
-      note: 'Order placed successfully',
-    }]);
-    if (historyError) throw new Error(`Failed to log order status history: ${historyError.message}`);
-
-    // Decrement stock
-    for (const item of validatedItems) {
-      const { error: stockError } = await insforge.database.rpc('decrement_stock', {
-        p_product_id: item.product_id,
-        p_quantity: item.quantity,
-      });
-      if (stockError) throw new Error(`Failed to update product stock: ${stockError.message}`);
-    }
-
-    // Return order with items
-    return {
-      success: true,
-      order: {
-        ...normalizeOrder(order),
-        orderItems: validatedItems,
-      },
-    };
   },
 
   getMyOrders: async () => {

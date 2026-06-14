@@ -89,11 +89,6 @@ app.use(errorHandler);
 
 // Auto-seed: populate DB if empty (for in-memory / fresh installs)
 async function autoSeed() {
-  const Product = require("./models/Product");
-  // Always clear products from MongoDB to keep it synchronized with empty products
-  await Product.deleteMany({});
-  console.log("🗑️  All products deleted from MongoDB database!");
-
   const User = require("./models/User");
   const count = await User.countDocuments();
   if (count === 0) {
@@ -148,6 +143,8 @@ async function autoSeed() {
     console.log("✅ Auto-seeded: 2 users, 3 coupons");
     console.log("📧 Admin: admin@trendy.com / admin123");
     console.log("📧 User:  alex@trendy.com / test1234");
+  } else {
+    console.log("ℹ️  Database already contains user records, skipping auto-seed.");
   }
 }
 
@@ -156,7 +153,12 @@ const PORT = process.env.PORT || 5000;
 // Start server after DB connection
 const startServer = async () => {
   await connectDatabase();
-  await autoSeed();
+
+  if (process.env.ENABLE_SEEDING === "true") {
+    await autoSeed();
+  } else {
+    console.log("ℹ️  Database seeding is disabled (set ENABLE_SEEDING=true to seed).");
+  }
 
   app.listen(PORT, () => {
     console.log(`\n🚀 Trendy Server running on port ${PORT}`);

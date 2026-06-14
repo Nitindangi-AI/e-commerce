@@ -41,9 +41,9 @@ router.post("/:id/reviews", protect, validateReview, createReview);
 router.put("/reviews/:id/helpful", protect, markHelpful);
 router.post("/reviews/:id/reply", protect, authorize("admin"), adminReply);
 
-// Admin only products
-router.post("/", protect, authorize("admin"), validateProduct, createProduct);
-router.put("/:id", protect, authorize("admin"), updateProduct);
-router.delete("/:id", protect, authorize("admin"), deleteProduct);
+// Admin and Vendor products
+router.post("/", protect, authorize("admin", "vendor"), validateProduct, createProduct);
+router.put("/:id", protect, authorize("admin", "vendor"), updateProduct);
+router.delete("/:id", protect, authorize("admin", "vendor"), deleteProduct);
 
 module.exports = router;

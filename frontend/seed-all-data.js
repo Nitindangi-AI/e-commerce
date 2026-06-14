@@ -39,7 +39,7 @@ const usersToSeed = [
     firstName: 'Jane',
     lastName: 'Smith',
     phone: '+91 98765 00002',
-    role: 'user', // Starts as 'user' role until admin approves vendor status
+    role: 'customer', // Starts as 'customer' role until admin approves vendor status
     isVendor: true,
     storeName: 'OpticaLux Styles',
     panCard: 'FGHIJ5678K',
@@ -54,7 +54,7 @@ const usersToSeed = [
     firstName: 'Alice',
     lastName: 'Brown',
     phone: '+91 98765 00003',
-    role: 'user',
+    role: 'customer',
     isVendor: false
   },
   {
@@ -63,7 +63,7 @@ const usersToSeed = [
     firstName: 'Bob',
     lastName: 'Green',
     phone: '+91 98765 00004',
-    role: 'user',
+    role: 'customer',
     isVendor: false
   }
 ];

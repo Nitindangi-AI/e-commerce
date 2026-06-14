@@ -17,8 +17,9 @@ const {
 } = require("../controllers/orderController");
 const { validateCoupon } = require("../controllers/couponController");
 const { protect, authorize, requireAdmin } = require("../middleware/auth");
+const { validateOrder } = require("../middleware/validate");
 
-router.post("/", protect, createOrder);
+router.post("/", protect, validateOrder, createOrder);
 router.get("/my", protect, getMyOrders);
 
 // Admin routes — placed before /:id to avoid Express wildcard conflict

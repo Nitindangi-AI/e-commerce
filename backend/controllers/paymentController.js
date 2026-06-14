@@ -5,7 +5,10 @@ const User = require("../models/User");
 // @route   GET /api/v1/payment/payment-account
 // @access  Private/Admin
 exports.getPaymentAccount = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id);
+  const user = await User.findOne({ email: req.user.email });
+  if (!user) {
+    return res.status(404).json({ success: false, message: "User not found" });
+  }
 
   res.status(200).json({
     success: true,
@@ -19,14 +22,17 @@ exports.getPaymentAccount = asyncHandler(async (req, res) => {
 exports.updatePaymentAccount = asyncHandler(async (req, res) => {
   const { upiId, bankName, accountHolder, accountNumber, ifscCode } = req.body;
 
-  const user = await User.findById(req.user._id);
+  const user = await User.findOne({ email: req.user.email });
+  if (!user) {
+    return res.status(404).json({ success: false, message: "User not found" });
+  }
 
   user.paymentAccount = {
-    upiId: upiId || user.paymentAccount.upiId || "",
-    bankName: bankName || user.paymentAccount.bankName || "",
-    accountHolder: accountHolder || user.paymentAccount.accountHolder || "",
-    accountNumber: accountNumber || user.paymentAccount.accountNumber || "",
-    ifscCode: ifscCode || user.paymentAccount.ifscCode || "",
+    upiId: upiId || (user.paymentAccount && user.paymentAccount.upiId) || "",
+    bankName: bankName || (user.paymentAccount && user.paymentAccount.bankName) || "",
+    accountHolder: accountHolder || (user.paymentAccount && user.paymentAccount.accountHolder) || "",
+    accountNumber: accountNumber || (user.paymentAccount && user.paymentAccount.accountNumber) || "",
+    ifscCode: ifscCode || (user.paymentAccount && user.paymentAccount.ifscCode) || "",
   };
 
   await user.save();

@@ -78,10 +78,57 @@ const validateAddress = [
   handleValidationErrors,
 ];
 
+// Order validation
+const validateOrder = [
+  body("orderItems")
+    .isArray({ min: 1 })
+    .withMessage("Order items must be a non-empty array"),
+  body("orderItems.*.product")
+    .isUUID()
+    .withMessage("Product ID must be a valid UUID"),
+  body("orderItems.*.quantity")
+    .isInt({ min: 1 })
+    .withMessage("Quantity must be a positive integer"),
+  body("shippingAddress")
+    .isObject()
+    .withMessage("Shipping address must be an object"),
+  body("shippingAddress.name")
+    .trim()
+    .notEmpty()
+    .withMessage("Recipient name is required"),
+  body("shippingAddress.phone")
+    .trim()
+    .matches(/^[6-9]\d{9}$/)
+    .withMessage("Recipient phone must be a valid 10-digit number"),
+  body("shippingAddress.line1")
+    .trim()
+    .notEmpty()
+    .withMessage("Address Line 1 is required"),
+  body("shippingAddress.city")
+    .trim()
+    .notEmpty()
+    .withMessage("City is required"),
+  body("shippingAddress.state")
+    .trim()
+    .notEmpty()
+    .withMessage("State is required"),
+  body("shippingAddress.pincode")
+    .trim()
+    .isLength({ min: 6, max: 6 })
+    .isNumeric()
+    .withMessage("Pincode must be a 6-digit number"),
+  body("paymentMethod")
+    .isIn(["cod", "upi", "card", "netbanking"])
+    .withMessage("Invalid payment method"),
+  handleValidationErrors,
+];
+
 module.exports = {
   validateRegister,
   validateLogin,
   validateProduct,
   validateReview,
   validateAddress,
+  validateOrder,
 };
+

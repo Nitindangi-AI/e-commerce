@@ -136,6 +136,20 @@ if (client.auth) {
       return res;
     };
   }
+
+  // 4. getProfile shim
+  client.auth.getProfile = async function (userId) {
+    try {
+      const { data, error } = await client.database
+        .from('profiles')
+        .select()
+        .eq('id', userId)
+        .maybeSingle();
+      return { data, error };
+    } catch (e) {
+      return { data: null, error: e };
+    }
+  };
 }
 
 export const insforge = client;

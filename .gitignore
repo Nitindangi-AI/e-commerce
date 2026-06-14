@@ -25,3 +25,9 @@ frontend/.env.local
 # Cookies / local auth files
 cookie.txt
 backend/cookie.txt
+node_modules
+.env
+frontend/test-results
+backend/scratch_test.js
+backend/scratch_update.js
+frontend/seed-users.js
