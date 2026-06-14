@@ -274,9 +274,12 @@ exports.verifyOTPAndRegister = async (req, res) => {
     }
 
     // Generate JWT session token
+    if (!process.env.JWT_SECRET) {
+      throw new Error("JWT_SECRET environment variable is not set.");
+    }
     const token = jwt.sign(
       { id: profile.id, role: profile.role },
-      process.env.JWT_SECRET || "fallback_secret",
+      process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
 
@@ -415,10 +418,13 @@ exports.login = async (req, res) => {
     }
 
     // Generate JWT
+    if (!process.env.JWT_SECRET) {
+      throw new Error("JWT_SECRET environment variable is not set.");
+    }
     const expiresIn = remember_me ? "30d" : "7d";
     const token = jwt.sign(
       { id: profile.id, role: profile.role },
-      process.env.JWT_SECRET || "fallback_secret",
+      process.env.JWT_SECRET,
       { expiresIn }
     );
 

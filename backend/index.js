@@ -12,6 +12,33 @@ const sanitize = require("./middleware/sanitize");
 // Load env vars
 dotenv.config();
 
+// ── Production environment validation — fail-fast on missing secrets ──
+function validateEnvironment() {
+  if (process.env.NODE_ENV !== "production") return;
+
+  const required = [
+    "DATABASE_URL",
+    "MONGO_URI",
+    "JWT_SECRET",
+    "INSFORGE_SERVICE_ROLE_KEY",
+    "INSFORGE_ANON_KEY",
+  ];
+
+  const missing = required.filter((key) => !process.env[key]);
+
+  if (missing.length > 0) {
+    console.error("❌ STARTUP FAILED — Missing required environment variables:");
+    missing.forEach((key) => console.error(`   • ${key} is not set`));
+    console.error("Set the above variables and restart the server.");
+    process.exit(1);
+  }
+
+  console.log("✅ Production environment validation passed.");
+}
+
+validateEnvironment();
+
+
 const app = express();
 
 // ── Security headers ──
