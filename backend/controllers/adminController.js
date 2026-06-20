@@ -35,24 +35,115 @@ exports.getDashboardStats = asyncHandler(async (req, res) => {
 exports.approveVendor = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const result = await db.query(
-    "UPDATE vendors SET status = 'approved', approved_at = now(), approved_by = $2 WHERE id = $1 RETURNING *",
-    [id, req.user._id.toString()]
-  );
+  // Begin PostgreSQL Transaction
+  await db.query("BEGIN");
 
-  if (result.rows.length === 0) {
-    return res.status(404).json({ success: false, message: "Vendor not found" });
+  try {
+    const result = await db.query(
+      "UPDATE vendors SET status = 'approved', approved_at = now(), approved_by = $2 WHERE id = $1 RETURNING *",
+      [id, req.user._id.toString()]
+    );
+
+    if (result.rows.length === 0) {
+      await db.query("ROLLBACK");
+      return res.status(404).json({ success: false, message: "Vendor not found" });
+    }
+
+    const userId = result.rows[0].user_id;
+
+    // Ensure SQL profile row exists and set role to 'vendor'
+    const profileRes = await db.query("SELECT * FROM profiles WHERE id = $1", [userId]);
+    if (profileRes.rows.length === 0) {
+      const crypto = require("crypto");
+      // Fetch details from auth.users if available
+      const authUserRes = await db.query("SELECT email, COALESCE(profile, metadata, '{}'::jsonb) AS user_meta FROM auth.users WHERE id = $1", [userId]);
+      let emailVal = "";
+      let phoneVal = "";
+      let fullName = "";
+      let firstName = "";
+      let lastName = "";
+      
+      if (authUserRes.rows.length > 0) {
+        const authUser = authUserRes.rows[0];
+        emailVal = authUser.email || "";
+        const meta = authUser.user_meta || {};
+        phoneVal = meta.phone || "";
+        fullName = meta.full_name || meta.name || "";
+        firstName = meta.first_name || "";
+        lastName = meta.last_name || "";
+      }
+      
+      const referralCode = `TRENDY-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
+      await db.query(
+        `INSERT INTO public.profiles (id, email, phone, full_name, first_name, last_name, role, referral_code)
+         VALUES ($1, $2, $3, $4, $5, $6, 'vendor', $7)`,
+        [userId, emailVal, phoneVal, fullName, firstName, lastName, referralCode]
+      );
+    } else {
+      await db.query("UPDATE profiles SET role = 'vendor' WHERE id = $1", [userId]);
+    }
+
+    // Sync MongoDB User role - Using raw MongoDB collection to support UUID string _id without Mongoose CastError
+    const User = require("../models/User");
+    let mongoUser = await User.collection.findOne({ _id: userId });
+    if (!mongoUser) {
+      const crypto = require("crypto");
+      const bcrypt = require("bcryptjs");
+      // Fetch details from auth.users if available
+      const authUserRes = await db.query("SELECT email, COALESCE(profile, metadata, '{}'::jsonb) AS user_meta FROM auth.users WHERE id = $1", [userId]);
+      let emailVal = `${userId}@trendy.com`;
+      let phoneVal = "";
+      let fullName = "Vendor User";
+      let passwordVal = "temporaryPassword123";
+      
+      if (authUserRes.rows.length > 0) {
+        const authUser = authUserRes.rows[0];
+        emailVal = authUser.email || emailVal;
+        const meta = authUser.user_meta || {};
+        phoneVal = meta.phone || "";
+        fullName = meta.full_name || meta.name || fullName;
+      }
+      
+      const names = fullName.trim().split(/\s+/);
+      const firstName = names[0] || "Vendor";
+      const lastName = names.slice(1).join(" ") || "User";
+      
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(passwordVal, salt);
+
+      await User.collection.insertOne({
+        _id: userId,
+        firstName,
+        lastName,
+        email: emailVal,
+        phone: phoneVal,
+        password: hashedPassword,
+        role: "vendor",
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+    } else {
+      await User.collection.updateOne(
+        { _id: userId },
+        { $set: { role: "vendor", updatedAt: new Date() } }
+      );
+    }
+
+    await db.query(
+      "INSERT INTO user_notifications (user_id, type, title, message, created_at) VALUES ($1, 'system', 'Vendor Approved', 'Your vendor account has been approved!', now())",
+      [userId]
+    );
+
+    // Commit Transaction
+    await db.query("COMMIT");
+
+    res.status(200).json({ success: true, message: "Vendor approved successfully", vendor: result.rows[0] });
+
+  } catch (error) {
+    await db.query("ROLLBACK");
+    console.error("Error during vendor approval:", error);
+    res.status(500).json({ success: false, message: error.message || "Failed to approve vendor" });
   }
-
-  const userId = result.rows[0].user_id;
-  await db.query("UPDATE profiles SET role = 'vendor' WHERE id = $1", [userId]);
-
-  await db.query(
-    "INSERT INTO user_notifications (user_id, type, title, message, created_at) VALUES ($1, 'system', 'Vendor Approved', 'Your vendor account has been approved!', now())",
-    [userId]
-  );
-
-  res.status(200).json({ success: true, message: "Vendor approved successfully", vendor: result.rows[0] });
 });
 
 // @desc    Reject a vendor
@@ -62,23 +153,47 @@ exports.rejectVendor = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { reason = "Registration criteria not met" } = req.body;
 
-  const result = await db.query(
-    "UPDATE vendors SET status = 'rejected', rejection_reason = $2 WHERE id = $1 RETURNING *",
-    [id, reason]
-  );
+  // Begin PostgreSQL Transaction
+  await db.query("BEGIN");
 
-  if (result.rows.length === 0) {
-    return res.status(404).json({ success: false, message: "Vendor not found" });
+  try {
+    const result = await db.query(
+      "UPDATE vendors SET status = 'rejected', rejection_reason = $2 WHERE id = $1 RETURNING *",
+      [id, reason]
+    );
+
+    if (result.rows.length === 0) {
+      await db.query("ROLLBACK");
+      return res.status(404).json({ success: false, message: "Vendor not found" });
+    }
+
+    const userId = result.rows[0].user_id;
+
+    // Reset SQL profile role to 'customer'
+    await db.query("UPDATE profiles SET role = 'customer' WHERE id = $1", [userId]);
+
+    // Sync MongoDB User role - Using raw MongoDB collection to support UUID string _id without Mongoose CastError
+    const User = require("../models/User");
+    await User.collection.updateOne(
+      { _id: userId },
+      { $set: { role: "customer", updatedAt: new Date() } }
+    );
+
+    await db.query(
+      "INSERT INTO user_notifications (user_id, type, title, message, created_at) VALUES ($1, 'system', 'Vendor Rejected', $2, now())",
+      [userId, `Your vendor registration request was rejected. Reason: ${reason}`]
+    );
+
+    // Commit Transaction
+    await db.query("COMMIT");
+
+    res.status(200).json({ success: true, message: "Vendor rejected successfully", vendor: result.rows[0] });
+
+  } catch (error) {
+    await db.query("ROLLBACK");
+    console.error("Error during vendor rejection:", error);
+    res.status(500).json({ success: false, message: error.message || "Failed to reject vendor" });
   }
-
-  const userId = result.rows[0].user_id;
-
-  await db.query(
-    "INSERT INTO user_notifications (user_id, type, title, message, created_at) VALUES ($1, 'system', 'Vendor Rejected', $2, now())",
-    [userId, `Your vendor registration request was rejected. Reason: ${reason}`]
-  );
-
-  res.status(200).json({ success: true, message: "Vendor rejected successfully", vendor: result.rows[0] });
 });
 
 // @desc    Ban a user

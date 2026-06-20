@@ -392,18 +392,6 @@ exports.login = async (req, res) => {
         if (isMatched) {
           verified = true;
         }
-      } else {
-        // Fallback for mock users when not found in Mongo or InsForge
-        const emailToPasswordMap = {
-          "admin@trendy.com": "admin123",
-          "alex@trendy.com": "test1234",
-          "seller1@trendy.com": "seller123",
-          "user1@trendy.com": "user123",
-        };
-        const expected = emailToPasswordMap[cleanIdentifier] || "user123";
-        if (password === expected) {
-          verified = true;
-        }
       }
     }
 

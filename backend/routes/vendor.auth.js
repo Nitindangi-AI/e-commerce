@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { createClient } = require('@insforge/sdk');
+const { createClient, createAdminClient } = require('@insforge/sdk');
+const db = require('../config/db');
 
 // Initialize InsForge client
 const insforge = createClient({
@@ -8,6 +9,15 @@ const insforge = createClient({
   anonKey: process.env.INSFORGE_ANON_KEY,
   isServerMode: true
 });
+
+// Initialize InsForge Admin client (bypasses RLS using service role key)
+let adminInsforge = null;
+if (process.env.INSFORGE_URL && process.env.INSFORGE_SERVICE_ROLE_KEY) {
+  adminInsforge = createAdminClient({
+    baseUrl: process.env.INSFORGE_URL,
+    apiKey: process.env.INSFORGE_SERVICE_ROLE_KEY
+  });
+}
 
 router.post('/register', async (req, res) => {
   try {
@@ -54,8 +64,9 @@ router.post('/register', async (req, res) => {
       return res.status(500).json({ message: 'Failed to retrieve user ID.' });
     }
 
-    // 5. Insert row into the vendors table
-    const { error: dbError } = await insforge
+    // 5. Insert row into the vendors table (uses admin client to bypass RLS)
+    const client = adminInsforge || insforge;
+    const { error: dbError } = await client.database
       .from('vendors')
       .insert([
         {
@@ -67,7 +78,11 @@ router.post('/register', async (req, res) => {
 
     if (dbError) {
       console.error('Database insert error for vendor:', dbError.message);
-      return res.status(500).json({ message: 'User created but failed to create vendor profile.' });
+      // Clean up orphaned InsForge user from database
+      await db.query("DELETE FROM auth.users WHERE id = $1", [userId]).catch((cleanupErr) => {
+        console.error('Failed to cleanup orphaned vendor auth user:', cleanupErr.message);
+      });
+      return res.status(500).json({ message: 'User created but failed to create vendor profile. Onboarding rolled back.' });
     }
 
     // 6. Return 201 on success
@@ -106,7 +121,7 @@ router.post('/login', async (req, res) => {
     const userId = authData.user.id;
 
     // 4. Query profiles table to check role
-    const { data: profileData, error: profileError } = await insforge
+    const { data: profileData, error: profileError } = await insforge.database
       .from('profiles')
       .select('role, full_name')
       .eq('id', userId)
@@ -118,7 +133,7 @@ router.post('/login', async (req, res) => {
     }
 
     // 5. Query vendors table to check status
-    const { data: vendorData, error: vendorError } = await insforge
+    const { data: vendorData, error: vendorError } = await insforge.database
       .from('vendors')
       .select('store_name, status')
       .eq('user_id', userId)
