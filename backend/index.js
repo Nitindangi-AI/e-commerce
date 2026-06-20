@@ -84,16 +84,10 @@ app.get("/api/v1/health", (req, res) => {
   });
 });
 
-// ── Auth rate limiter — applied to login/register before routes ──
-app.use("/api/v1/auth/login", authLimiter);
-app.use("/api/v1/auth/register", authLimiter);
-
 // ── Mount routes ──
 app.use("/api/admin", require("./routes/adminRoutes"));
 app.use("/api/vendor", require("./routes/vendorRoutes"));
 app.use("/api/vendor", require("./routes/vendor.auth"));
-app.use("/api/v1/auth", require("./routes/authRoutes"));
-app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/v1/products", require("./routes/productRoutes"));
 app.use("/api/v1/orders", require("./routes/orderRoutes"));
 app.use("/api/v1/reviews", require("./routes/reviewRoutes"));
