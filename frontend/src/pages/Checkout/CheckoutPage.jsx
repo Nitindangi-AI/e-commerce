@@ -61,19 +61,11 @@ export default function CheckoutPage() {
       try {
         const meRes = await authAPI.getMe();
         if (meRes?.user) {
-          if (active) setUser(meRes.user);
-          
-          // Fetch user profile to get loyalty points
-          try {
-            const profileRes = await axios.get("/api/auth/profile");
-            const profile = profileRes.data.profile || profileRes.data.user || profileRes.data;
-            if (active && profile) {
-              setLoyaltyPoints(profile.loyalty_points || 0);
-            }
-          } catch (profileErr) {
-            console.error("Failed to load loyalty points:", profileErr);
+          if (active) {
+            setUser(meRes.user);
+            setLoyaltyPoints(meRes.user.loyalty_points || 0);
           }
-
+          
           setLoadingAddresses(true);
           const addrRes = await addressAPI.getAll();
           if (active && addrRes.success && addrRes.addresses) {
