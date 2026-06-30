@@ -27,11 +27,11 @@ async function runMigrations() {
     process.exit(1);
   }
 
+  const hasSslDisabled = process.env.PGSSLMODE === 'disable' || connectionString.includes('sslmode=disable');
+
   const client = new Client({
     connectionString,
-    ssl: {
-      rejectUnauthorized: false
-    }
+    ssl: hasSslDisabled ? false : { rejectUnauthorized: false }
   });
 
   try {

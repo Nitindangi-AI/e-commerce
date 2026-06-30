@@ -264,7 +264,7 @@ export default function LoginPage() {
               className="w-full py-4 bg-[#C9A84C] hover:bg-[#b8952e] disabled:bg-[#C9A84C]/50 text-white rounded-xl text-sm font-bold tracking-widest uppercase transition-all duration-300 flex items-center justify-center gap-2 shadow-md shadow-[#C9A84C]/10"
             >
               {loading ? (
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <div className="skeleton h-4 w-20 rounded !bg-white/30" />
               ) : (
                 'Login'
               )}

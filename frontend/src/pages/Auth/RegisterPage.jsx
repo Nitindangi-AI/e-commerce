@@ -398,7 +398,7 @@ export default function RegisterPage() {
               className="w-full py-4 bg-[#C9A84C] hover:bg-[#b8952e] text-white rounded-xl text-sm font-bold tracking-widest uppercase transition-all duration-300 flex items-center justify-center gap-2"
             >
               {loading ? (
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <div className="skeleton h-4 w-20 rounded !bg-white/30" />
               ) : (
                 'Send Verification Code'
               )}

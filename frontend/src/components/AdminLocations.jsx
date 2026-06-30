@@ -89,7 +89,32 @@ export default function AdminLocations() {
         </div>
         
         {loading ? (
-          <div className="p-8 flex justify-center"><div className="w-6 h-6 border-2 border-gold border-t-transparent rounded-full animate-spin" /></div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-white/5 text-white/40 text-xs uppercase">
+                <tr>
+                  <th className="p-4"><div className="skeleton h-3 w-16" /></th>
+                  <th className="p-4"><div className="skeleton h-3 w-20" /></th>
+                  <th className="p-4"><div className="skeleton h-3 w-20" /></th>
+                  <th className="p-4"><div className="skeleton h-3 w-10" /></th>
+                  <th className="p-4"><div className="skeleton h-3 w-10" /></th>
+                  <th className="p-4"><div className="skeleton h-3 w-16" /></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {[...Array(3)].map((_, i) => (
+                  <tr key={i}>
+                    <td className="p-4"><div className="skeleton h-4 w-20" /></td>
+                    <td className="p-4"><div className="skeleton h-4 w-28" /><div className="skeleton h-3 w-20 mt-1" /></td>
+                    <td className="p-4 text-center"><div className="skeleton h-5 w-10 mx-auto rounded" /></td>
+                    <td className="p-4 text-center"><div className="skeleton h-5 w-10 mx-auto rounded" /></td>
+                    <td className="p-4 text-center"><div className="skeleton h-4 w-6 mx-auto" /></td>
+                    <td className="p-4 text-right"><div className="skeleton h-4 w-12 ml-auto" /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">

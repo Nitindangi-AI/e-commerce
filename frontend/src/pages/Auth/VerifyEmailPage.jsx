@@ -73,15 +73,13 @@ export default function VerifyEmailPage() {
         {status === 'loading' && (
           <>
             <div className="flex justify-center">
-              <div className="w-16 h-16 border-[3px] border-[#E8E8E8] border-t-[#C9A84C] rounded-full animate-spin" />
+              <div className="w-16 h-16 skeleton rounded-full" />
             </div>
             <div className="space-y-2">
               <h2 className="text-2xl font-bold text-[#0A0A0A]" style={{ fontFamily: "'Playfair Display', serif" }}>
                 Verifying Email...
               </h2>
-              <p className="text-sm text-gray-500 font-medium">
-                Please wait while we verify your email address
-              </p>
+              <div className="skeleton h-4 w-[70%] mx-auto" />
             </div>
           </>
         )}

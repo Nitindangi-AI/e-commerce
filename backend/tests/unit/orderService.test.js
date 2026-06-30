@@ -208,6 +208,125 @@ describe("orderService - createOrder & Price Calculation", () => {
       })
     );
   });
+
+  it("should throw BadRequestError if coupon is expired during order creation", async () => {
+    const orderData = {
+      orderItems: [{ product: "p1", quantity: 1 }],
+      shippingAddress: { address: "123 Main St" },
+      couponCode: "EXPIRED",
+    };
+    const mockProduct = { id: "p1", price: 50000, stock: 10 };
+    const mockCoupon = { id: "coupon1", code: "EXPIRED", expires_at: new Date(Date.now() - 3600000).toISOString() };
+    orderRepository.lockProductForUpdate.mockResolvedValue(mockProduct);
+    orderRepository.findActiveCouponByCode.mockResolvedValue(mockCoupon);
+    await expect(orderService.createOrder("user1", "user@email.com", orderData, null)).rejects.toThrow(
+      new BadRequestError("Coupon has expired")
+    );
+  });
+
+  it("should throw BadRequestError if minimum order value is not met during order creation", async () => {
+    const orderData = {
+      orderItems: [{ product: "p1", quantity: 1 }],
+      shippingAddress: { address: "123 Main St" },
+      couponCode: "MINORDER",
+    };
+    const mockProduct = { id: "p1", price: 2000, stock: 10 }; // ₹20
+    const mockCoupon = { id: "coupon1", code: "MINORDER", min_order: 5000 }; // ₹50
+    orderRepository.lockProductForUpdate.mockResolvedValue(mockProduct);
+    orderRepository.findActiveCouponByCode.mockResolvedValue(mockCoupon);
+    await expect(orderService.createOrder("user1", "user@email.com", orderData, null)).rejects.toThrow(
+      new BadRequestError("Minimum order value of ₹50.00 required to use this coupon")
+    );
+  });
+
+  it("should calculate correct order price totals with coupon (flat discount)", async () => {
+    const orderData = {
+      orderItems: [{ product: "p1", quantity: 2, color: "Black", size: "M" }],
+      shippingAddress: { address: "123 Main St" },
+      paymentMethod: "prepaid",
+      couponCode: "FLAT15",
+    };
+
+    const mockProduct = {
+      id: "p1",
+      name: "Product 1",
+      price: 50000,
+      stock: 10,
+      delivery_days: 3,
+      seller_id: "seller1",
+      img: "img.jpg",
+    };
+
+    const mockCoupon = {
+      id: "coupon1",
+      code: "FLAT15",
+      type: "flat",
+      discount: 1500, // ₹15.00
+      min_order: 0,
+      usage_limit: 100,
+      used_count: 0,
+    };
+
+    orderRepository.lockProductForUpdate.mockResolvedValue(mockProduct);
+    orderRepository.findActiveCouponByCode.mockResolvedValue(mockCoupon);
+    orderRepository.findCouponUsage.mockResolvedValue(null);
+    orderRepository.decrementStock.mockResolvedValue({ rowCount: 1 });
+    orderRepository.createOrder.mockResolvedValue({ id: "order1", order_status: "Processing" });
+
+    await orderService.createOrder("user1", "user@email.com", orderData, null);
+
+    // Subtotal: 100000 paise (₹1000)
+    // GST (18%): 18000 paise (₹180)
+    // Shipping: 0 (subtotal > 99900)
+    // Discount: 1500 paise (₹15)
+    // Total: 100000 + 18000 + 0 - 1500 = 116500 paise
+    expect(orderRepository.createOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subtotal: 100000,
+        shippingCost: 0,
+        discountAmount: 1500,
+        totalAmount: 116500,
+      })
+    );
+  });
+
+  it("should calculate subtotal + shipping - discount = total with known values", async () => {
+    const orderData = {
+      orderItems: [{ product: "p1", quantity: 1 }],
+      shippingAddress: { address: "123 Main St" },
+      paymentMethod: "cod",
+    };
+
+    const mockProduct = {
+      id: "p1",
+      name: "Product 1",
+      price: 10000, // ₹100
+      stock: 10,
+      delivery_days: 3,
+      seller_id: "seller1",
+      img: "img.jpg",
+    };
+
+    orderRepository.lockProductForUpdate.mockResolvedValue(mockProduct);
+    orderRepository.decrementStock.mockResolvedValue({ rowCount: 1 });
+    orderRepository.createOrder.mockResolvedValue({ id: "order1", order_status: "Processing" });
+
+    await orderService.createOrder("user1", "user@email.com", orderData, null);
+
+    // Subtotal: 10000 paise (₹100)
+    // GST: 18% of 10000 = 1800 paise
+    // Shipping: 9900 paise (since subtotal <= 99900)
+    // Discount: 0
+    // Total: 10000 + 1800 + 9900 - 0 = 21700 paise (₹217)
+    expect(orderRepository.createOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subtotal: 10000,
+        shippingCost: 9900,
+        discountAmount: 0,
+        totalAmount: 21700,
+      })
+    );
+  });
 });
 
 describe("orderService - Stock Decrement", () => {
@@ -241,6 +360,20 @@ describe("orderService - Stock Decrement", () => {
       stock: 3, // Insufficient stock!
     };
 
+    orderRepository.lockProductForUpdate.mockResolvedValue(mockProduct);
+
+    await expect(orderService.createOrder("user1", "user@email.com", orderData, null)).rejects.toThrow(
+      new AppError("Out of stock", 409)
+    );
+    expect(orderRepository.rollbackTransaction).toHaveBeenCalled();
+  });
+
+  it("should throw a specific error (AppError: Out of stock, 409) when there is insufficient stock", async () => {
+    const orderData = {
+      orderItems: [{ product: "p1", quantity: 10 }],
+      shippingAddress: { address: "123 Main St" },
+    };
+    const mockProduct = { id: "p1", name: "Product 1", price: 50000, stock: 5 };
     orderRepository.lockProductForUpdate.mockResolvedValue(mockProduct);
 
     await expect(orderService.createOrder("user1", "user@email.com", orderData, null)).rejects.toThrow(
@@ -340,6 +473,46 @@ describe("orderService - Order Status Transitions", () => {
     orderRepository.findOrderById.mockResolvedValue(order);
 
     await expect(orderService.updateOrderStatus("order1", "Pending", "Note")).rejects.toThrow(
+      new BadRequestError("Order has already been delivered")
+    );
+    expect(orderRepository.updateOrderStatusOnly).not.toHaveBeenCalled();
+  });
+
+  it("should support valid transitions (pending -> processing -> shipped -> delivered)", async () => {
+    // 1. Pending -> Processing (Note: orderService has Confirmed instead of Processing as DB state but lets test Confirmed, or other string)
+    const order1 = { id: "order1", order_status: "Pending", user_id: "user1" };
+    orderRepository.findOrderById.mockResolvedValue(order1);
+    orderRepository.updateOrderStatusOnly.mockResolvedValue({ ...order1, order_status: "Confirmed" });
+    orderRepository.findShipmentFullDetails.mockResolvedValue(null);
+
+    let res = await orderService.updateOrderStatus("order1", "Confirmed", "Valid transition note");
+    expect(res.order_status).toBe("Confirmed");
+
+    // 2. Confirmed/Processing -> Shipped
+    const order2 = { id: "order1", order_status: "Confirmed", user_id: "user1" };
+    orderRepository.findOrderById.mockResolvedValue(order2);
+    orderRepository.updateOrderStatusOnly.mockResolvedValue({ ...order2, order_status: "Shipped" });
+    orderRepository.findShipmentFullDetails.mockResolvedValue(null);
+
+    res = await orderService.updateOrderStatus("order1", "Shipped", "Valid transition note");
+    expect(res.order_status).toBe("Shipped");
+
+    // 3. Shipped -> Delivered
+    const order3 = { id: "order1", order_status: "Shipped", user_id: "user1", total_amount: "50000", order_number: "ORD-1" };
+    const shipment = { id: "shipment1", status: "in_transit" };
+    orderRepository.findOrderById.mockResolvedValue(order3);
+    orderRepository.updateOrderStatusOnly.mockResolvedValue({ ...order3, order_status: "Delivered" });
+    orderRepository.findShipmentFullDetails.mockResolvedValue(shipment);
+
+    res = await orderService.updateOrderStatus("order1", "Delivered", "Valid transition note");
+    expect(res.order_status).toBe("Delivered");
+  });
+
+  it("should throw a BadRequestError for invalid transitions (delivered -> pending)", async () => {
+    const order = { id: "order1", order_status: "Delivered", user_id: "user1" };
+    orderRepository.findOrderById.mockResolvedValue(order);
+
+    await expect(orderService.updateOrderStatus("order1", "Pending", "Try back to pending")).rejects.toThrow(
       new BadRequestError("Order has already been delivered")
     );
     expect(orderRepository.updateOrderStatusOnly).not.toHaveBeenCalled();

@@ -1,0 +1,121 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  # 1. lint — runs ESLint on the full codebase. Fail on any error.
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: 'npm'
+      - name: Install dependencies
+        run: |
+          npm install
+          npm install --prefix frontend
+      - name: Run ESLint
+        run: npm run lint
+      - name: Secret scan
+        uses: gitguardian/ggshield-action@main
+        env:
+          GITGUARDIAN_API_KEY: ${{ secrets.GITGUARDIAN_API_KEY }}
+
+  # 2. test — runs vitest (unit) and playwright (E2E). Fail if any test fails.
+  test:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: 'npm'
+      - name: Install dependencies
+        run: |
+          npm install
+          npm install --prefix backend
+          npm install --prefix frontend
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+        working-directory: ./frontend
+      - name: Run Backend Unit Tests (Vitest)
+        run: npm run test --prefix backend
+      - name: Run E2E Tests (Playwright)
+        run: npm run test:e2e --prefix frontend
+        env:
+          CI: true
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          INSFORGE_URL: ${{ secrets.INSFORGE_URL }}
+          INSFORGE_ANON_KEY: ${{ secrets.INSFORGE_ANON_KEY }}
+          INSFORGE_SERVICE_ROLE_KEY: ${{ secrets.INSFORGE_SERVICE_ROLE_KEY }}
+
+  # 3. build — runs vite build and tsc --noEmit. Fail on any type error or build error.
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: 'npm'
+      - name: Install dependencies
+        run: |
+          npm install
+          npm install --prefix frontend
+      - name: Build and Typecheck
+        run: npm run build
+
+  # 4. deploy-preview — on every PR, deploy a Vercel preview and post the URL as a PR comment.
+  deploy-preview:
+    needs: build
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Deploy Preview to Vercel
+        id: vercel
+        run: |
+          DEPLOY_URL=$(npx vercel --token=${{ secrets.VERCEL_TOKEN }} --yes ./frontend)
+          echo "deploy_url=$DEPLOY_URL" >> $GITHUB_OUTPUT
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      - name: Comment PR with Preview URL
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const deployUrl = '${{ steps.vercel.outputs.deploy_url }}';
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `🚀 **Vercel Preview Deployment** is ready!\n\n🔗 [View Preview](${deployUrl})`
+            });
+
+  # 5. deploy-prod — on merge to main only, deploy frontend to Vercel and backend to Render.
+  deploy-prod:
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Deploy Frontend to Vercel (Production)
+        run: npx vercel --token=${{ secrets.VERCEL_TOKEN }} --prod ./frontend --yes
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      - name: Trigger Render Deploy (Backend)
+        run: curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK_URL }}

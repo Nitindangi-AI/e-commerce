@@ -453,7 +453,19 @@ export default function CheckoutPage() {
               <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-[#C9A84C]" style={{ fontFamily: "'Playfair Display', serif" }}>📍 Delivery Address</h2>
               
               {loadingAddresses ? (
-                <p className="text-xs py-4 text-center">Loading saved addresses...</p>
+                <div className="space-y-3">
+                  {[...Array(2)].map((_, i) => (
+                    <div key={i} className="p-4 rounded-xl border border-[#E8E8E8] dark:border-white/5 bg-white dark:bg-[#111111]/10 flex items-start gap-4">
+                      <div className="skeleton w-4 h-4 rounded-full mt-1 flex-shrink-0" />
+                      <div className="flex-1 space-y-2">
+                        <div className="skeleton h-4 w-[40%]" />
+                        <div className="skeleton h-3 w-[30%]" />
+                        <div className="skeleton h-3 w-[80%]" />
+                        <div className="skeleton h-3 w-[60%]" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
               ) : (
                 <div className="space-y-4 mb-6">
                   {savedAddresses.length > 0 && (
@@ -831,7 +843,7 @@ export default function CheckoutPage() {
               >
                 {placing ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <div className="skeleton h-4 w-4 rounded !bg-white/30" />
                     Placing Order...
                   </>
                 ) : (

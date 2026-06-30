@@ -4,6 +4,7 @@ const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const cookieParser = require("cookie-parser");
+const Sentry = require("@sentry/node");
 const errorHandler = require("./src/middleware/errorHandler");
 const { authLimiter, apiLimiter } = require("./middleware/rateLimiter");
 const sanitize = require("./middleware/sanitize");
@@ -40,8 +41,13 @@ function validateEnvironment() {
 
 validateEnvironment();
 
+// Sentry initialization before Express app
+Sentry.init({ dsn: process.env.SENTRY_DSN });
 
 const app = express();
+
+// Sentry requestHandler as the first middleware
+app.use(Sentry.Handlers.requestHandler());
 
 // ── Security headers ──
 app.use(helmet());
@@ -84,8 +90,30 @@ if (process.env.NODE_ENV === "development") {
 app.use("/api", apiLimiter);
 
 // ── Health check ──
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '1.0.0', service: 'trendy-backend' });
+app.get('/api/health', async (req, res) => {
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('Database timeout')), 450)
+  );
+
+  try {
+    const db = require("./config/db");
+    await Promise.race([
+      db.query("SELECT 1"),
+      timeoutPromise
+    ]);
+
+    res.status(200).json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      version: process.env.npm_package_version || '1.0.0',
+      db: 'connected'
+    });
+  } catch (err) {
+    res.status(503).json({
+      status: 'error',
+      db: 'disconnected'
+    });
+  }
 });
 
 // Legacy health check (keep backward-compatible)
@@ -107,6 +135,9 @@ app.use((req, res) => {
     message: `Route not found: ${req.originalUrl}`,
   });
 });
+
+// Sentry errorHandler just before the custom errorHandler
+app.use(Sentry.Handlers.errorHandler());
 
 // ── Global error handler ──
 app.use(errorHandler);

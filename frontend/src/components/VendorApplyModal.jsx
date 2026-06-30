@@ -91,7 +91,7 @@ export default function VendorApplyModal({ onClose, onSuccess }) {
         ifscCode:         fields.ifscCode.toUpperCase(),
       });
       setSubmitted(true);
-      toast.success('Application submitted! We'll review within 2-3 business days.');
+      toast.success("Application submitted! We'll review within 2-3 business days.");
       if (onSuccess) onSuccess();
     } catch (err) {
       toast.error(err.response?.data?.message || err.message || 'Submission failed');

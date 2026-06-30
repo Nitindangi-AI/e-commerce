@@ -6,7 +6,10 @@
     "install:all": "npm install --prefix frontend && npm install --prefix backend",
     "dev:server": "npm run dev --prefix backend",
     "dev:client": "npm run dev --prefix frontend",
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\""
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "lint": "npm run lint --prefix frontend",
+    "build": "npm run build --prefix frontend && npm run tsc --prefix frontend",
+    "test": "npm run test --prefix backend"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
