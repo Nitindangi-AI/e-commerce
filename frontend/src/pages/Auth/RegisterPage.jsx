@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authService } from '../../services/authService';
-import { useAuthStore } from '../../store/useAuthStore';
+import { useAuthStore } from '../../store/authStore';
 import { insforge } from '../../lib/insforge';
 import OTPInput from '../../components/OTPInput';
 import PasswordStrengthMeter from '../../components/PasswordStrengthMeter';
@@ -10,7 +10,7 @@ import { Eye, EyeOff } from 'lucide-react';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
-  const setAuth = useAuthStore((state) => state.setAuth);
+  const setUser = useAuthStore((state) => state.setUser);
 
   const [step, setStep] = useState(1); // 1: Details, 2: OTP, 3: Success
   const [loading, setLoading] = useState(false);
@@ -59,8 +59,8 @@ export default function RegisterPage() {
     if (phoneDigits.length !== 10) {
       newErrors.phone = 'Please enter a valid 10-digit Indian phone number';
     }
-    if (!password || password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters';
+    if (!password || password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
     }
     if (password !== confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match';
@@ -94,7 +94,7 @@ export default function RegisterPage() {
           // Log in and auto-login
           const loginRes = await authService.login(email, password);
           if (loginRes.success) {
-            setAuth(loginRes.user, loginRes.token);
+            setUser(loginRes.user, loginRes.token);
             // Update profile name
             if (loginRes.user?.id) {
               await insforge.database
@@ -151,7 +151,7 @@ export default function RegisterPage() {
 
       if (res.success) {
         // Set Auth State
-        setAuth(res.user, res.token);
+        setUser(res.user, res.token);
         toast.success('Account created successfully!');
         setStep(3);
       } else {

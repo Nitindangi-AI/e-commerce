@@ -3,61 +3,61 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { insforge } from '../lib/insforge';
 import Loader from './Loader';
 import { toast } from './GlobalToast';
+import { useAuthStore } from '../store/authStore';
 
 export default function RoleGuard({ allowedRoles }) {
-  const [loading, setLoading] = useState(true);
+  const { user, isLoading, initialize } = useAuthStore();
   const [authorized, setAuthorized] = useState(false);
-  const [user, setUser] = useState(null);
   const [redirectTo, setRedirectTo] = useState(null);
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
     let active = true;
 
     async function checkAuth() {
       try {
-        const { data: authData } = await insforge.auth.getUser();
-        if (!authData?.user) {
+        await initialize();
+        const activeUser = useAuthStore.getState().user;
+        
+        if (!activeUser) {
           if (active) {
             const wasActive = sessionStorage.getItem("session_active") === "true";
             const wasManual = sessionStorage.getItem("manual_logout") === "true";
             if (wasActive && !wasManual) {
               setAuthorized(true);
-              setLoading(false);
+              setChecking(false);
             } else {
               setAuthorized(false);
               setRedirectTo("/login");
-              setLoading(false);
+              setChecking(false);
             }
           }
           return;
         }
 
-        // Fetch profile from InsForge profiles table
-        const { data: profile, error: profileError } = await insforge.database
-          .from('profiles')
-          .select('role')
-          .eq('id', authData.user.id)
-          .maybeSingle();
+        const userRole = activeUser.role || 'customer';
+        let isAuthorized = false;
 
-        if (profileError) {
-          console.error("Profile Fetch Error:", profileError.message);
+        const normalizedUserRole = userRole === 'user' ? 'customer' : (userRole === 'merchant' ? 'vendor' : userRole);
+        const normalizedAllowedRoles = allowedRoles.map(r => r === 'user' ? 'customer' : (r === 'merchant' ? 'vendor' : r));
+
+        if (normalizedAllowedRoles.includes(normalizedUserRole)) {
+          isAuthorized = true;
+        } else if (normalizedAllowedRoles.includes('vendor') && normalizedUserRole === 'admin') {
+          isAuthorized = true;
+        } else if (normalizedAllowedRoles.includes('vendor')) {
+          // Check if vendor profile exists (pending or rejected)
+          const { data: vendorRecord } = await insforge.database
+            .from('vendors')
+            .select('status')
+            .eq('user_id', activeUser.id)
+            .maybeSingle();
+          if (vendorRecord) {
+            isAuthorized = true;
+          }
         }
 
         if (active) {
-          const userRole = profile?.role || 'customer';
-          setUser({ ...authData.user, role: userRole });
-
-          let isAuthorized = false;
-
-          const normalizedUserRole = userRole === 'user' ? 'customer' : (userRole === 'merchant' ? 'vendor' : userRole);
-          const normalizedAllowedRoles = allowedRoles.map(r => r === 'user' ? 'customer' : (r === 'merchant' ? 'vendor' : r));
-
-          if (normalizedAllowedRoles.includes(normalizedUserRole)) {
-            isAuthorized = true;
-          } else if (normalizedAllowedRoles.includes('vendor') && normalizedUserRole === 'admin') {
-            isAuthorized = true;
-          }
-
           if (isAuthorized) {
             setAuthorized(true);
           } else {
@@ -70,14 +70,14 @@ export default function RoleGuard({ allowedRoles }) {
             toast.error(errorMessage);
             setRedirectTo("/");
           }
-          setLoading(false);
+          setChecking(false);
         }
       } catch (err) {
         console.error("RoleGuard Error:", err);
         if (active) {
           setAuthorized(false);
           setRedirectTo("/login");
-          setLoading(false);
+          setChecking(false);
         }
       }
     }
@@ -87,9 +87,9 @@ export default function RoleGuard({ allowedRoles }) {
     return () => {
       active = false;
     };
-  }, [allowedRoles]);
+  }, [allowedRoles, initialize]);
 
-  if (loading) {
+  if (isLoading || checking) {
     return (
       <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
         <Loader />

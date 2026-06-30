@@ -1,12 +1,16 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useCartStore } from "../../store/useCartStore";
-import { useWishlistStore } from "../../store/useWishlistStore";
+import { formatPrice } from "../../utils/price";
+import { getProductImageUrl } from "../../utils/image";
+import { useCartStore } from "../../store/cartStore";
+import { useWishlistStore } from "../../store/wishlistStore";
+import { useAuthStore } from "../../store/authStore";
 import { useRecentlyViewedStore } from "../../store/useRecentlyViewedStore";
 import { orderAPI, authAPI, paymentAPI, addressAPI, couponAPI } from "../../services/api";
 import toast from "react-hot-toast";
 import { insforge } from "../../lib/insforge";
 import AdminLocations from "../../components/AdminLocations";
+import OrderListSkeleton from "../../components/OrderListSkeleton";
 import { 
   User, 
   ShoppingBag, 
@@ -28,16 +32,20 @@ import {
   Trash2,
   CheckCircle2,
   AlertTriangle,
-  Gift
+  Gift,
+  Store,
+  Upload,
+  Info,
+  CheckCircle
 } from "lucide-react";
 
 export default function AccountPage() {
   const navigate = useNavigate();
-  const wishlistItems = useWishlistStore(s => s.wishlistItems);
+  const wishlistItems = useWishlistStore(s => s.items);
   const { recentlyViewed = [] } = useRecentlyViewedStore() || {};
+  const user = useAuthStore(s => s.user);
 
   // Core User Session & Loading States
-  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("Home");
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -89,6 +97,24 @@ export default function AccountPage() {
   const [couponCodeInput, setCouponCodeInput] = useState("");
   const [scratchedList, setScratchedList] = useState({});
 
+  // Seller Application State
+  const [vendorStatus, setVendorStatus] = useState(null);
+  const [vendorData, setVendorData] = useState(null);
+  const [sellerForm, setSellerForm] = useState({
+    storeName: "",
+    storeDescription: "",
+    panCard: "",
+    gstNumber: "",
+    aadharNumber: "",
+    bankAccount: "",
+    ifscCode: ""
+  });
+  const [sellerLogoFile, setSellerLogoFile] = useState(null);
+  const [logoPreview, setLogoPreview] = useState("");
+  const [logoUploadError, setLogoUploadError] = useState("");
+  const [submittingSeller, setSubmittingSeller] = useState(false);
+  const [sellerErrors, setSellerErrors] = useState({});
+
   const isAdmin = user?.role === "admin";
 
   const filteredOrders = orders.filter(order => {
@@ -114,11 +140,14 @@ export default function AccountPage() {
     { id: "Settings", label: "Settings", icon: SettingsIcon },
   ];
 
+  if (user?.role === "customer") {
+    TABS.push({ id: "Seller", label: "Become a Seller", icon: Store });
+  }
+
   // Load user data
   useEffect(() => {
     authAPI.getMe()
       .then(d => {
-        setUser(d.user);
         setProfile({ 
           firstName: d.user.firstName || "", 
           lastName: d.user.lastName || "", 
@@ -133,10 +162,31 @@ export default function AccountPage() {
           setNotificationPrefs(d.user.notification_preferences);
         }
         if (d.user.paymentAccount) setPaymentAccount(d.user.paymentAccount);
+
+        if (d.user.role === 'customer') {
+          insforge.database.from('vendors').select().eq('user_id', d.user.id).maybeSingle()
+            .then(({ data: vendor }) => {
+              if (vendor) {
+                setVendorStatus(vendor.status);
+                setVendorData(vendor);
+                setSellerForm({
+                  storeName: vendor.store_name || "",
+                  storeDescription: vendor.store_description || "",
+                  panCard: vendor.pan_card || "",
+                  gstNumber: vendor.gst_number || "",
+                  aadharNumber: vendor.aadhar_number || "",
+                  bankAccount: vendor.bank_account || "",
+                  ifscCode: vendor.ifsc_code || ""
+                });
+                if (vendor.store_logo) setLogoPreview(vendor.store_logo);
+              }
+            })
+            .catch(console.error);
+        }
       })
       .catch(() => navigate("/login"))
       .finally(() => setLoading(false));
-  }, [navigate]);
+  }, [navigate, user?.role]);
 
   // Load orders
   useEffect(() => {
@@ -233,6 +283,94 @@ export default function AccountPage() {
     }
   };
 
+  const handleSellerLogoChange = (e) => {
+    const file = e.target.files?.[0];
+    setLogoUploadError('');
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      setLogoUploadError('File size exceeds 2MB limit.');
+      return;
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      setLogoUploadError('Only JPG, PNG, and WEBP formats are allowed.');
+      return;
+    }
+
+    setSellerLogoFile(file);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setLogoPreview(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSellerSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Validations
+    const errs = {};
+    if (!sellerForm.storeName.trim()) errs.storeName = 'Store name is required';
+    if (!sellerForm.storeDescription.trim()) errs.storeDescription = 'Store description is required';
+
+    const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+    if (!sellerForm.panCard.trim() || !panRegex.test(sellerForm.panCard.toUpperCase())) {
+      errs.panCard = 'Invalid PAN card format (Expected: ABCDE1234F)';
+    }
+
+    const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+    if (!sellerForm.gstNumber.trim() || !gstRegex.test(sellerForm.gstNumber.toUpperCase())) {
+      errs.gstNumber = 'Invalid GSTIN format';
+    }
+
+    const aadharClean = sellerForm.aadharNumber.replace(/\s/g, '');
+    const aadharRegex = /^[2-9]{1}[0-9]{11}$/;
+    if (!aadharClean || !aadharRegex.test(aadharClean)) {
+      errs.aadharNumber = 'Invalid Aadhaar number (Expected: 12 digits, starts with 2-9)';
+    }
+
+    const bankRegex = /^[0-9]{9,18}$/;
+    if (!sellerForm.bankAccount.trim() || !bankRegex.test(sellerForm.bankAccount)) {
+      errs.bankAccount = 'Invalid Bank Account Number (Expected: 9-18 digits)';
+    }
+
+    const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+    if (!sellerForm.ifscCode.trim() || !ifscRegex.test(sellerForm.ifscCode.toUpperCase())) {
+      errs.ifscCode = 'Invalid IFSC code format (Expected: 11 characters, 5th character is 0)';
+    }
+
+    setSellerErrors(errs);
+    if (Object.keys(errs).length > 0) {
+      toast.error("Please resolve validation errors.");
+      return;
+    }
+
+    setSubmittingSeller(true);
+    try {
+      const res = await authAPI.applyForVendor({
+        storeName: sellerForm.storeName,
+        storeDescription: sellerForm.storeDescription,
+        storeLogoFile: sellerLogoFile,
+        panCard: sellerForm.panCard.toUpperCase(),
+        gstNumber: sellerForm.gstNumber.toUpperCase(),
+        bankAccount: sellerForm.bankAccount,
+        aadharNumber: aadharClean,
+        ifscCode: sellerForm.ifscCode.toUpperCase()
+      });
+
+      toast.success(res.message || "Seller application submitted successfully!");
+      setVendorStatus("pending");
+      setVendorData({ store_name: sellerForm.storeName, commission_rate: 10.00 });
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || "Failed to submit seller application.");
+    } finally {
+      setSubmittingSeller(false);
+    }
+  };
+
   // Add New Address
   const handleAddAddressSubmit = async (e) => {
     e.preventDefault();
@@ -320,7 +458,7 @@ export default function AccountPage() {
     toast.success("Congratulations! Code Revealed!");
   };
 
-  const formatCurrency = (p) => `₹${(p || 0).toLocaleString("en-IN")}`;
+  const formatCurrency = formatPrice;
 
   const statusColorMap = {
     "Processing": "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
@@ -500,11 +638,7 @@ export default function AccountPage() {
                   </div>
 
                   {ordersLoading ? (
-                    <div className="space-y-3">
-                      {[...Array(2)].map((_, i) => (
-                        <div key={i} className="h-16 w-full bg-[#E8E8E8] dark:bg-white/5 rounded-xl animate-pulse" />
-                      ))}
-                    </div>
+                    <OrderListSkeleton />
                   ) : orders.length === 0 ? (
                     <p className={`text-xs text-center py-10 ${textSubtle}`}>No purchase history recorded.</p>
                   ) : (
@@ -551,7 +685,17 @@ export default function AccountPage() {
                     <div className="grid grid-cols-3 gap-3">
                       {wishlistItems.slice(0, 3).map(item => (
                         <Link key={item.id} to={`/product/slug/${item.slug || item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`} className="block group">
-                          <img src={item.img} alt={item.name} loading="lazy" width="100" height="100" className="w-full aspect-square object-cover rounded-xl border border-white/5 group-hover:border-[#d4af37]/35 transition-all mb-2" />
+                          <img
+                            src={getProductImageUrl(item.img, 'thumbnail')}
+                            srcSet={`${getProductImageUrl(item.img, 'thumbnail')} 400w, ${getProductImageUrl(item.img, 'detail')} 800w`}
+                            sizes="(max-width: 600px) 400px, 800px"
+                            loading="lazy"
+                            decoding="async"
+                            width={400}
+                            height={400}
+                            alt={item.name}
+                            className="w-full aspect-square object-cover rounded-xl border border-white/5 group-hover:border-[#d4af37]/35 transition-all mb-2"
+                          />
                           <p className={`text-[10px] font-semibold truncate ${textTitle}`}>{item.name}</p>
                           <span className="gold text-[10px] font-bold">{formatCurrency(item.price)}</span>
                         </Link>
@@ -590,11 +734,7 @@ export default function AccountPage() {
               </div>
 
               {ordersLoading ? (
-                <div className="space-y-4">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="h-28 w-full bg-[#E8E8E8] dark:bg-white/5 rounded-2xl animate-pulse" />
-                  ))}
-                </div>
+                <OrderListSkeleton />
               ) : filteredOrders.length === 0 ? (
                 <div className={`text-center py-20 border rounded-2xl ${cardBg}`}>
                   <span className="text-4xl block mb-4">🛒</span>
@@ -633,7 +773,17 @@ export default function AccountPage() {
                         <div className="p-5 border-b border-white/5 space-y-4">
                           {order.orderItems?.map((item, i) => (
                             <div key={i} className="flex items-center gap-4">
-                              <img src={item.image} alt={item.name} loading="lazy" width="48" height="48" className="w-12 h-12 rounded-xl object-cover border border-white/10" />
+                              <img
+                                src={getProductImageUrl(item.image, 'thumbnail')}
+                                srcSet={`${getProductImageUrl(item.image, 'thumbnail')} 400w, ${getProductImageUrl(item.image, 'detail')} 800w`}
+                                sizes="(max-width: 600px) 400px, 800px"
+                                loading="lazy"
+                                decoding="async"
+                                width={400}
+                                height={400}
+                                alt={item.name}
+                                className="w-12 h-12 rounded-xl object-cover border border-white/10"
+                              />
                               <div className="flex-1 min-w-0">
                                 <h5 className={`font-bold text-xs truncate ${textTitle}`}>{item.name}</h5>
                                 <p className={`text-[10px] ${textSubtle}`}>
@@ -714,7 +864,7 @@ export default function AccountPage() {
                                   </div>
                                   <div>
                                     <span className="text-white/40 block text-[9px] uppercase font-bold">Transferred Amount</span>
-                                    <span className="gold font-black">₹{order.paymentDetails.refund_details.amount.toLocaleString("en-IN")}</span>
+                                    <span className="gold font-black">{formatCurrency(order.paymentDetails.refund_details.amount)}</span>
                                   </div>
                                   <div>
                                     <span className="text-white/40 block text-[9px] uppercase font-bold">Credited Destination Account</span>
@@ -826,7 +976,17 @@ export default function AccountPage() {
                     <div key={p.id || p._id} className={`border rounded-2xl overflow-hidden p-4 group relative ${cardBg}`}>
                       <Link to={`/product/slug/${p.slug || p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`} className="block">
                         <div className="overflow-hidden rounded-xl aspect-square border border-white/5 relative mb-4">
-                          <img src={p.img} alt={p.name} loading="lazy" width="300" height="300" className="w-full h-full object-cover group-hover:scale-105 transition-all duration-500" />
+                          <img
+                            src={getProductImageUrl(p.img, 'thumbnail')}
+                            srcSet={`${getProductImageUrl(p.img, 'thumbnail')} 400w, ${getProductImageUrl(p.img, 'detail')} 800w`}
+                            sizes="(max-width: 600px) 400px, 800px"
+                            loading="lazy"
+                            decoding="async"
+                            width={400}
+                            height={400}
+                            alt={p.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-all duration-500"
+                          />
                           {p.badge && (
                             <span className="absolute top-2.5 left-2.5 bg-black/80 backdrop-blur-md border border-white/10 text-[#d4af37] text-[8px] font-extrabold px-2 py-0.5 rounded-full tracking-wider uppercase">
                               {p.badge}
@@ -862,7 +1022,17 @@ export default function AccountPage() {
                   {recentlyViewed.map((p, idx) => (
                     <div key={idx} className={`border rounded-2xl p-4 relative ${cardBg}`}>
                       <Link to={`/product/slug/${p.slug || p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`} className="block">
-                        <img src={p.img} alt={p.name} loading="lazy" width="200" height="200" className="w-full aspect-square object-cover rounded-xl border border-white/5 mb-3" />
+                         <img
+                          src={getProductImageUrl(p.img, 'thumbnail')}
+                          srcSet={`${getProductImageUrl(p.img, 'thumbnail')} 400w, ${getProductImageUrl(p.img, 'detail')} 800w`}
+                          sizes="(max-width: 600px) 400px, 800px"
+                          loading="lazy"
+                          decoding="async"
+                          width={400}
+                          height={400}
+                          alt={p.name}
+                          className="w-full aspect-square object-cover rounded-xl border border-white/5 mb-3"
+                        />
                         <h4 className={`font-bold text-[11px] truncate ${textTitle}`}>{p.name}</h4>
                         <span className="gold text-xs font-bold">{formatCurrency(p.price)}</span>
                       </Link>
@@ -1260,6 +1430,252 @@ export default function AccountPage() {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* ─── TAB: BECOME A SELLER (VENDOR ONBOARDING & UPGRADE FLOW) ─── */}
+          {activeTab === "Seller" && (
+            <div className="space-y-6 animate-fade-in">
+              <div>
+                <h2 className={`display text-3xl font-black mb-1 ${textTitle}`}>Become a Trendy Seller</h2>
+                <p className={`text-xs ${textSubtle}`}>Apply to become a vendor on Trendy, list your products, and start earning.</p>
+              </div>
+
+              {/* Status conditional rendering */}
+              {vendorStatus === "pending" ? (
+                <div className={`border rounded-2xl p-8 text-center space-y-6 shadow-xl ${cardBg}`}>
+                  <div className="w-16 h-16 rounded-full bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center text-yellow-500 mx-auto animate-pulse">
+                    <Store size={32} />
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className={`font-bold text-lg ${textTitle}`}>Application Under Review</h3>
+                    <p className={`text-xs max-w-md mx-auto ${textSubtle}`}>
+                      Your application for <strong>{vendorData?.store_name || sellerForm.storeName || "your store"}</strong> is currently under review by our administration team. 
+                      We will verify your details and notify you within 24-48 business hours.
+                    </p>
+                  </div>
+                  <div className="p-4 bg-black/[0.02] border border-white/5 rounded-xl max-w-sm mx-auto text-left text-xs space-y-2">
+                    <div className="flex justify-between">
+                      <span className={textSubtle}>Store Name:</span>
+                      <span className={`font-bold ${textTitle}`}>{vendorData?.store_name || sellerForm.storeName}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className={textSubtle}>Application Status:</span>
+                      <span className="text-yellow-500 font-bold uppercase tracking-wider text-[10px]">Pending</span>
+                    </div>
+                  </div>
+                </div>
+              ) : vendorStatus === "approved" ? (
+                <div className={`border rounded-2xl p-8 text-center space-y-6 shadow-xl ${cardBg}`}>
+                  <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mx-auto">
+                    <CheckCircle size={32} />
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className={`font-bold text-lg ${textTitle}`}>Application Approved!</h3>
+                    <p className={`text-xs max-w-md mx-auto ${textSubtle}`}>
+                      Congratulations! Your application has been approved. You are now an active vendor on the Trendy platform.
+                    </p>
+                  </div>
+                  <div className="flex justify-center gap-4 pt-2">
+                    <Link to="/vendor" className="btn-gold px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider">
+                      Go to Vendor Dashboard
+                    </Link>
+                  </div>
+                </div>
+              ) : (
+                <div className={`border rounded-2xl p-6 space-y-6 shadow-xl ${cardBg}`}>
+                  {vendorStatus === "rejected" && (
+                    <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-3">
+                      <AlertTriangle className="text-red-400 flex-shrink-0 mt-0.5" size={18} />
+                      <div className="space-y-1">
+                        <h4 className="font-bold text-xs text-red-400 uppercase tracking-wider">Application Rejected</h4>
+                        <p className={`text-xs ${textSubtle}`}>
+                          Reason: <span className={`font-semibold ${textTitle}`}>{vendorData?.rejection_reason || "Details not specified."}</span>
+                        </p>
+                        <p className={`text-[10px] ${textSubtle} mt-1`}>
+                          Please review the feedback, update the fields below with valid information, and re-apply.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleSellerSubmit} className="space-y-6 text-xs">
+                    {/* Basic Store Info */}
+                    <div className="space-y-4">
+                      <h3 className={`font-bold text-xs uppercase tracking-wider border-b ${borderLight} pb-2 ${textTitle}`}>
+                        Store Details
+                      </h3>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className={`block text-[10px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>
+                            Store Name <span className="text-red-400">*</span>
+                          </label>
+                          <input 
+                            type="text" 
+                            value={sellerForm.storeName} 
+                            onChange={e => setSellerForm({...sellerForm, storeName: e.target.value})} 
+                            className={`input-field w-full px-4 py-3 rounded-xl text-xs ${inputBg}`} 
+                            placeholder="E.g. Royal Silks"
+                          />
+                          {sellerErrors.storeName && (
+                            <p className="text-red-400 text-[10px] mt-1">{sellerErrors.storeName}</p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className={`block text-[10px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>
+                            Store Logo
+                          </label>
+                          <div className="flex items-center gap-4">
+                            <label className={`cursor-pointer px-4 py-2.5 rounded-xl border ${borderLight} hover:bg-white/5 transition-all text-xs font-semibold ${textTitle} flex items-center gap-2`}>
+                              <Upload size={14} />
+                              Choose Image
+                              <input 
+                                type="file" 
+                                accept="image/jpeg,image/png,image/webp" 
+                                onChange={handleSellerLogoChange} 
+                                className="hidden" 
+                              />
+                            </label>
+                            {logoPreview && (
+                              <img src={logoPreview} alt="Logo Preview" className="w-12 h-12 rounded-xl object-cover border border-[#d4af37]" />
+                            )}
+                          </div>
+                          {logoUploadError && (
+                            <p className="text-red-400 text-[10px] mt-1">{logoUploadError}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className={`block text-[10px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>
+                          Store Description <span className="text-red-400">*</span>
+                        </label>
+                        <textarea 
+                          value={sellerForm.storeDescription} 
+                          onChange={e => setSellerForm({...sellerForm, storeDescription: e.target.value})} 
+                          className={`input-field w-full px-4 py-3 rounded-xl text-xs min-h-[80px] resize-y ${inputBg}`} 
+                          placeholder="Tell us about the products you plan to sell..."
+                        />
+                        {sellerErrors.storeDescription && (
+                          <p className="text-red-400 text-[10px] mt-1">{sellerErrors.storeDescription}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Tax & Verification Info */}
+                    <div className="space-y-4 pt-2">
+                      <h3 className={`font-bold text-xs uppercase tracking-wider border-b ${borderLight} pb-2 ${textTitle}`}>
+                        Verification Documents
+                      </h3>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <label className={`block text-[10px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>
+                            PAN Card Number <span className="text-red-400">*</span>
+                          </label>
+                          <input 
+                            type="text" 
+                            value={sellerForm.panCard} 
+                            onChange={e => setSellerForm({...sellerForm, panCard: e.target.value})} 
+                            className={`input-field w-full px-4 py-3 rounded-xl text-xs uppercase ${inputBg}`} 
+                            placeholder="ABCDE1234F"
+                            maxLength={10}
+                          />
+                          {sellerErrors.panCard && (
+                            <p className="text-red-400 text-[10px] mt-1">{sellerErrors.panCard}</p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className={`block text-[10px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>
+                            GSTIN (GST Number) <span className="text-red-400">*</span>
+                          </label>
+                          <input 
+                            type="text" 
+                            value={sellerForm.gstNumber} 
+                            onChange={e => setSellerForm({...sellerForm, gstNumber: e.target.value})} 
+                            className={`input-field w-full px-4 py-3 rounded-xl text-xs uppercase ${inputBg}`} 
+                            placeholder="27ABCDE1234F1Z2"
+                            maxLength={15}
+                          />
+                          {sellerErrors.gstNumber && (
+                            <p className="text-red-400 text-[10px] mt-1">{sellerErrors.gstNumber}</p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className={`block text-[10px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>
+                            Aadhaar Number <span className="text-red-400">*</span>
+                          </label>
+                          <input 
+                            type="text" 
+                            value={sellerForm.aadharNumber} 
+                            onChange={e => setSellerForm({...sellerForm, aadharNumber: e.target.value})} 
+                            className={`input-field w-full px-4 py-3 rounded-xl text-xs ${inputBg}`} 
+                            placeholder="12-digit number"
+                            maxLength={16}
+                          />
+                          {sellerErrors.aadharNumber && (
+                            <p className="text-red-400 text-[10px] mt-1">{sellerErrors.aadharNumber}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bank Settlement Info */}
+                    <div className="space-y-4 pt-2">
+                      <h3 className={`font-bold text-xs uppercase tracking-wider border-b ${borderLight} pb-2 ${textTitle}`}>
+                        Bank Settlement Account
+                      </h3>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className={`block text-[10px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>
+                            Bank Account Number <span className="text-red-400">*</span>
+                          </label>
+                          <input 
+                            type="text" 
+                            value={sellerForm.bankAccount} 
+                            onChange={e => setSellerForm({...sellerForm, bankAccount: e.target.value})} 
+                            className={`input-field w-full px-4 py-3 rounded-xl text-xs ${inputBg}`} 
+                            placeholder="Enter bank account number"
+                          />
+                          {sellerErrors.bankAccount && (
+                            <p className="text-red-400 text-[10px] mt-1">{sellerErrors.bankAccount}</p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className={`block text-[10px] tracking-widest uppercase mb-2 font-bold ${textSubtle}`}>
+                            IFSC Code <span className="text-red-400">*</span>
+                          </label>
+                          <input 
+                            type="text" 
+                            value={sellerForm.ifscCode} 
+                            onChange={e => setSellerForm({...sellerForm, ifscCode: e.target.value})} 
+                            className={`input-field w-full px-4 py-3 rounded-xl text-xs uppercase ${inputBg}`} 
+                            placeholder="SBIN0001234"
+                            maxLength={11}
+                          />
+                          {sellerErrors.ifscCode && (
+                            <p className="text-red-400 text-[10px] mt-1">{sellerErrors.ifscCode}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button 
+                      type="submit" 
+                      disabled={submittingSeller} 
+                      className="btn-gold w-full py-3.5 rounded-xl text-xs font-bold tracking-widest uppercase mt-4 disabled:opacity-60"
+                    >
+                      {submittingSeller ? "Submitting Application..." : (vendorStatus === "rejected" ? "Re-apply for Seller Status" : "Submit Seller Application")}
+                    </button>
+                  </form>
+                </div>
+              )}
             </div>
           )}
 

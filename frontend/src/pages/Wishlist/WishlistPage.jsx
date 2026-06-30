@@ -1,10 +1,10 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
-import { useWishlistStore } from "../../store/useWishlistStore";
+import { useWishlistStore } from "../../store/wishlistStore";
 import ProductCard from "../../components/ProductCard";
 
 export default function WishlistPage() {
-  const wishlistItems = useWishlistStore((state) => state.wishlistItems);
+  const wishlistItems = useWishlistStore((state) => state.items);
   const clearWishlist = useWishlistStore((state) => state.clearWishlist);
   const fetchWishlist = useWishlistStore((state) => state.fetchWishlist);
 

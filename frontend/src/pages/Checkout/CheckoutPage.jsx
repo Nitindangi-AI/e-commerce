@@ -1,23 +1,61 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { useCartStore } from "../../store/useCartStore";
+import { Helmet } from "react-helmet-async";
+import { useCartStore } from "../../store/cartStore";
+import { useAuthStore } from "../../store/authStore";
 import { orderAPI, authAPI, addressAPI } from "../../services/api";
 import { toast } from "../../components/GlobalToast";
 import AddressForm from "../../components/AddressForm";
 import DeliverySlotPicker from "../../components/DeliverySlotPicker";
 import axios from "axios";
+import { formatPrice } from "../../utils/price";
+import { getProductImageUrl } from "../../utils/image";
+
+// ───────────────────────────────────────────────────────────────────────
+// Razorpay checkout.js loader
+// Injects the Razorpay script tag once and resolves when window.Razorpay
+// becomes available. Safe to call multiple times — reuses the existing tag.
+// ───────────────────────────────────────────────────────────────────────
+function loadRazorpayScript() {
+  return new Promise((resolve, reject) => {
+    if (window.Razorpay) { resolve(true); return; }
+    const existing = document.querySelector('script[src*="checkout.razorpay.com"]');
+    if (existing) {
+      existing.onload = () => resolve(true);
+      existing.onerror = () => reject(new Error("Razorpay SDK failed to load"));
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => reject(new Error("Razorpay SDK failed to load. Check your internet connection."));
+    document.body.appendChild(script);
+  });
+}
 
 const STEPS = ["1. Address", "2. Payment", "3. Confirm"];
 
 export default function CheckoutPage() {
-  const cartItems = useCartStore(s => s.cartItems);
+  const [idempotencyKey] = useState(() => {
+    if (typeof window !== "undefined" && window.crypto && typeof window.crypto.randomUUID === "function") {
+      return window.crypto.randomUUID();
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  });
+
+  const cartItems = useCartStore(s => s.items);
   const clearCart = useCartStore(s => s.clearCart);
+  const user = useAuthStore(s => s.user);
   const navigate = useNavigate();
   const location = useLocation();
   
   const initialCoupon = location.state?.appliedCoupon || null;
   const initialDiscount = location.state?.couponDiscount || 0;
-  const shippingFee = location.state?.shippingFee ?? 99;
+  const shippingFee = location.state?.shippingFee ?? 9900;
 
   const [step, setStep] = useState(0);
   
@@ -43,7 +81,6 @@ export default function CheckoutPage() {
 
   const [paymentErrors, setPaymentErrors] = useState({});
   const [placing, setPlacing] = useState(false);
-  const [user, setUser] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState("slot1");
 
   // Coupon & Loyalty States
@@ -62,7 +99,6 @@ export default function CheckoutPage() {
         const meRes = await authAPI.getMe();
         if (meRes?.user) {
           if (active) {
-            setUser(meRes.user);
             setLoyaltyPoints(meRes.user.loyalty_points || 0);
           }
           
@@ -93,16 +129,16 @@ export default function CheckoutPage() {
   }, []);
 
   // Total Calculations using NUMERIC (precise decimal) representation
-  const subtotal = parseFloat(cartItems.reduce((t, i) => t + i.price * i.quantity, 0).toFixed(2));
-  const gstAmount = parseFloat((subtotal * 0.18).toFixed(2));
+  const subtotal = cartItems.reduce((t, i) => t + i.price * i.quantity, 0);
+  const gstAmount = Math.round(subtotal * 0.18);
   
-  // Loyalty Point conversion: 1 point = ₹1 discount
-  const maxLoyaltyDiscount = Math.min(loyaltyPoints, subtotal + gstAmount + shippingFee - couponDiscount);
+  // Loyalty Point conversion: 1 point = 100 paise discount
+  const maxLoyaltyDiscount = Math.min(loyaltyPoints * 100, subtotal + gstAmount + shippingFee - couponDiscount);
   const loyaltyDiscount = useLoyalty ? maxLoyaltyDiscount : 0;
   
-  const total = parseFloat((subtotal + gstAmount + shippingFee - couponDiscount - loyaltyDiscount).toFixed(2));
+  const total = subtotal + gstAmount + shippingFee - couponDiscount - loyaltyDiscount;
   
-  const fmt = (p) => `₹${p.toLocaleString("en-IN")}`;
+  const fmt = formatPrice;
   const totalItems = cartItems.reduce((t, i) => t + i.quantity, 0);
 
   if (cartItems.length === 0) {
@@ -219,26 +255,123 @@ export default function CheckoutPage() {
       return;
     }
 
+    // COD and netbanking go through the existing backend order flow directly.
+    // UPI, card, and razorpay open the Razorpay modal first.
+    const usesRazorpay = payment === "upi" || payment === "card" || payment === "razorpay";
+
+    if (usesRazorpay) {
+      await handleRazorpayCheckout();
+    } else {
+      await placeOrderOnBackend({ razorpayDetails: null });
+    }
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Step 1: Create a Razorpay order server-side, open the checkout modal,
+  //         then verify the signature before finalising the backend order.
+  // ─────────────────────────────────────────────────────────────────────────
+  const handleRazorpayCheckout = async () => {
     setPlacing(true);
     try {
-      let finalDetails = {};
-      finalDetails.deliverySlot = selectedSlot;
-      if (payment === "upi") {
-        finalDetails.upiId = upiId;
-      } else if (payment === "card") {
-        finalDetails.cardHolder = cardHolder;
-        finalDetails.cardNumberLast4 = cardNumber.slice(-4);
-      } else if (payment === "netbanking") {
-        finalDetails.bankName = netBank;
+      // 1a. Load the Razorpay SDK script
+      await loadRazorpayScript();
+
+      // 1b. Create a Razorpay order on our backend (amount in ₹, controller converts to paise)
+      const { data: rzpOrder } = await axios.post("/api/payments/create-order", {
+        amount: total,
+      });
+
+      if (!rzpOrder.success) {
+        throw new Error(rzpOrder.message || "Failed to create payment order");
       }
 
+      // 1c. Open the Razorpay checkout modal
+      await new Promise((resolve, reject) => {
+        const options = {
+          key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+          amount: rzpOrder.amount_paise,
+          currency: rzpOrder.currency,
+          name: "Trendy",
+          description: `Order payment ${formatPrice(total)}`,
+          order_id: rzpOrder.razorpay_order_id,
+          prefill: {
+            name:  address.name  || user?.firstName || "",
+            email: user?.email   || "",
+            contact: address.phone || user?.phone || "",
+          },
+          theme: { color: "#C9A84C" },
+
+          // Called by Razorpay ONLY after the payment succeeds on their side
+          handler: async (response) => {
+            try {
+              // 1d. Verify the signature server-side before marking the order paid
+              const verifyRes = await axios.post("/api/payments/verify", {
+                razorpay_order_id:   response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature:  response.razorpay_signature,
+              });
+
+              if (!verifyRes.data.success) {
+                reject(new Error(verifyRes.data.message || "Payment verification failed"));
+                return;
+              }
+
+              // 1e. Signature verified — now create the order record on our backend
+              await placeOrderOnBackend({
+                razorpayDetails: {
+                  razorpay_order_id:   response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  // NOTE: we deliberately do NOT send the signature to the order
+                  // controller — it has already been consumed by /api/payments/verify.
+                },
+              });
+              resolve();
+            } catch (err) {
+              reject(err);
+            }
+          },
+
+          modal: {
+            ondismiss: () => {
+              // User closed the modal without paying
+              reject(new Error("Payment cancelled"));
+            },
+          },
+        };
+
+        const rzp = new window.Razorpay(options);
+        rzp.on("payment.failed", (resp) => {
+          reject(new Error(resp.error?.description || "Payment failed"));
+        });
+        rzp.open();
+      });
+    } catch (err) {
+      const msg = err.message || "Payment could not be completed";
+      // "Payment cancelled" is a normal user action — use info level
+      if (msg.toLowerCase().includes("cancel")) {
+        toast.info("Payment was cancelled. Your order was not placed.");
+      } else {
+        toast.error(msg);
+      }
+    } finally {
+      setPlacing(false);
+    }
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Shared: sends the actual order to our backend order API.
+  // For Razorpay payments, razorpayDetails is the verified IDs object.
+  // For COD, razorpayDetails is null.
+  // ─────────────────────────────────────────────────────────────────────────
+  const placeOrderOnBackend = async ({ razorpayDetails }) => {
+    setPlacing(true);
+    try {
       const orderData = {
         orderItems: cartItems.map(item => ({
           product: item._id || item.id,
           quantity: item.quantity,
           color: item.selectedColor || "",
           size: item.selectedSize || "",
-          // Snapshots of product details
           product_name: item.name,
           product_img: item.img || item.image || "",
         })),
@@ -246,16 +379,19 @@ export default function CheckoutPage() {
         paymentMethod: payment,
         couponCode: appliedCoupon?.code || null,
         useLoyalty: useLoyalty,
-        paymentDetails: finalDetails
+        // Only non-sensitive metadata reaches the order record.
+        // Raw card numbers, CVVs, and UPI PINs are NEVER sent here.
+        paymentDetails: {
+          deliverySlot: selectedSlot,
+          ...(payment === "netbanking" ? { bankName: netBank } : {}),
+          ...(razorpayDetails || {}),
+        },
       };
 
-      const data = await orderAPI.create(orderData);
-      
-      // If a new address was used, save it permanently to addresses table
+      const data = await orderAPI.create(orderData, idempotencyKey);
+
       if (selectedAddressId === "new") {
-        try {
-          await addressAPI.add(address);
-        } catch (addrErr) {
+        try { await addressAPI.add(address); } catch (addrErr) {
           console.warn("Failed to save address permanently:", addrErr);
         }
       }
@@ -275,6 +411,10 @@ export default function CheckoutPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-6 pt-28 pb-20 min-h-screen bg-[#FAFAF8] dark:bg-[#0A0A0A]">
+      <Helmet>
+        <title>Checkout | Trendy</title>
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
       {/* Steps progress indicator */}
       <div className="flex items-center justify-center mb-12">
         <div className="flex items-center w-full max-w-lg justify-between relative">
@@ -416,7 +556,25 @@ export default function CheckoutPage() {
               <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-[#C9A84C]" style={{ fontFamily: "'Playfair Display', serif" }}>💳 Payment Method</h2>
               
               <div className="space-y-4">
+                {/* ── Razorpay (recommended for online payments) ── */}
+                <label className={`flex flex-col p-4 rounded-xl border cursor-pointer transition-all ${payment === "razorpay" ? "border-[#C9A84C] bg-[#C9A84C]/5" : "border-[#E8E8E8] dark:border-white/5 hover:border-[#C9A84C]/20"}`}>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="radio"
+                      name="payment"
+                      value="razorpay"
+                      checked={payment === "razorpay"}
+                      onChange={() => setPayment("razorpay")}
+                      className="accent-[#C9A84C] h-4 w-4"
+                    />
+                    <span className="text-sm font-bold text-[#111] dark:text-white">⚡ Pay via Razorpay</span>
+                    <span className="ml-auto text-[10px] bg-[#C9A84C]/10 text-[#C9A84C] px-2 py-0.5 rounded-full font-bold uppercase">Recommended</span>
+                  </div>
+                  <p className="text-xs text-[#6B6B6B] dark:text-gray-400 pl-7 mt-0.5">UPI, Cards, Netbanking, Wallets — secured by Razorpay.</p>
+                </label>
+
                 <label className={`flex flex-col p-4 rounded-xl border cursor-pointer transition-all ${payment === "cod" ? "border-[#C9A84C] bg-[#C9A84C]/5" : "border-[#E8E8E8] dark:border-white/5 hover:border-[#C9A84C]/20"}`}>
+
                   <div className="flex items-center gap-3">
                     <input 
                       type="radio" 
@@ -643,7 +801,17 @@ export default function CheckoutPage() {
                 <div className="space-y-3">
                   {cartItems.map(item => (
                     <div key={`${item.id}-${item.selectedColor}-${item.selectedSize}`} className="flex items-center gap-4 py-2 border-b border-[#E8E8E8] dark:border-white/5 last:border-0">
-                      <img src={item.img} alt={item.name} loading="lazy" width="48" height="48" className="w-12 h-12 rounded-lg object-cover border border-[#E8E8E8] dark:border-white/5" />
+                      <img
+                        src={getProductImageUrl(item.img, 'thumbnail')}
+                        srcSet={`${getProductImageUrl(item.img, 'thumbnail')} 400w, ${getProductImageUrl(item.img, 'detail')} 800w`}
+                        sizes="(max-width: 600px) 400px, 800px"
+                        loading="lazy"
+                        decoding="async"
+                        width={400}
+                        height={400}
+                        alt={item.name}
+                        className="w-12 h-12 rounded-lg object-cover border border-[#E8E8E8] dark:border-white/5"
+                      />
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-bold text-[#111] dark:text-white truncate">{item.name}</p>
                         <p className="text-[10px] text-[#6B6B6B] dark:text-gray-400 mt-0.5 font-semibold">

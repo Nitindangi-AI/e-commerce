@@ -1,14 +1,16 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useCartStore } from "../store/useCartStore";
-import { useWishlistStore } from "../store/useWishlistStore";
-import { useAuthStore } from "../store/useAuthStore";
+import { useCartStore } from "../store/cartStore";
+import { useWishlistStore } from "../store/wishlistStore";
+import { useAuthStore } from "../store/authStore";
 import { insforge } from "../lib/insforge";
 import { useThemeStore } from "../store/useThemeStore";
 import { useSearchStore } from "../store/useSearchStore";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, X, Heart, ShoppingBag, Menu, User, LogOut, ChevronRight, Sparkles, Sun, Moon, Home, Bell } from "lucide-react";
 import products from "../data/product";
+import { formatPrice } from "../utils/price";
+import { getProductImageUrl } from "../utils/image";
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -20,11 +22,10 @@ export default function Navbar() {
   const searchContainerRef = useRef(null);
 
   const { user: storeUser, isLoggedIn: storeIsLoggedIn } = useAuthStore();
-  const [user, setUser] = useState(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
 
-  const activeUser = storeUser || user;
+  const activeUser = storeUser;
   const avatarUrl = activeUser?.avatar_url || activeUser?.profile?.avatar_url;
   const role = activeUser?.role || activeUser?.profile?.role;
   const fullName = activeUser?.full_name || activeUser?.profile?.full_name || '';
@@ -39,8 +40,8 @@ export default function Navbar() {
     else setTheme("light");
   };
   
-  const cartCount = useCartStore((state) => state.cartItems.reduce((t, i) => t + i.quantity, 0));
-  const wishlistCount = useWishlistStore((state) => state.wishlistItems.length);
+  const cartCount = useCartStore((state) => state.items.reduce((t, i) => t + i.quantity, 0));
+  const wishlistCount = useWishlistStore((state) => state.items.length);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -91,43 +92,7 @@ export default function Navbar() {
     return () => window.removeEventListener("scroll", handler);
   }, []);
 
-  useEffect(() => {
-    const fetchProfile = async (u) => {
-      if (!u) return;
-      try {
-        const { data: profile } = await insforge.database
-          .from('profiles')
-          .select('*')
-          .eq('id', u.id)
-          .maybeSingle();
-        if (profile) {
-          setUser({ ...u, profile });
-        } else {
-          setUser(u);
-        }
-      } catch (err) {
-        setUser(u);
-      }
-    };
 
-    insforge.auth.getUser().then(({ data }) => {
-      if (data?.user) {
-        fetchProfile(data.user);
-      }
-    }).catch(() => {});
-
-    const { data: { subscription } } = insforge.auth.onAuthStateChange((event, session) => {
-      if (session?.user) {
-        fetchProfile(session.user);
-      } else {
-        setUser(null);
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
 
   useEffect(() => {
     if (!activeUser) {
@@ -347,12 +312,22 @@ export default function Navbar() {
                                   }}
                                   className="flex items-center gap-3 w-full text-left p-1.5 rounded-lg hover:bg-[#FAFAF8] dark:hover:bg-[#1A1A18] transition-colors"
                                 >
-                                  <img src={p.img} alt={p.name} loading="lazy" width="32" height="32" className="w-8 h-8 rounded object-cover border border-[#E8E8E8] dark:border-white/5" />
+                                  <img
+                                    src={getProductImageUrl(p.img, 'thumbnail')}
+                                    srcSet={`${getProductImageUrl(p.img, 'thumbnail')} 400w, ${getProductImageUrl(p.img, 'detail')} 800w`}
+                                    sizes="(max-width: 600px) 400px, 800px"
+                                    loading="lazy"
+                                    decoding="async"
+                                    width={400}
+                                    height={400}
+                                    alt={p.name}
+                                    className="w-8 h-8 rounded object-cover border border-[#E8E8E8] dark:border-white/5"
+                                  />
                                   <div className="flex-1 min-w-0">
                                     <p className="text-xs font-bold text-[#111111] dark:text-white truncate">{p.name}</p>
                                     <p className="text-[10px] text-[#6B6B6B] dark:text-gray-400">{p.category}</p>
                                   </div>
-                                  <span className="text-xs font-bold text-[#C9A84C]">₹{p.price.toLocaleString("en-IN")}</span>
+                                  <span className="text-xs font-bold text-[#C9A84C]">{formatPrice(p.price)}</span>
                                 </button>
                               ))}
                             </div>

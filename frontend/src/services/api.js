@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { insforge } from '../lib/insforge';
+import { formatPrice } from '../utils/price';
 
 // Axios request interceptor to automatically attach the InsForge access token
 axios.interceptors.request.use((config) => {
@@ -18,65 +19,59 @@ axios.interceptors.request.use((config) => {
 
 // ─── Auth API ────────────────────────────────────────────
 export const authAPI = {
-  register: async ({ firstName, lastName, email, password, phone, role, storeName, storeLogoFile, panCard, gstNumber, bankAccount, aadharNumber }) => {
-    const { data, error } = await insforge.auth.signUp({
-      email,
-      password,
-      profile: { first_name: firstName, last_name: lastName },
-    });
-    if (error) throw new Error(error.message);
-
-    const userId = data?.user?.id;
-
-    if (userId) {
+  register: async ({ firstName, lastName, email, password, phone, role, storeName, storeDescription, businessAddress, storeLogoFile, panCard, gstNumber, bankAccount, aadharNumber, ifscCode }) => {
+    if (role === 'vendor') {
       // 1. Upload store logo if provided
       let storeLogoUrl = '';
       if (storeLogoFile) {
-        try {
-          const fileExt = storeLogoFile.name.split('.').pop();
-          const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
-          const filePath = `vendors/${fileName}`;
-          const { data: uploadData, error: uploadErr } = await insforge.storage
-            .from('images')
-            .upload(filePath, storeLogoFile);
-          if (uploadErr) throw uploadErr;
-          storeLogoUrl = uploadData?.url || '';
-        } catch (uploadErr) {
-          console.error("Failed to upload store logo during register:", uploadErr);
-        }
+        const fileExt = storeLogoFile.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+        const filePath = `vendors/${fileName}`;
+        const { data: uploadData, error: uploadErr } = await insforge.storage
+          .from('images')
+          .upload(filePath, storeLogoFile);
+        if (uploadErr) throw new Error(uploadErr.message || 'Logo upload failed');
+        storeLogoUrl = uploadData?.url || '';
       }
 
-      // 2. Create profile row with 'customer' role
-      await authAPI.createProfile(userId, {
-        first_name: firstName,
-        last_name: lastName,
-        phone: phone || '',
-        role: 'customer', // Set initially as 'customer'
-        avatar_url: email,
+      // 2. Call backend register endpoint
+      const res = await axios.post('/api/v1/vendor/register', {
+        full_name: `${firstName} ${lastName}`,
+        email,
+        password,
+        store_name: storeName,
+        phone,
+        store_description: storeDescription || '',
+        business_address: businessAddress || '',
+        pan_card: panCard,
+        gst_number: gstNumber,
+        bank_account: bankAccount,
+        aadhar_number: aadharNumber,
+        ifsc_code: ifscCode,
+        store_logo: storeLogoUrl
       });
+      return res.data;
+    } else {
+      // Standard customer registration
+      const { data, error } = await insforge.auth.signUp({
+        email,
+        password,
+        profile: { first_name: firstName, last_name: lastName },
+      });
+      if (error) throw new Error(error.message);
 
-      // 3. Insert pending vendor onboarding details if role is vendor
-      if (role === 'vendor') {
-        const { error: vendorError } = await insforge.database.from('vendors').insert([{
-          user_id: userId,
-          store_name: storeName || `${firstName} ${lastName}'s Store`,
-          store_logo: storeLogoUrl,
-          pan_card: panCard || '',
-          gst_number: gstNumber || '',
-          bank_account: bankAccount || '',
-          aadhar_number: aadharNumber || '',
-          status: 'pending',
-          commission_rate: 10.00,
-        }]);
-        if (vendorError) {
-          console.error("Vendor Onboarding Insert Error:", vendorError.message);
-          throw new Error(vendorError.message);
-        }
-        await insforge.auth.signOut().catch(console.error);
+      const userId = data?.user?.id;
+      if (userId) {
+        await authAPI.createProfile(userId, {
+          first_name: firstName,
+          last_name: lastName,
+          phone: phone || '',
+          role: 'customer',
+          avatar_url: email,
+        });
       }
+      return { success: true, user: data.user, token: data.accessToken };
     }
-
-    return { success: true, user: data.user, token: data.accessToken };
   },
 
   createProfile: async (userId, { first_name, last_name, phone, role, avatar_url }) => {
@@ -172,27 +167,21 @@ export const authAPI = {
   },
 
   updateProfile: async ({ firstName, lastName, displayName, phone, dateOfBirth, gender, avatarUrl, notificationPreferences }) => {
-    const { data: userData } = await insforge.auth.getUser();
-    if (!userData?.user) throw new Error('Not authenticated');
+    // Route through the backend — which has a strict server-side allowlist.
+    // Direct InsForge SDK database writes bypass server validation and allow
+    // privilege-escalation (e.g. sending role: 'admin' in the payload).
+    const payload = {};
+    if (firstName !== undefined) payload.first_name = firstName;
+    if (lastName !== undefined) payload.last_name = lastName;
+    if (displayName !== undefined) payload.display_name = displayName;
+    if (phone !== undefined) payload.phone = phone || '';
+    if (dateOfBirth !== undefined) payload.date_of_birth = dateOfBirth || null;
+    if (gender !== undefined) payload.gender = gender || null;
+    if (avatarUrl !== undefined) payload.avatar_url = avatarUrl;
+    if (notificationPreferences !== undefined) payload.notification_preferences = notificationPreferences;
 
-    const updateFields = {
-      updated_at: new Date().toISOString(),
-    };
-    if (firstName !== undefined) updateFields.first_name = firstName;
-    if (lastName !== undefined) updateFields.last_name = lastName;
-    if (displayName !== undefined) updateFields.display_name = displayName;
-    if (phone !== undefined) updateFields.phone = phone || '';
-    if (dateOfBirth !== undefined) updateFields.date_of_birth = dateOfBirth || null;
-    if (gender !== undefined) updateFields.gender = gender || null;
-    if (avatarUrl !== undefined) updateFields.avatar_url = avatarUrl;
-    if (notificationPreferences !== undefined) updateFields.notification_preferences = notificationPreferences;
-
-    const { error } = await insforge.database
-      .from('profiles')
-      .update(updateFields)
-      .eq('id', userData.user.id);
-
-    if (error) throw new Error(error.message);
+    const res = await axios.patch('/api/v1/profile', payload);
+    if (!res.data?.success) throw new Error(res.data?.message || 'Profile update failed');
     return { success: true };
   },
 
@@ -213,18 +202,51 @@ export const authAPI = {
     if (error) throw new Error(error.message);
     return { success: true };
   },
+
+  applyForVendor: async ({ storeName, storeDescription, businessAddress, storeLogoFile, panCard, gstNumber, bankAccount, aadharNumber, ifscCode }) => {
+    // 1. Upload store logo if provided
+    let storeLogoUrl = '';
+    if (storeLogoFile) {
+      const fileExt = storeLogoFile.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+      const filePath = `vendors/${fileName}`;
+      const { data: uploadData, error: uploadErr } = await insforge.storage
+        .from('images')
+        .upload(filePath, storeLogoFile);
+      if (uploadErr) throw new Error(uploadErr.message || 'Logo upload failed');
+      storeLogoUrl = uploadData?.url || '';
+    }
+
+    // 2. Call backend upgrade endpoint
+    const res = await axios.post('/api/v1/vendor/upgrade', {
+      store_name: storeName,
+      store_description: storeDescription,
+      business_address: businessAddress || '',
+      store_logo: storeLogoUrl,
+      pan_card: panCard,
+      gst_number: gstNumber,
+      bank_account: bankAccount,
+      aadhar_number: aadharNumber,
+      ifsc_code: ifscCode
+    });
+    return res.data;
+  },
 };
 
 // ─── Products API ────────────────────────────────────────
 export const productAPI = {
   getAll: async (params = '') => {
     const res = await axios.get(`/api/v1/products?${params}`);
+    const productsList = res.data.products || res.data.data || [];
+    const totalCount = res.data.totalProducts || res.data.pagination?.total || 0;
+    const pageNum = res.data.page || res.data.pagination?.page || 1;
+    const totalPagesCount = res.data.totalPages || res.data.pagination?.totalPages || 1;
     return {
       success: true,
-      products: (res.data.products || []).map(normalizeProduct),
-      total: res.data.totalProducts || 0,
-      page: res.data.page || 1,
-      pages: res.data.totalPages || 1,
+      products: productsList.map(normalizeProduct),
+      total: totalCount,
+      page: pageNum,
+      pages: totalPagesCount,
     };
   },
 
@@ -273,14 +295,20 @@ export const productAPI = {
 
 // ─── Orders API ──────────────────────────────────────────
 export const orderAPI = {
-  create: async ({ orderItems, shippingAddress, paymentMethod, couponCode, useLoyalty }) => {
+  create: async ({ orderItems, shippingAddress, paymentMethod, couponCode, useLoyalty }, idempotencyKey) => {
+    const config = {};
+    if (idempotencyKey) {
+      config.headers = {
+        "X-Idempotency-Key": idempotencyKey
+      };
+    }
     const res = await axios.post('/api/v1/orders', {
       orderItems,
       shippingAddress,
       paymentMethod,
       couponCode,
       useLoyalty,
-    });
+    }, config);
 
     if (res.data.success) {
       const orderDetails = await orderAPI.getById(res.data.order.id);
@@ -356,7 +384,7 @@ export const orderAPI = {
           processed_at: new Date().toISOString()
         }
       };
-      noteText = `Automatic Payment Gateway Refund Processed: ₹${order.total_amount.toLocaleString("en-IN")} returned to original account. Refund Reference ID: ${refundId}`;
+      noteText = `Automatic Payment Gateway Refund Processed: ${formatPrice(order.total_amount)} returned to original account. Refund Reference ID: ${refundId}`;
     }
 
     const { error } = await insforge.database
@@ -462,7 +490,7 @@ export const orderAPI = {
             processed_at: new Date().toISOString()
           }
         };
-        noteText = `Return Approved. Automatic Payment Gateway Refund Processed: ₹${order.total_amount.toLocaleString("en-IN")} returned to original account. Refund Reference ID: ${refundId}`;
+        noteText = `Return Approved. Automatic Payment Gateway Refund Processed: ${formatPrice(order.total_amount)} returned to original account. Refund Reference ID: ${refundId}`;
       }
 
       await insforge.database.from('orders').update({
@@ -496,24 +524,42 @@ export const orderAPI = {
 // ─── Reviews API ─────────────────────────────────────────
 export const reviewAPI = {
   getForProduct: async (productId) => {
-    const { data, error } = await insforge.database
+    const { data: reviewsData, error } = await insforge.database
       .from('reviews')
-      .select('*, profiles(first_name, last_name)')
+      .select('*')
       .eq('product_id', productId)
       .order('created_at', { ascending: false });
     if (error) throw new Error(error.message);
+
+    const userIds = Array.from(new Set((reviewsData || []).map(r => r.user_id).filter(Boolean)));
+    const profilesMap = {};
+    if (userIds.length > 0) {
+      const { data: profilesData } = await insforge.database
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .in('id', userIds);
+      if (profilesData) {
+        profilesData.forEach(p => {
+          profilesMap[p.id] = p;
+        });
+      }
+    }
+
     return {
       success: true,
-      reviews: (data || []).map(r => ({
-        _id: r.id,
-        rating: r.rating,
-        title: r.title,
-        text: r.text,
-        verified: r.verified,
-        helpful: r.helpful,
-        createdAt: r.created_at,
-        user: r.profiles ? { firstName: r.profiles.first_name, lastName: r.profiles.last_name } : {},
-      })),
+      reviews: (reviewsData || []).map(r => {
+        const prof = profilesMap[r.user_id];
+        return {
+          _id: r.id,
+          rating: r.rating,
+          title: r.title,
+          text: r.text,
+          verified: r.verified,
+          helpful: r.helpful,
+          createdAt: r.created_at,
+          user: prof ? { firstName: prof.first_name, lastName: prof.last_name } : {},
+        };
+      }),
     };
   },
 
@@ -776,7 +822,7 @@ export const couponAPI = {
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!data) throw new Error('Invalid coupon code');
-    if (cartTotal < data.min_order) throw new Error(`Minimum order ₹${data.min_order.toLocaleString('en-IN')} required`);
+    if (cartTotal < data.min_order) throw new Error(`Minimum order ${formatPrice(data.min_order)} required`);
 
     let discountAmount = 0;
     if (data.type === 'percent') {
@@ -1373,3 +1419,28 @@ function normalizeAddress(a) {
     isDefault: a.is_default,
   };
 }
+
+// ─── Admin API ───────────────────────────────────────────
+export const adminAPI = {
+  getVendors: async (status = '') => {
+    const query = status ? `?status=${status}` : '';
+    const res = await axios.get(`/api/v1/admin/vendors${query}`);
+    return res.data;
+  },
+  approveVendor: async (id) => {
+    const res = await axios.patch(`/api/v1/admin/vendors/${id}/approve`);
+    return res.data;
+  },
+  rejectVendor: async (id, reason) => {
+    const res = await axios.patch(`/api/v1/admin/vendors/${id}/reject`, { reason });
+    return res.data;
+  },
+  suspendVendor: async (id, reason) => {
+    const res = await axios.patch(`/api/v1/admin/vendors/${id}/suspend`, { reason });
+    return res.data;
+  },
+  getDashboardStats: async () => {
+    const res = await axios.get('/api/v1/admin/stats');
+    return res.data;
+  }
+};

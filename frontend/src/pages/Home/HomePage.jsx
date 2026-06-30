@@ -1,5 +1,7 @@
 import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
+import { getProductImageUrl } from "../../utils/image";
+import { Helmet } from "react-helmet-async";
 import HeroBanner from "../../components/HeroBanner";
 import Marquee from "../../components/Marquee";
 import FeatureStrip from "../../components/FeatureStrip";
@@ -10,6 +12,7 @@ import { useRecentlyViewedStore } from "../../store/useRecentlyViewedStore";
 import { productAPI } from "../../services/api";
 import localProducts from "../../data/product";
 import { toast } from "../../components/GlobalToast";
+import { formatPrice } from "../../utils/price";
 
 const categoryImages = {
   Watches: "https://images.unsplash.com/photo-1524592094714-0f0654e20314?q=80&w=600&auto=format&fit=crop",
@@ -123,6 +126,18 @@ export default function HomePage() {
 
   return (
     <div className="overflow-x-hidden">
+      <Helmet>
+        <title>Trendy — Premium Fashion</title>
+        <meta name="description" content="Discover premium fashion, accessories, watches, footwear & more on Trendy. Shop the latest trends at unbeatable prices." />
+        <meta property="og:title" content="Trendy — Premium Fashion" />
+        <meta property="og:description" content="Discover premium fashion, accessories, watches, footwear & more on Trendy." />
+        <meta property="og:type" content="website" />
+        <meta property="og:image" content="https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?q=80&w=1200&auto=format&fit=crop" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Trendy — Premium Fashion" />
+        <meta name="twitter:image" content="https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?q=80&w=1200&auto=format&fit=crop" />
+      </Helmet>
+
       {/* Hero Banner */}
       <HeroBanner />
 
@@ -195,9 +210,9 @@ export default function HomePage() {
               <div className="pt-4 flex items-center gap-6">
                 <div>
                   {dealProduct.originalPrice && dealProduct.originalPrice > dealProduct.price && (
-                    <span className="text-xs text-[#6B6B6B] dark:text-gray-400 line-through">₹{dealProduct.originalPrice.toLocaleString()}</span>
+                    <span className="text-xs text-[#6B6B6B] dark:text-gray-400 line-through">{formatPrice(dealProduct.originalPrice)}</span>
                   )}
-                  <p className="text-2xl font-bold text-[#C9A84C]">₹{dealProduct.price?.toLocaleString()}</p>
+                  <p className="text-2xl font-bold text-[#C9A84C]">{formatPrice(dealProduct.price)}</p>
                 </div>
                 <Link
                   to={`/product/slug/${dealProduct.slug || dealProduct.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`}
@@ -211,9 +226,14 @@ export default function HomePage() {
             <div className="flex justify-center relative">
               <div className="w-80 h-80 rounded-2xl overflow-hidden border border-[#E8E8E8] dark:border-white/5 shadow-luxury">
                 <img
-                  src={dealProduct.img}
-                  alt={dealProduct.name}
+                  src={getProductImageUrl(dealProduct.img, 'thumbnail')}
+                  srcSet={`${getProductImageUrl(dealProduct.img, 'thumbnail')} 400w, ${getProductImageUrl(dealProduct.img, 'detail')} 800w`}
+                  sizes="(max-width: 600px) 400px, 800px"
                   loading="lazy"
+                  decoding="async"
+                  width={400}
+                  height={400}
+                  alt={dealProduct.name}
                   className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
                 />
               </div>

@@ -6,8 +6,8 @@
 CREATE TABLE products (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
-  price INTEGER NOT NULL CHECK (price >= 0),
-  original_price INTEGER DEFAULT NULL,
+  price INTEGER NOT NULL CHECK (price >= 0), -- stored in paise. ₹1 = 100
+  original_price INTEGER DEFAULT NULL, -- stored in paise. ₹1 = 100
   category TEXT NOT NULL,
   brand TEXT NOT NULL,
   material TEXT DEFAULT '',
@@ -104,11 +104,11 @@ CREATE TABLE orders (
   payment_method TEXT NOT NULL DEFAULT 'cod' CHECK (payment_method IN ('cod', 'upi', 'card', 'netbanking')),
   payment_status TEXT NOT NULL DEFAULT 'pending' CHECK (payment_status IN ('pending', 'paid', 'failed', 'refunded')),
   payment_details JSONB DEFAULT '{}',
-  subtotal INTEGER NOT NULL,
-  shipping_cost INTEGER DEFAULT 0,
-  discount INTEGER DEFAULT 0,
+  subtotal INTEGER NOT NULL, -- stored in paise. ₹1 = 100
+  shipping_cost INTEGER DEFAULT 0, -- stored in paise. ₹1 = 100
+  discount INTEGER DEFAULT 0, -- stored in paise. ₹1 = 100
   coupon_code TEXT DEFAULT NULL,
-  total_amount INTEGER NOT NULL,
+  total_amount INTEGER NOT NULL, -- stored in paise. ₹1 = 100
   estimated_delivery TIMESTAMPTZ,
   delivered_at TIMESTAMPTZ,
   return_status TEXT DEFAULT 'none' CHECK (return_status IN ('none', 'requested', 'approved', 'rejected', 'completed')),
@@ -126,7 +126,7 @@ CREATE TABLE order_items (
   order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
   product_id UUID REFERENCES products(id),
   name TEXT NOT NULL,
-  price INTEGER NOT NULL,
+  price INTEGER NOT NULL, -- stored in paise. ₹1 = 100
   quantity INTEGER NOT NULL CHECK (quantity >= 1),
   image TEXT NOT NULL,
   color TEXT DEFAULT '',
@@ -150,10 +150,10 @@ CREATE INDEX idx_status_history_order ON order_status_history(order_id);
 CREATE TABLE coupons (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   code TEXT NOT NULL UNIQUE,
-  discount INTEGER NOT NULL,
+  discount INTEGER NOT NULL, -- stored in paise. ₹1 = 100 (if flat)
   type TEXT NOT NULL CHECK (type IN ('percent', 'flat')),
-  min_order INTEGER DEFAULT 0,
-  max_discount INTEGER DEFAULT NULL,
+  min_order INTEGER DEFAULT 0, -- stored in paise. ₹1 = 100
+  max_discount INTEGER DEFAULT NULL, -- stored in paise. ₹1 = 100
   description TEXT DEFAULT '',
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT now()

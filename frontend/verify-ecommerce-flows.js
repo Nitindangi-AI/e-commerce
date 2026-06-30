@@ -1,9 +1,12 @@
+import 'dotenv/config';
 import { createClient } from '@insforge/sdk';
 import axios from 'axios';
 
-const VITE_INSFORGE_URL = 'https://r7q99f5d.us-east.insforge.app';
-const VITE_INSFORGE_ANON_KEY = 'ik_84619633df209ae1fafdaf404bfbd91a';
-const API_URL = 'http://localhost:5000';
+// Credentials are read from environment variables — never hardcoded.
+// Copy frontend/.env.example to frontend/.env and fill in real values.
+const VITE_INSFORGE_URL = process.env.INSFORGE_URL || process.env.VITE_INSFORGE_URL;
+const VITE_INSFORGE_ANON_KEY = process.env.INSFORGE_ANON_KEY || process.env.VITE_INSFORGE_ANON_KEY;
+const API_URL = process.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 async function runTests() {
   console.log("🏁 Starting Phase 4 E-Commerce Business Logic Stabilization tests...\n");
@@ -16,8 +19,8 @@ async function runTests() {
   // 1. Log in users
   console.log("Logging in users...");
   const custLogin = await client.auth.signInWithPassword({
-    email: 'user1@trendy.com',
-    password: 'user123'
+    email: process.env.TEST_CUSTOMER_EMAIL,
+    password: process.env.TEST_CUSTOMER_PASSWORD
   });
   if (custLogin.error) {
     console.error("❌ Customer login failed:", custLogin.error.message);
@@ -26,8 +29,8 @@ async function runTests() {
   const custToken = custLogin.data.accessToken;
 
   const vendLogin = await client.auth.signInWithPassword({
-    email: 'seller1@trendy.com',
-    password: 'seller123'
+    email: process.env.TEST_VENDOR_EMAIL,
+    password: process.env.TEST_VENDOR_PASSWORD
   });
   if (vendLogin.error) {
     console.error("❌ Vendor login failed:", vendLogin.error.message);
@@ -36,8 +39,8 @@ async function runTests() {
   const vendToken = vendLogin.data.accessToken;
 
   const adminLogin = await client.auth.signInWithPassword({
-    email: 'admin@trendy.com',
-    password: 'admin123'
+    email: process.env.TEST_ADMIN_EMAIL,
+    password: process.env.TEST_ADMIN_PASSWORD
   });
   if (adminLogin.error) {
     console.error("❌ Admin login failed:", adminLogin.error.message);

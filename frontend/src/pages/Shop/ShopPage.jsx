@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams, Link } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import ProductCard from "../../components/ProductCard";
 import { SkeletonGrid } from "../../components/SkeletonCard";
 import { productAPI } from "../../services/api";
@@ -19,6 +20,13 @@ const RATINGS = [5, 4, 3, 2, 1];
 
 export default function ShopPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // SEO helpers (computed before any early return)
+  const seoCategory = searchParams.get("category") || "";
+  const seoTitle = seoCategory ? `${seoCategory} | Trendy` : "Shop All Products | Trendy";
+  const seoDescription = seoCategory
+    ? `Shop ${seoCategory} on Trendy.`
+    : "Shop all products on Trendy — premium fashion, accessories, watches, footwear & more.";
 
   // Read URL query params
   const currentPage = parseInt(searchParams.get("page")) || 1;
@@ -155,6 +163,13 @@ export default function ShopPage() {
 
   return (
     <div className="bg-[#FAFAF8] dark:bg-[#0A0A0A] min-h-screen pt-20">
+      <Helmet>
+        <title>{seoTitle}</title>
+        <meta name="description" content={seoDescription} />
+        <meta property="og:title" content={seoTitle} />
+        <meta property="og:description" content={seoDescription} />
+        <meta property="og:type" content="website" />
+      </Helmet>
       {/* Top Banner */}
       <div className="bg-white dark:bg-[#111111]/30 border-b border-[#E8E8E8] dark:border-white/5 py-10 px-6">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">

@@ -1,9 +1,12 @@
+import 'dotenv/config';
 import { createClient } from '@insforge/sdk';
 import axios from 'axios';
 
-const VITE_INSFORGE_URL = 'https://r7q99f5d.us-east.insforge.app';
-const VITE_INSFORGE_ANON_KEY = 'ik_84619633df209ae1fafdaf404bfbd91a';
-const API_URL = 'http://localhost:5000';
+// Credentials are read from environment variables — never hardcoded.
+// Copy frontend/.env.example to frontend/.env and fill in real values.
+const VITE_INSFORGE_URL = process.env.INSFORGE_URL || process.env.VITE_INSFORGE_URL;
+const VITE_INSFORGE_ANON_KEY = process.env.INSFORGE_ANON_KEY || process.env.VITE_INSFORGE_ANON_KEY;
+const API_URL = process.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 async function testRoute(name, url, token, expectedStatus) {
   try {
@@ -31,8 +34,8 @@ async function runTests() {
   // 1. Log in as Customer (user1@trendy.com)
   console.log("Logging in as Customer (user1@trendy.com)...");
   const custLogin = await client.auth.signInWithPassword({
-    email: 'user1@trendy.com',
-    password: 'user123'
+    email: process.env.TEST_CUSTOMER_EMAIL,
+    password: process.env.TEST_CUSTOMER_PASSWORD
   });
   if (custLogin.error) {
     console.error("❌ Customer login failed:", custLogin.error.message);
@@ -43,8 +46,8 @@ async function runTests() {
   // 2. Log in as Vendor (seller1@trendy.com)
   console.log("Logging in as Vendor (seller1@trendy.com)...");
   const vendLogin = await client.auth.signInWithPassword({
-    email: 'seller1@trendy.com',
-    password: 'seller123'
+    email: process.env.TEST_VENDOR_EMAIL,
+    password: process.env.TEST_VENDOR_PASSWORD
   });
   if (vendLogin.error) {
     console.error("❌ Vendor login failed:", vendLogin.error.message);
@@ -55,8 +58,8 @@ async function runTests() {
   // 3. Log in as Admin (admin@trendy.com)
   console.log("Logging in as Admin (admin@trendy.com)...");
   const adminLogin = await client.auth.signInWithPassword({
-    email: 'admin@trendy.com',
-    password: 'admin123'
+    email: process.env.TEST_ADMIN_EMAIL,
+    password: process.env.TEST_ADMIN_PASSWORD
   });
   if (adminLogin.error) {
     console.error("❌ Admin login failed:", adminLogin.error.message);

@@ -1,7 +1,7 @@
 import { createClient } from '@insforge/sdk';
 
-const VITE_INSFORGE_URL = 'https://r7q99f5d.us-east.insforge.app';
-const VITE_INSFORGE_ANON_KEY = 'ik_84619633df209ae1fafdaf404bfbd91a';
+const VITE_INSFORGE_URL = process.env.INSFORGE_URL || process.env.VITE_INSFORGE_URL;
+const VITE_INSFORGE_ANON_KEY = process.env.INSFORGE_ANON_KEY || process.env.VITE_INSFORGE_ANON_KEY;
 
 const adminClient = createClient({
   baseUrl: VITE_INSFORGE_URL,

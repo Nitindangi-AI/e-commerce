@@ -1,33 +1,94 @@
-node_modules
+# ============================================
+# Dependencies
+# ============================================
+node_modules/
+**/node_modules/
 
-# InsForge & AI agent skills
-.insforge
-.agent
-.agents
-.augment
-.claude
-.cline
+# ============================================
+# AI / Agent Directories
+# ============================================
+.insforge/
+.agent/
+.agents/
+.augment/
+.claude/
+.cline/
 .github/copilot*
-.kilocode
-.qoder
-.qwen
-.roo
-.trae
-.windsurf
-# Environment files
-backend/.env
-frontend/.env
-frontend/.env.local
+.kilocode/
+.qoder/
+.qwen/
+.roo/
+.trae/
+.windsurf/
+
 .insforge/project.json
+
+# ============================================
+# Environment Files
+# ============================================
+.env
+.env.*
 *.env
+*.env.*
 *.env.local
 
-# Cookies / local auth files
+backend/.env
+backend/.env.*
+frontend/.env
+frontend/.env.*
+frontend/.env.local
+
+# ============================================
+# Cookies
+# ============================================
 cookie.txt
 backend/cookie.txt
-node_modules
-.env
-frontend/test-results
+
+# ============================================
+# Coverage
+# ============================================
+coverage/
+backend/coverage/
+
+# ============================================
+# Playwright
+# ============================================
+playwright-report/
+frontend/playwright-report/
+
+# ============================================
+# Test Results
+# ============================================
+test-results/
+frontend/test-results/
+
+# ============================================
+# Build Output
+# ============================================
+dist/
+build/
+out/
+
+# ============================================
+# Logs
+# ============================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ============================================
+# Scratch Files
+# ============================================
 backend/scratch_test.js
 backend/scratch_update.js
-frontend/seed-users.js
+
+# ============================================
+# OS Files
+# ============================================
+.DS_Store
+Thumbs.db
+Desktop.ini

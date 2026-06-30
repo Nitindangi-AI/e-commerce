@@ -1,7 +1,10 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { insforge } from "../../lib/insforge";
-import { logisticsAPI } from "../../services/api";
+import { logisticsAPI, adminAPI } from "../../services/api";
+import { formatPrice } from "../../utils/price";
+import { getProductImageUrl } from "../../utils/image";
+import axios from "axios";
 import Loader from "../../components/Loader";
 import toast from "react-hot-toast";
 import {
@@ -322,37 +325,19 @@ export default function AdminDashboard() {
       return;
     }
     try {
-      const updatePayload = { status: action, updated_at: new Date().toISOString() };
-      if (action === "rejected") {
-        updatePayload.rejection_reason = rejectionReason;
-      }
-      
-      const { error } = await insforge.database
-        .from("vendors")
-        .update(updatePayload)
-        .eq("id", vendorId);
-
-      if (error) throw error;
-
       if (action === "approved") {
-        const { data: vRecord } = await insforge.database
-          .from("vendors")
-          .select("user_id")
-          .eq("id", vendorId)
-          .single();
-
-        if (vRecord) {
-          await insforge.database
-            .from("profiles")
-            .update({ role: "vendor", updated_at: new Date().toISOString() })
-            .eq("id", vRecord.user_id);
-        }
+        await adminAPI.approveVendor(vendorId);
+      } else if (action === "rejected") {
+        await adminAPI.rejectVendor(vendorId, rejectionReason);
+      } else {
+        throw new Error("Invalid action type");
       }
 
       toast.success(`Merchant onboarding application successfully ${action === "approved" ? "approved" : "rejected"}!`);
       loadAdminData();
     } catch (err) {
-      toast.error("Failed to process merchant action");
+      console.error("Vendor Action Error:", err);
+      toast.error(err.message || "Failed to process merchant action");
     }
   };
 
@@ -392,11 +377,7 @@ export default function AdminDashboard() {
     }
     if (!window.confirm("Are you sure you want to revoke this product listing? This will violate merchant agreements.")) return;
     try {
-      const { error } = await insforge.database
-        .from("products")
-        .delete()
-        .eq("id", id);
-      if (error) throw error;
+      await axios.delete(`/api/v1/products/${id}`);
       toast.success("Product listing successfully revoked!");
       loadAdminData();
     } catch (err) {
@@ -489,9 +470,9 @@ export default function AdminDashboard() {
       const payload = {
         code: couponForm.code.toUpperCase().trim(),
         type: couponForm.type,
-        discount: parseFloat(couponForm.discount) || 0,
-        min_order: parseFloat(couponForm.min_order) || 0,
-        max_discount: couponForm.max_discount ? parseFloat(couponForm.max_discount) : null,
+        discount: couponForm.type === "percent" ? (parseFloat(couponForm.discount) || 0) : (parseFloat(couponForm.discount) * 100 || 0),
+        min_order: (parseFloat(couponForm.min_order) || 0) * 100,
+        max_discount: couponForm.max_discount ? (parseFloat(couponForm.max_discount) * 100) : null,
         is_active: couponForm.is_active
       };
 
@@ -524,9 +505,9 @@ export default function AdminDashboard() {
     setCouponForm({
       code: coupon.code || "",
       type: coupon.type || "percent",
-      discount: coupon.discount || "",
-      min_order: coupon.min_order || "",
-      max_discount: coupon.max_discount || "",
+      discount: coupon.type === "percent" ? (coupon.discount || "") : (coupon.discount ? coupon.discount / 100 : ""),
+      min_order: coupon.min_order ? (coupon.min_order / 100) : "",
+      max_discount: coupon.max_discount ? (coupon.max_discount / 100) : "",
       is_active: coupon.is_active ?? true
     });
     setShowCouponForm(true);
@@ -743,7 +724,7 @@ export default function AdminDashboard() {
     { label: "Theme: Blossom Pink Active", action: () => { setShowCommandPalette(false); } }
   ].filter(c => c.label.toLowerCase().includes(commandSearch.toLowerCase()));
 
-  const formatCurrency = (p) => `₹${(p || 0).toLocaleString("en-IN")}`;
+  const formatCurrency = formatPrice;
 
   const statusColorMap = {
     "Processing": "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
@@ -1271,7 +1252,17 @@ export default function AdminDashboard() {
                         <tr key={p.id} className="hover:bg-white/[0.005] transition-colors">
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
-                              <img src={p.img} alt={p.name} className="w-10 h-10 object-cover rounded-lg border border-white/10" />
+                              <img
+                                src={getProductImageUrl(p.img, 'thumbnail')}
+                                srcSet={`${getProductImageUrl(p.img, 'thumbnail')} 400w, ${getProductImageUrl(p.img, 'detail')} 800w`}
+                                sizes="(max-width: 600px) 400px, 800px"
+                                loading="lazy"
+                                decoding="async"
+                                width={400}
+                                height={400}
+                                alt={p.name}
+                                className="w-10 h-10 object-cover rounded-lg border border-white/10"
+                              />
                               <div>
                                 <span className={`font-bold block ${textTitle}`}>{p.name}</span>
                                 <span className={`text-[10px] ${textSubtle}`}>{p.category}</span>
@@ -1343,7 +1334,17 @@ export default function AdminDashboard() {
                     {allProducts.map(p => (
                       <tr key={p.id} className="hover:bg-white/[0.005] transition-colors">
                         <td className="px-6 py-4 flex items-center gap-3">
-                          <img src={p.img} alt={p.name} className="w-10 h-10 rounded-lg object-cover border border-[#ffd5dd]" />
+                          <img
+                            src={getProductImageUrl(p.img, 'thumbnail')}
+                            srcSet={`${getProductImageUrl(p.img, 'thumbnail')} 400w, ${getProductImageUrl(p.img, 'detail')} 800w`}
+                            sizes="(max-width: 600px) 400px, 800px"
+                            loading="lazy"
+                            decoding="async"
+                            width={400}
+                            height={400}
+                            alt={p.name}
+                            className="w-10 h-10 rounded-lg object-cover border border-[#ffd5dd]"
+                          />
                           <div>
                             <p className={`font-bold text-sm ${textTitle}`}>{p.name}</p>
                             <span className={`text-[9px] font-mono ${textSubtle}`}>ID: {p.id.slice(0, 8)}</span>
@@ -1353,8 +1354,8 @@ export default function AdminDashboard() {
                           {vendorMap[p.seller_id] || "Trendz Admin"}
                         </td>
                         <td className="px-6 py-4 font-semibold text-[#3d2428]/60">
-                          Sale: ₹{p.price.toLocaleString()}<br />
-                          Cost: ₹{p.original_price?.toLocaleString()}
+                          Sale: {formatPrice(p.price)}<br />
+                          Cost: {p.original_price ? formatPrice(p.original_price) : "N/A"}
                         </td>
                         <td className={`px-6 py-4 font-bold ${p.stock < 5 ? 'text-yellow-500' : textSubtle}`}>{p.stock} units</td>
                         <td className="px-6 py-4 text-center">
@@ -1629,7 +1630,17 @@ export default function AdminDashboard() {
                     <div className="flex flex-wrap gap-3 p-3 bg-pink-50/60 rounded-xl border border-[#ffd5dd]/60">
                       {productForm.images.map((url, index) => (
                         <div key={index} className="relative group w-16 h-16 rounded-lg overflow-hidden border border-[#ffd5dd]">
-                          <img src={url} alt="Product Thumbnail" className="w-full h-full object-cover" />
+                          <img
+                            src={getProductImageUrl(url, 'thumbnail')}
+                            srcSet={`${getProductImageUrl(url, 'thumbnail')} 400w, ${getProductImageUrl(url, 'detail')} 800w`}
+                            sizes="(max-width: 600px) 400px, 800px"
+                            loading="lazy"
+                            decoding="async"
+                            width={400}
+                            height={400}
+                            alt="Product Thumbnail"
+                            className="w-full h-full object-cover"
+                          />
                           <button
                             type="button"
                             onClick={() => removeUploadedImage(index)}
@@ -2391,7 +2402,13 @@ export default function AdminDashboard() {
                                         {order.items?.map((item, idx) => (
                                           <div key={idx} className="flex gap-4 p-3 bg-pink-50/30 border border-[#ffd5dd]/60 rounded-xl hover:border-[#ffd5dd] transition-all">
                                             <img
-                                              src={item.image || (item.products?.img)}
+                                              src={getProductImageUrl(item.image || (item.products?.img), 'thumbnail')}
+                                              srcSet={`${getProductImageUrl(item.image || (item.products?.img), 'thumbnail')} 400w, ${getProductImageUrl(item.image || (item.products?.img), 'detail')} 800w`}
+                                              sizes="(max-width: 600px) 400px, 800px"
+                                              loading="lazy"
+                                              decoding="async"
+                                              width={400}
+                                              height={400}
                                               alt={item.name}
                                               className="w-14 h-14 rounded-lg object-cover border border-[#ffd5dd] flex-shrink-0"
                                             />
@@ -2626,13 +2643,13 @@ export default function AdminDashboard() {
                               </div>
                             </td>
                             <td className={`px-6 py-4 font-bold text-sm ${textTitle}`}>
-                              {coupon.type === "percent" ? `${coupon.discount}% Off` : `₹${coupon.discount} Flat`}
+                              {coupon.type === "percent" ? `${coupon.discount}% Off` : `${formatCurrency(coupon.discount)} Flat`}
                             </td>
                             <td className={`px-6 py-4 font-mono font-semibold ${textTitle}`}>
-                              {coupon.min_order > 0 ? `₹${coupon.min_order.toLocaleString()}` : "No Minimum"}
+                              {coupon.min_order > 0 ? formatCurrency(coupon.min_order) : "No Minimum"}
                             </td>
                             <td className={`px-6 py-4 font-mono font-semibold ${textTitle}`}>
-                              {coupon.type === "percent" && coupon.max_discount ? `₹${coupon.max_discount.toLocaleString()}` : "N/A"}
+                              {coupon.type === "percent" && coupon.max_discount ? formatCurrency(coupon.max_discount) : "N/A"}
                             </td>
                             <td className="px-6 py-4 text-center">
                               <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border uppercase tracking-wider ${

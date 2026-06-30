@@ -8,21 +8,21 @@ export default function AdminLocations() {
   const [csvData, setCsvData] = useState("");
   const [uploading, setUploading] = useState(false);
 
-  useEffect(() => {
-    fetchPincodes();
-  }, []);
-
-  const fetchPincodes = async () => {
+  async function fetchPincodes() {
     setLoading(true);
     try {
       const data = await locationAPI.getAllPincodes();
       setPincodes(data.pincodes || []);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load pincodes");
     } finally {
       setLoading(false);
     }
-  };
+  }
+
+  useEffect(() => {
+    (async () => { await fetchPincodes(); })();
+  }, []);
 
   const handleBulkUpload = async () => {
     if (!csvData) {

@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
+import { formatPrice } from "../../utils/price";
 
 export default function OrderSuccessPage() {
   const [confetti, setConfetti] = useState(true);
@@ -12,7 +13,7 @@ export default function OrderSuccessPage() {
     return () => clearTimeout(timer);
   }, []);
 
-  const fmt = (p) => `₹${p?.toLocaleString("en-IN") || "0"}`;
+  const fmt = formatPrice;
 
   return (
     <div className="min-h-[80vh] flex flex-col items-center justify-center pt-24 px-6 text-center relative overflow-hidden bg-[var(--bg-gradient)] text-[var(--text-primary)]">

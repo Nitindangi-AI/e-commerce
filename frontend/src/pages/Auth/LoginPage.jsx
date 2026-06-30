@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { authService } from '../../services/authService';
-import { useAuthStore } from '../../store/useAuthStore';
+import { useAuthStore } from '../../store/authStore';
 import { toast } from '../../store/useToastStore';
 import { Eye, EyeOff } from 'lucide-react';
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const setAuth = useAuthStore((state) => state.setAuth);
+  const location = useLocation();
+  const setUser = useAuthStore((state) => state.setUser);
 
   // Form inputs
   const [identifier, setIdentifier] = useState('');
@@ -47,8 +48,8 @@ export default function LoginPage() {
 
     if (!password) {
       newErrors.password = 'Password is required';
-    } else if (password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters';
+    } else if (password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
     }
 
     setErrors(newErrors);
@@ -73,7 +74,7 @@ export default function LoginPage() {
         const profileRes = await authService.getProfile();
         const user = profileRes.success ? profileRes.profile : res.user;
 
-        setAuth(user, res.token);
+        setUser(user, res.token);
         if (rememberMe) {
           localStorage.setItem('remember_me', 'true');
         } else {
@@ -82,18 +83,10 @@ export default function LoginPage() {
 
         toast.success(`Welcome back, ${user.full_name || user.email || 'User'}!`);
 
-        // Check redirect route based on role or ?redirect= param
-        const redirectParam = searchParams.get('redirect');
+        // Check redirect route based on location.state.from or fallback to /
+        const from = location.state?.from || '/';
         setTimeout(() => {
-          if (redirectParam) {
-            navigate(redirectParam);
-          } else if (user.role === 'admin') {
-            navigate('/admin');
-          } else if (user.role === 'merchant' || user.role === 'vendor') {
-            navigate('/vendor');
-          } else {
-            navigate('/');
-          }
+          navigate(from);
         }, 1000);
       } else {
         triggerFailure(res);

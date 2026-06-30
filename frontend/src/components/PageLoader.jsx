@@ -2,29 +2,24 @@ import React from "react";
 
 export default function PageLoader() {
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#0A0A0A]">
-      <div className="relative flex items-center justify-center w-24 h-24">
-        {/* Rotating outer ring */}
-        <div className="absolute inset-0 rounded-full border border-t-[#C9A84C] border-r-transparent border-b-transparent border-l-transparent animate-spin duration-1000"></div>
-        {/* Subtle background ring */}
-        <div className="absolute inset-0 rounded-full border border-white/5"></div>
-        {/* Centered T logo */}
-        <span 
-          className="text-4xl font-bold text-[#C9A84C] font-display select-none tracking-widest"
-          style={{ fontFamily: "'Playfair Display', serif" }}
-        >
-          T
-        </span>
+    <div className="fixed inset-0 z-[9999] bg-[#FAFAF8] dark:bg-[#0A0A0A] pt-28 pb-16 overflow-hidden">
+      <div className="max-w-7xl mx-auto px-6 space-y-8">
+        {/* Top Header skeleton */}
+        <div className="space-y-3">
+          <div className="skeleton h-8 w-48" />
+          <div className="skeleton h-4 w-96" />
+        </div>
+        {/* Main Grid skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="flex flex-col gap-3 p-4 border border-gray-100 dark:border-white/5 rounded-xl bg-white dark:bg-[#111111]">
+              <div className="skeleton w-full h-[200px]" />
+              <div className="skeleton h-4 w-[80%]" />
+              <div className="skeleton h-4 w-[60%]" />
+            </div>
+          ))}
+        </div>
       </div>
-      <style>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-        .animate-spin {
-          animation: spin 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-        }
-      `}</style>
     </div>
   );
 }

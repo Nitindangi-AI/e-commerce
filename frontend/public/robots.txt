@@ -3,4 +3,5 @@ Allow: /
 Disallow: /admin
 Disallow: /vendor
 Disallow: /checkout
+Disallow: /account
 Sitemap: https://trendy.vercel.app/sitemap.xml

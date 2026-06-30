@@ -1,13 +1,16 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useCartStore } from "../store/useCartStore";
-import { useWishlistStore } from "../store/useWishlistStore";
+import { useCartStore } from "../store/cartStore";
+import { useWishlistStore } from "../store/wishlistStore";
 import { insforge } from "../lib/insforge";
 import toast from "react-hot-toast";
+import { formatPrice } from "../utils/price";
+import { getProductImageUrl } from "../utils/image";
 
 export default function ProductCard({ product }) {
   const addToCart = useCartStore((state) => state.addToCart);
-  const toggleWishlist = useWishlistStore((state) => state.toggleWishlist);
+  const addToWishlist = useWishlistStore((state) => state.addToWishlist);
+  const removeFromWishlist = useWishlistStore((state) => state.removeFromWishlist);
   const isInWishlist = useWishlistStore((state) => state.isInWishlist(product.id));
 
   const [added, setAdded] = useState(false);
@@ -50,7 +53,11 @@ export default function ProductCard({ product }) {
       setIsToggling(true);
       setTimeout(() => setIsToggling(false), 400);
       
-      await toggleWishlist(product);
+      if (wasInWishlist) {
+        await removeFromWishlist(product.id);
+      } else {
+        await addToWishlist(product);
+      }
       
       toast(wasInWishlist ? "Removed from wishlist" : "Added to wishlist ♡", {
         icon: wasInWishlist ? "💔" : "❤️",
@@ -60,7 +67,7 @@ export default function ProductCard({ product }) {
     }
   };
 
-  const formatPrice = (price) => `₹${price.toLocaleString("en-IN")}`;
+
 
   const badgeColor = () => {
     const b = product.badge?.toLowerCase();
@@ -91,9 +98,14 @@ export default function ProductCard({ product }) {
             <div className="absolute inset-0 bg-gray-200 dark:bg-neutral-800 animate-pulse z-10" />
           )}
           <img
-            src={hoveredImg || product.img}
-            alt={product.name}
+            src={getProductImageUrl(hoveredImg || product.img, 'thumbnail')}
+            srcSet={`${getProductImageUrl(hoveredImg || product.img, 'thumbnail')} 400w, ${getProductImageUrl(hoveredImg || product.img, 'detail')} 800w`}
+            sizes="(max-width: 600px) 400px, 800px"
             loading="lazy"
+            decoding="async"
+            width={400}
+            height={400}
+            alt={product.name}
             onLoad={() => setImageLoaded(true)}
             className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
           />

@@ -1,10 +1,14 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
+import { Helmet } from "react-helmet-async";
 import { productAPI, reviewAPI } from "../../services/api";
+import { formatPrice } from "../../utils/price";
+import { getProductImageUrl } from "../../utils/image";
 import ProductCard from "../../components/ProductCard";
 import SkeletonProductDetail from "../../components/SkeletonProductDetail";
-import { useCartStore } from "../../store/useCartStore";
-import { useWishlistStore } from "../../store/useWishlistStore";
+import { useCartStore } from "../../store/cartStore";
+import { useWishlistStore } from "../../store/wishlistStore";
+import { useAuthStore } from "../../store/authStore";
 import { useRecentlyViewedStore } from "../../store/useRecentlyViewedStore";
 import { insforge } from "../../lib/insforge";
 import toast from "react-hot-toast";
@@ -76,8 +80,10 @@ export default function ProductDetails() {
   const [vendorInfo, setVendorInfo] = useState(null);
 
   const addToCart = useCartStore((state) => state.addToCart);
-  const toggleWishlist = useWishlistStore((state) => state.toggleWishlist);
+  const addToWishlist = useWishlistStore((state) => state.addToWishlist);
+  const removeFromWishlist = useWishlistStore((state) => state.removeFromWishlist);
   const isInWishlist = useWishlistStore((state) => (product ? state.isInWishlist(product.id) : false));
+  const currentUser = useAuthStore((state) => state.user);
   const addToRecentlyViewed = useRecentlyViewedStore((state) => state.addToRecentlyViewed);
 
   // Selector states
@@ -96,7 +102,6 @@ export default function ProductDetails() {
   const [isZoomed, setIsZoomed] = useState(false);
 
   // Review Form & Modal States
-  const [currentUser, setCurrentUser] = useState(null);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [reviewRating, setReviewRating] = useState(5);
   const [hoverRating, setHoverRating] = useState(0);
@@ -179,13 +184,7 @@ export default function ProductDetails() {
     fetchProductData();
   }, [slug]);
 
-  useEffect(() => {
-    const checkUser = async () => {
-      const { data } = await insforge.auth.getUser();
-      setCurrentUser(data?.user || null);
-    };
-    checkUser();
-  }, []);
+
 
   useEffect(() => {
     if (product) {
@@ -251,7 +250,7 @@ export default function ProductDetails() {
     const sizeVal = product.sizes?.[selectedSize] || "";
 
     // Sync quantity logic with Zustand store
-    const cartItems = useCartStore.getState().cartItems;
+    const cartItems = useCartStore.getState().items;
     const existingItem = cartItems.find(
       (item) =>
         (item.id || item._id) === product.id &&
@@ -265,11 +264,11 @@ export default function ProductDetails() {
     };
 
     if (existingItem) {
-      useCartStore.getState().updateQuantity(product.id, existingItem.quantity + qty, colorVal, sizeVal);
+      useCartStore.getState().updateQty(product.id, existingItem.quantity + qty, colorVal, sizeVal);
     } else {
       addToCart(productWithVariantPrice, colorVal, sizeVal);
       if (qty > 1) {
-        useCartStore.getState().updateQuantity(product.id, qty, colorVal, sizeVal);
+        useCartStore.getState().updateQty(product.id, qty, colorVal, sizeVal);
       }
     }
     setAdded(true);
@@ -338,7 +337,6 @@ export default function ProductDetails() {
   }
 
   const images = product.images?.length ? product.images : [product.img];
-  const formatPrice = (price) => `₹${price.toLocaleString("en-IN")}`;
   const discount = product.originalPrice ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100) : 0;
 
   const deliveryDays = product.deliveryDays || 3;
@@ -364,6 +362,21 @@ export default function ProductDetails() {
 
   return (
     <div className="bg-[#FAFAF8] dark:bg-[#0A0A0A] min-h-screen pt-20">
+      <Helmet>
+        <title>{product.name} | Trendy</title>
+        <meta name="description" content={(product.description || "").slice(0, 160)} />
+        <meta property="og:title" content={`${product.name} | Trendy`} />
+        <meta property="og:description" content={(product.description || "").slice(0, 160)} />
+        <meta property="og:type" content="product" />
+        {(product.images?.[0] || product.image) && (
+          <meta property="og:image" content={product.images?.[0] || product.image} />
+        )}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={`${product.name} | Trendy`} />
+        {(product.images?.[0] || product.image) && (
+          <meta name="twitter:image" content={product.images?.[0] || product.image} />
+        )}
+      </Helmet>
       {/* Local styles for checkmark & heartbeat & image transitions */}
       <style>{`
         @keyframes fadeIn {
@@ -412,11 +425,14 @@ export default function ProductDetails() {
             >
               <img 
                 key={selectedImage}
-                src={images[selectedImage]} 
+                src={getProductImageUrl(images[selectedImage], 'thumbnail')} 
+                srcSet={`${getProductImageUrl(images[selectedImage], 'thumbnail')} 400w, ${getProductImageUrl(images[selectedImage], 'detail')} 800w`}
+                sizes="(max-width: 600px) 400px, 800px"
+                loading="lazy"
+                decoding="async"
+                width={400}
+                height={400}
                 alt={product.name} 
-                loading="eager"
-                width="600"
-                height="600"
                 className="w-full h-full object-cover animate-fade-in"
               />
               
@@ -427,7 +443,7 @@ export default function ProductDetails() {
                   style={{
                     left: `${lensPos.x - 72}px`,
                     top: `${lensPos.y - 72}px`,
-                    backgroundImage: `url(${images[selectedImage]})`,
+                    backgroundImage: `url(${getProductImageUrl(images[selectedImage], 'detail')})`,
                     backgroundPosition: bgPos,
                     backgroundSize: `250%`, // 2.5x zoom
                   }}
@@ -471,7 +487,17 @@ export default function ProductDetails() {
                       : "border-[#E8E8E8] dark:border-white/5 hover:border-[#C9A84C]/50"
                   }`}
                 >
-                  <img src={img} alt={`${product.name} thumbnail ${i + 1}`} loading="lazy" width="80" height="80" className="w-full h-full object-cover" />
+                  <img
+                    src={getProductImageUrl(img, 'thumbnail')}
+                    srcSet={`${getProductImageUrl(img, 'thumbnail')} 400w, ${getProductImageUrl(img, 'detail')} 800w`}
+                    sizes="(max-width: 600px) 400px, 800px"
+                    loading="lazy"
+                    decoding="async"
+                    width={400}
+                    height={400}
+                    alt={`${product.name} thumbnail ${i + 1}`}
+                    className="w-full h-full object-cover"
+                  />
                 </button>
               ))}
             </div>
@@ -648,12 +674,17 @@ export default function ProductDetails() {
                     {added ? "✓ Added" : "Add to Cart"}
                   </button>
                   <button 
-                    onClick={() => {
-                      toggleWishlist(product);
+                    onClick={async () => {
+                      const wasInWishlist = isInWishlist;
                       setIsTogglingWishlist(true);
                       setTimeout(() => setIsTogglingWishlist(false), 400);
-                      toast(isInWishlist ? "Removed from wishlist" : "Added to wishlist ♡", {
-                        icon: isInWishlist ? "💔" : "❤️",
+                      if (wasInWishlist) {
+                        await removeFromWishlist(product.id);
+                      } else {
+                        await addToWishlist(product);
+                      }
+                      toast(wasInWishlist ? "Removed from wishlist" : "Added to wishlist ♡", {
+                        icon: wasInWishlist ? "💔" : "❤️",
                       });
                     }}
                     className="w-full border border-[#C9A84C] text-[#C9A84C] hover:bg-[#C9A84C]/5 py-4 rounded-xl text-xs tracking-[0.2em] uppercase font-bold transition-all duration-300 flex items-center justify-center gap-2"

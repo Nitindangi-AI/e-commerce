@@ -1,12 +1,22 @@
+import React from 'react';
+
 export default function Loader() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#FAFAF8] dark:bg-[#0A0A0A]">
-      <div className="flex flex-col items-center gap-4">
-        <div className="relative w-12 h-12">
-          <div className="absolute inset-0 rounded-full border-2 border-[#E8E8E8] dark:border-white/5" />
-          <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-[#C9A84C] animate-spin" />
+    <div className="min-h-screen bg-[#FAFAF8] dark:bg-[#0A0A0A] pt-28 pb-16">
+      <div className="max-w-7xl mx-auto px-6 space-y-8">
+        <div className="space-y-3">
+          <div className="skeleton h-8 w-48" />
+          <div className="skeleton h-4 w-96" />
         </div>
-        <p className="text-[10px] tracking-[0.3em] uppercase text-[#6B6B6B] dark:text-gray-400 font-medium">Loading</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="flex flex-col gap-3 p-4 border border-gray-100 dark:border-white/5 rounded-xl bg-white dark:bg-[#111111]">
+              <div className="skeleton w-full h-[200px]" />
+              <div className="skeleton h-4 w-[80%]" />
+              <div className="skeleton h-4 w-[60%]" />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

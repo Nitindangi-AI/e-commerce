@@ -1,4 +1,6 @@
 import { test, expect } from '@playwright/test';
+// Credentials loaded from environment — set TEST_ADMIN_EMAIL and TEST_ADMIN_PASSWORD
+// in a .env file or in CI environment variables. Never hardcode them here.
 
 test('capture admin dashboard error', async ({ page }) => {
   const errors = [];
@@ -17,10 +19,10 @@ test('capture admin dashboard error', async ({ page }) => {
     await page.goto('http://localhost:5173/login');
     
     console.log("Entering email...");
-    await page.locator('input[type="email"]').fill('admin@trendy.com');
+    await page.locator('input[type="email"]').fill(process.env.TEST_ADMIN_EMAIL ?? 'admin@trendy.com');
     
     console.log("Entering password...");
-    await page.locator('input[type="password"]').fill('admin123');
+    await page.locator('input[type="password"]').fill(process.env.TEST_ADMIN_PASSWORD ?? '');
     
     console.log("Submitting login form...");
     await page.locator('button[type="submit"]').click();

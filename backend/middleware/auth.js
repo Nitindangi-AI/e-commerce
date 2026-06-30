@@ -1,5 +1,6 @@
 const { createClient } = require("@insforge/sdk");
 const db = require("../config/db");
+const { AuthError, ForbiddenError } = require("./errors");
 
 // ── InsForge client factory ──────────────────────────────────────────────
 // Each request gets the user's Bearer token injected via setAccessToken(),
@@ -8,13 +9,13 @@ const db = require("../config/db");
 let _insforge = null;
 
 function getInsforgeClient() {
-  if (!_insforge) {
-    _insforge = createClient({
-      baseUrl: process.env.INSFORGE_URL,
-      anonKey: process.env.INSFORGE_ANON_KEY,
-      isServerMode: true,
-    });
-  }
+  if (_insforge) return _insforge;
+
+  _insforge = createClient({
+    baseUrl: process.env.INSFORGE_URL,
+    anonKey: process.env.INSFORGE_ANON_KEY,
+    isServerMode: true,
+  });
   return _insforge;
 }
 
@@ -92,13 +93,17 @@ const verifyToken = async (req, res, next) => {
   }
 
   if (!token) {
-    return res.status(401).json({ error: "Authentication required", message: "Authentication required" });
+    return next(new AuthError("Authentication required"));
   }
 
   const result = await resolveUserFromToken(token);
 
   if (result.error) {
-    return res.status(result.status).json({ error: result.error, message: result.error });
+    if (result.status === 401) {
+      return next(new AuthError(result.error));
+    } else {
+      return next(new ForbiddenError(result.error));
+    }
   }
 
   req.user = result.user;
@@ -112,8 +117,8 @@ const verifyToken = async (req, res, next) => {
   }
 
   if (role === 'customer') {
-    if (originalUrl.startsWith('/api/vendor') || originalUrl.startsWith('/api/admin')) {
-      return res.status(403).json({ error: "Unauthorized role access", message: "Customer is not authorized to access this resource" });
+    if (originalUrl.startsWith('/api/vendor') || originalUrl.startsWith('/api/v1/admin')) {
+      return next(new ForbiddenError("Customer is not authorized to access this resource"));
     }
     return next();
   }
@@ -128,23 +133,23 @@ const verifyToken = async (req, res, next) => {
       return next();
     }
 
-    return res.status(403).json({ error: "Unauthorized role access", message: "Vendor is not authorized to access this resource" });
+    return next(new ForbiddenError("Vendor is not authorized to access this resource"));
   }
 
-  return res.status(403).json({ error: "Unauthorized role access", message: "Role is not authorized to access this resource" });
+  return next(new ForbiddenError("Role is not authorized to access this resource"));
 };
 
 // ── Middleware: requireAdmin ─────────────────────────────────────────────
 const requireAdmin = async (req, res, next) => {
   if (!req.user || req.user.role !== "admin") {
-    return res.status(403).json({ error: "Admin access required", message: "Admin access required" });
+    return next(new ForbiddenError("Admin access required"));
   }
   next();
 };
 
 // ── Middleware: requireVendor ────────────────────────────────────────────
 const requireVendor = async (req, res, next) => {
-  if (!req.user) return res.status(401).json({ error: "Authentication required", message: "Authentication required" });
+  if (!req.user) return next(new AuthError("Authentication required"));
 
   if (req.user.role === 'admin') {
     return next(); // admin gets full access
@@ -153,12 +158,12 @@ const requireVendor = async (req, res, next) => {
   try {
     const vendorRes = await db.query("SELECT * FROM vendors WHERE user_id = $1", [req.user.id]);
     if (vendorRes.rows.length === 0 || vendorRes.rows[0].status !== "approved") {
-      return res.status(403).json({ error: "Approved vendor account required", message: "Approved vendor account required" });
+      return next(new ForbiddenError("Approved vendor account required"));
     }
     req.vendor = vendorRes.rows[0];
     next();
   } catch (error) {
-    return res.status(500).json({ error: error.message, message: error.message });
+    next(error);
   }
 };
 
@@ -199,10 +204,7 @@ const authorize = (...roles) => {
   return (req, res, next) => {
     if (!req.user || !roles.includes(req.user.role)) {
       const msg = `Role '${req.user?.role || ""}' is not authorized to access this resource`;
-      return res.status(403).json({
-        error: msg,
-        message: msg
-      });
+      return next(new ForbiddenError(msg));
     }
     next();
   };

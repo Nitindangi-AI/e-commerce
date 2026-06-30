@@ -7,7 +7,7 @@ import BackToTop from "../components/BackToTop";
 import Chatbot from "../components/Chatbot";
 import { useThemeStore } from "../store/useThemeStore";
 import { useSearchStore } from "../store/useSearchStore";
-import { useAuthStore } from "../store/useAuthStore";
+import { useAuthStore } from "../store/authStore";
 import SearchDropdown from "../components/SearchDropdown";
 import { AnimatePresence } from "framer-motion";
 

@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { orderAPI, logisticsAPI } from "../../services/api";
 import toast from "react-hot-toast";
+import { formatPrice } from "../../utils/price";
+import { getProductImageUrl } from "../../utils/image";
 import { FileText, CheckCircle, Package, Truck, Home, XCircle, ArrowLeft, RotateCcw } from "lucide-react";
 import TrackingBadge from "../../components/TrackingBadge";
 import ReturnWindowBanner from "../../components/ReturnWindowBanner";
@@ -166,7 +168,7 @@ export default function OrderDetailPage() {
     };
   }, [loading, order]);
 
-  const fmt = (p) => `₹${(p || 0).toLocaleString("en-IN")}`;
+  const fmt = formatPrice;
 
   const handleRequestReturn = async () => {
     if (!returnReason.trim()) { 
@@ -650,7 +652,17 @@ export default function OrderDetailPage() {
             <div className="space-y-4">
               {order.orderItems.map((item, i) => (
                 <div key={i} className="flex items-center gap-4 pb-4 border-b border-[var(--card-border)]/5 last:border-0 last:pb-0">
-                  <img src={item.image} alt={item.name} loading="lazy" width="64" height="64" className="w-16 h-16 rounded-xl object-cover border border-[var(--card-border)] flex-shrink-0" />
+                  <img
+                    src={getProductImageUrl(item.image, 'thumbnail')}
+                    srcSet={`${getProductImageUrl(item.image, 'thumbnail')} 400w, ${getProductImageUrl(item.image, 'detail')} 800w`}
+                    sizes="(max-width: 600px) 400px, 800px"
+                    loading="lazy"
+                    decoding="async"
+                    width={400}
+                    height={400}
+                    alt={item.name}
+                    className="w-16 h-16 rounded-xl object-cover border border-[var(--card-border)] flex-shrink-0"
+                  />
                   
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-sm text-[var(--text-primary)] truncate">{item.name}</p>

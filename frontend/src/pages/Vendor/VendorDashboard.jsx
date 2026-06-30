@@ -1,10 +1,14 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { Link, useNavigate, useOutletContext } from "react-router-dom";
 import { insforge } from "../../lib/insforge";
 import { logisticsAPI } from "../../services/api";
 import Loader from "../../components/Loader";
 import toast from "react-hot-toast";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { formatPrice } from "../../utils/price";
+import { getProductImageUrl } from "../../utils/image";
+import axios from "axios";
+// recharts is loaded lazily — keeps it out of the initial VendorDashboard chunk
+const VendorChart = lazy(() => import("./VendorChart"));
 import { formatTrackingNumber } from "../../utils/formatTracking";
 import {
   BarChart3,
@@ -440,8 +444,8 @@ export default function VendorDashboard() {
 
       const payload = {
         name: productForm.name,
-        price: parseFloat(productForm.price),
-        original_price: productForm.originalPrice ? parseFloat(productForm.originalPrice) : parseFloat(productForm.price),
+        price: Math.round(parseFloat(productForm.price) * 100),
+        original_price: productForm.originalPrice ? Math.round(parseFloat(productForm.originalPrice) * 100) : Math.round(parseFloat(productForm.price) * 100),
         category: productForm.category,
         brand: productForm.brand || "Trendz",
         material: productForm.material || "",
@@ -734,8 +738,8 @@ export default function VendorDashboard() {
 
     setProductForm({
       name: p.name || "",
-      price: p.price || "",
-      originalPrice: p.original_price || "",
+      price: p.price ? p.price / 100 : "",
+      originalPrice: p.original_price ? p.original_price / 100 : "",
       category: p.category || "Watches",
       brand: p.brand || "",
       material: p.material || "",
@@ -770,11 +774,7 @@ export default function VendorDashboard() {
         return;
       }
 
-      const { error } = await insforge.database
-        .from("products")
-        .delete()
-        .eq("id", id);
-      if (error) throw error;
+      await axios.delete(`/api/v1/products/${id}`);
       toast.success("Product deleted");
       loadDashboardData();
     } catch (err) {
@@ -1088,6 +1088,10 @@ export default function VendorDashboard() {
     e.preventDefault();
     if (!withdrawalAmount || parseFloat(withdrawalAmount) <= 0) {
       toast.error("Please enter a valid payout settlement amount");
+      return;
+    }
+    if (parseFloat(withdrawalAmount) * 100 > stats.netEarnings) {
+      toast.error("Insufficient net earnings for withdrawal");
       return;
     }
     toast.success(`Settlement processing! ₹${parseFloat(withdrawalAmount).toLocaleString("en-IN")} dispatched to Bank Payout account.`);
@@ -1422,9 +1426,9 @@ export default function VendorDashboard() {
             {/* Stats Metrics GTV Cards Grid */}
             <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
               {[
-                { title: "Gross Revenue", val: `₹${stats.totalRevenue.toLocaleString('en-IN')}`, desc: `${stats.totalSales} items bought`, color: "text-[#d4af37]" },
+                { title: "Gross Revenue", val: formatPrice(stats.totalRevenue), desc: `${stats.totalSales} items bought`, color: "text-[#d4af37]" },
                 { title: "Total Orders", val: stats.totalOrders, desc: `${stats.pendingOrdersCount} awaiting shipment`, color: "gold" },
-                { title: "Net Earnings", val: `₹${stats.netEarnings.toLocaleString('en-IN')}`, desc: `Commission: ${vendorData?.commission_rate}%`, color: "text-green-400" },
+                { title: "Net Earnings", val: formatPrice(stats.netEarnings), desc: `Commission: ${vendorData?.commission_rate}%`, color: "text-green-400" },
                 { title: "Products Sold", val: stats.productsSold || stats.totalSales, desc: "Successful checkouts", color: "text-blue-400" },
                 { title: "Top Product", val: stats.topProduct || "N/A", desc: "Most popular item", color: "text-purple-400" },
                 { title: "Conversion Rate", val: `${stats.conversionRate}%`, desc: `${stats.trafficVisits} site views`, color: "text-orange-400" },
@@ -1454,22 +1458,13 @@ export default function VendorDashboard() {
                   </span>
                 </div>
                 
-                {/* Recharts BarChart rendering */}
+                {/* Recharts BarChart — lazy loaded to defer the recharts bundle */}
                 <div className="h-48 w-full pt-2">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                      <XAxis dataKey="month" stroke="rgba(255,255,255,0.4)" fontSize={9} tickLine={false} />
-                      <YAxis stroke="rgba(255,255,255,0.4)" fontSize={9} tickLine={false} />
-                      <Tooltip 
-                        contentStyle={{ background: '#111', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
-                        labelStyle={{ color: '#d4af37', fontSize: 10, fontWeight: 'bold' }}
-                        itemStyle={{ color: '#fff', fontSize: 10 }}
-                        formatter={(value) => [`₹${value.toLocaleString()}`, 'Net Share']}
-                      />
-                      <Bar dataKey="Revenue" fill="#d4af37" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <Suspense fallback={
+                    <div className="h-full w-full animate-pulse rounded-xl bg-white/5" />
+                  }>
+                    <VendorChart data={chartData} />
+                  </Suspense>
                 </div>
               </div>
 
@@ -1507,7 +1502,17 @@ export default function VendorDashboard() {
                   {products.filter(p => p.stock < 5).map(p => (
                     <div key={p.id} className="flex items-center justify-between gap-3 p-3 bg-red-500/5 border border-red-500/10 rounded-xl">
                       <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <img src={p.img} alt={p.name} className="w-10 h-10 rounded-lg object-cover border border-[#ffd5dd]" />
+                        <img
+                          src={getProductImageUrl(p.img, 'thumbnail')}
+                          srcSet={`${getProductImageUrl(p.img, 'thumbnail')} 400w, ${getProductImageUrl(p.img, 'detail')} 800w`}
+                          sizes="(max-width: 600px) 400px, 800px"
+                          loading="lazy"
+                          decoding="async"
+                          width={400}
+                          height={400}
+                          alt={p.name}
+                          className="w-10 h-10 rounded-lg object-cover border border-[#ffd5dd]"
+                        />
                         <div className="min-w-0 flex-1">
                           <p className={`font-bold text-xs truncate ${textTitle}`}>{p.name}</p>
                           <p className="text-[10px] text-red-500 font-bold uppercase">{p.stock === 0 ? "Out of Stock" : `Only ${p.stock} units left`}</p>
@@ -1567,7 +1572,17 @@ export default function VendorDashboard() {
                       {products.map(p => (
                         <tr key={p.id} className="hover:bg-white/[0.005] transition-colors">
                           <td className="px-6 py-4 flex items-center gap-3">
-                            <img src={p.img} alt={p.name} className="w-10 h-10 rounded-lg object-cover border border-[#ffd5dd]" />
+                            <img
+                              src={getProductImageUrl(p.img, 'thumbnail')}
+                              srcSet={`${getProductImageUrl(p.img, 'thumbnail')} 400w, ${getProductImageUrl(p.img, 'detail')} 800w`}
+                              sizes="(max-width: 600px) 400px, 800px"
+                              loading="lazy"
+                              decoding="async"
+                              width={400}
+                              height={400}
+                              alt={p.name}
+                              className="w-10 h-10 rounded-lg object-cover border border-[#ffd5dd]"
+                            />
                             <div>
                               <div className="flex items-center gap-2">
                                 <p className={`font-bold text-sm ${textTitle}`}>{p.name}</p>
@@ -1588,9 +1603,9 @@ export default function VendorDashboard() {
                             {p.specs?.sku || `SKU-${p.id.slice(0, 5).toUpperCase()}`}
                           </td>
                           <td className="px-6 py-4 font-semibold">
-                            <span className={textTitle}>₹{p.price.toLocaleString("en-IN")}</span>
+                            <span className={textTitle}>{formatPrice(p.price)}</span>
                             {p.original_price && p.original_price > p.price && (
-                              <p className={`text-[10px] line-through ${textSubtle}`}>₹{p.original_price.toLocaleString("en-IN")}</p>
+                              <p className={`text-[10px] line-through ${textSubtle}`}>{formatPrice(p.original_price)}</p>
                             )}
                           </td>
                           <td className="px-6 py-4 font-semibold">
@@ -1863,7 +1878,17 @@ export default function VendorDashboard() {
                     <div className="flex flex-wrap gap-3 p-3 bg-pink-50/60 rounded-xl border border-[#ffd5dd]/60">
                       {productForm.images.map((url, index) => (
                         <div key={index} className="relative group w-16 h-16 rounded-lg overflow-hidden border border-[#ffd5dd]">
-                          <img src={url} alt="Product Gallery Thumbnail" className="w-full h-full object-cover" />
+                          <img
+                            src={getProductImageUrl(url, 'thumbnail')}
+                            srcSet={`${getProductImageUrl(url, 'thumbnail')} 400w, ${getProductImageUrl(url, 'detail')} 800w`}
+                            sizes="(max-width: 600px) 400px, 800px"
+                            loading="lazy"
+                            decoding="async"
+                            width={400}
+                            height={400}
+                            alt="Product Gallery Thumbnail"
+                            className="w-full h-full object-cover"
+                          />
                           <button
                             type="button"
                             onClick={() => removeUploadedImage(index)}
@@ -2057,14 +2082,24 @@ export default function VendorDashboard() {
                         <div className="space-y-3 pt-2">
                           {orderItemsForThisOrder.map(item => (
                             <div key={item.id} className="flex items-center gap-4 pl-2">
-                              <img src={item.image || item.products?.img} alt={item.name} className="w-10 h-10 rounded-lg object-cover border border-[#ffd5dd]" />
+                              <img
+                                src={getProductImageUrl(item.image || item.products?.img, 'thumbnail')}
+                                srcSet={`${getProductImageUrl(item.image || item.products?.img, 'thumbnail')} 400w, ${getProductImageUrl(item.image || item.products?.img, 'detail')} 800w`}
+                                sizes="(max-width: 600px) 400px, 800px"
+                                loading="lazy"
+                                decoding="async"
+                                width={400}
+                                height={400}
+                                alt={item.name}
+                                className="w-10 h-10 rounded-lg object-cover border border-[#ffd5dd]"
+                              />
                               <div className="flex-1 min-w-0">
                                 <h4 className={`font-bold text-xs truncate ${textTitle}`}>{item.name}</h4>
                                 <div className={`text-[9px] flex gap-3 mt-0.5 ${textSubtle}`}>
                                   <span>Qty: <strong className={textTitle}>{item.quantity}</strong></span>
                                   {item.color && <span>Color: <strong className={textTitle}>{item.color}</strong></span>}
                                   {item.size && <span>Size: <strong className={textTitle}>{item.size}</strong></span>}
-                                  <span>Revenue Share: <strong className="gold">₹{(item.price * item.quantity).toLocaleString()}</strong></span>
+                                  <span>Revenue Share: <strong className="gold">{formatPrice(item.price * item.quantity)}</strong></span>
                                 </div>
                               </div>
                             </div>
@@ -2176,7 +2211,7 @@ export default function VendorDashboard() {
                   {[
                     { label: "Today's Deliveries", val: todayDeliveries, color: "text-green-400" },
                     { label: "In Transit", val: inTransitCount, color: "text-blue-400" },
-                    { label: "Total Net Earnings", val: `₹${totalEarnings.toLocaleString('en-IN')}`, color: "text-green-400" },
+                    { label: "Total Net Earnings", val: formatPrice(totalEarnings), color: "text-green-400" },
                     { label: "Pending Shipments", val: pendingCount, color: "text-yellow-400" }
                   ].map((sys, idx) => (
                     <div key={idx} className={`p-4 border rounded-2xl ${cardBg}`}>
@@ -2324,7 +2359,7 @@ export default function VendorDashboard() {
                               </td>
                               <td className="px-6 py-4 font-bold">
                                 {isDelivered ? (
-                                  <span className="text-green-400">₹{netEarnings.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                  <span className="text-green-400">{formatPrice(netEarnings)}</span>
                                 ) : (
                                   <span className={textSubtle}>—</span>
                                 )}
@@ -2549,7 +2584,17 @@ export default function VendorDashboard() {
                     {products.map(p => (
                       <tr key={p.id} className="hover:bg-white/[0.005] transition-colors">
                         <td className="px-6 py-4 flex items-center gap-3">
-                          <img src={p.img} alt={p.name} className="w-10 h-10 rounded-lg object-cover border border-[#ffd5dd]" />
+                          <img
+                            src={getProductImageUrl(p.img, 'thumbnail')}
+                            srcSet={`${getProductImageUrl(p.img, 'thumbnail')} 400w, ${getProductImageUrl(p.img, 'detail')} 800w`}
+                            sizes="(max-width: 600px) 400px, 800px"
+                            loading="lazy"
+                            decoding="async"
+                            width={400}
+                            height={400}
+                            alt={p.name}
+                            className="w-10 h-10 rounded-lg object-cover border border-[#ffd5dd]"
+                          />
                           <span className={`font-bold ${textTitle}`}>{p.name}</span>
                         </td>
                         <td className="px-6 py-4 font-mono font-bold gold">{p.specs?.sku || "SKU-AUTO"}</td>
@@ -2740,9 +2785,9 @@ export default function VendorDashboard() {
             {/* Split cards overview */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[
-                { title: "Accumulated Revenue Share", val: `₹${stats.totalRevenue.toLocaleString()}`, sub: "Gross orders total value" },
-                { title: "Net Seller Payout Ledger", val: `₹${stats.netEarnings.toLocaleString()}`, sub: "Dispatched to bank settings" },
-                { title: "Commission Splits Deducted", val: `₹${stats.commissionDeducted.toLocaleString()}`, sub: "Retained by Platform Admin" }
+                { title: "Accumulated Revenue Share", val: formatPrice(stats.totalRevenue), sub: "Gross orders total value" },
+                { title: "Net Seller Payout Ledger", val: formatPrice(stats.netEarnings), sub: "Dispatched to bank settings" },
+                { title: "Commission Splits Deducted", val: formatPrice(stats.commissionDeducted), sub: "Retained by Platform Admin" }
               ].map((card, idx) => (
                 <div key={idx} className={`border rounded-2xl p-5 relative overflow-hidden ${cardBg}`}>
                   <div className={`text-[9px] uppercase tracking-widest font-bold mb-2 ${textSubtle}`}>{card.title}</div>
@@ -2766,7 +2811,7 @@ export default function VendorDashboard() {
                       type="number"
                       value={withdrawalAmount}
                       onChange={e => setWithdrawalAmount(e.target.value)}
-                      placeholder={`Max available: ₹${Math.floor(stats.netEarnings).toLocaleString()}`}
+                      placeholder={`Max available: ${formatPrice(stats.netEarnings)}`}
                       className={`input-field w-full px-4 py-3 rounded-xl text-xs ${inputBg}`}
                     />
                   </div>

@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
-import { useCartStore } from "../../store/useCartStore";
+import { useCartStore } from "../../store/cartStore";
 import { couponAPI } from "../../services/api";
 import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import { formatPrice } from "../../utils/price";
+import { getProductImageUrl } from "../../utils/image";
 
 export default function CartPage() {
-  const cartItems = useCartStore((state) => state.cartItems);
+  const cartItems = useCartStore((state) => state.items);
   const removeFromCart = useCartStore((state) => state.removeFromCart);
-  const updateQuantity = useCartStore((state) => state.updateQuantity);
+  const updateQty = useCartStore((state) => state.updateQty);
   const clearCart = useCartStore((state) => state.clearCart);
   const [couponCode, setCouponCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState(null);
@@ -31,7 +33,7 @@ export default function CartPage() {
   const subtotal = cartItems.reduce((t, i) => t + i.price * i.quantity, 0);
   
   // Shipping: free if > ₹999, else ₹99
-  const shipping = subtotal > 999 ? 0 : 99;
+  const shipping = subtotal > 99900 ? 0 : 9900;
 
   let couponDiscount = 0;
   if (appliedCoupon) {
@@ -46,7 +48,6 @@ export default function CartPage() {
   }
 
   const total = subtotal + shipping - couponDiscount;
-  const formatPrice = (p) => `₹${p.toLocaleString("en-IN")}`;
   const totalItems = cartItems.reduce((t, i) => t + i.quantity, 0);
 
   const applyCoupon = async (code) => {
@@ -120,7 +121,17 @@ export default function CartPage() {
                   className="flex gap-4 sm:gap-6 border border-[var(--card-border)] p-4 rounded-2xl bg-luxe-card items-center hover:border-gold/20 transition-all duration-300 shadow-card"
                 >
                   <Link to={`/product/slug/${item.slug || item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`} className="flex-shrink-0">
-                    <img src={item.img} alt={item.name} loading="lazy" width="96" height="96" className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-xl border border-[var(--card-border)]" />
+                    <img
+                      src={getProductImageUrl(item.img, 'thumbnail')}
+                      srcSet={`${getProductImageUrl(item.img, 'thumbnail')} 400w, ${getProductImageUrl(item.img, 'detail')} 800w`}
+                      sizes="(max-width: 600px) 400px, 800px"
+                      loading="lazy"
+                      decoding="async"
+                      width={400}
+                      height={400}
+                      alt={item.name}
+                      className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-xl border border-[var(--card-border)]"
+                    />
                   </Link>
                   
                   <div className="flex-1 min-w-0">
@@ -155,14 +166,14 @@ export default function CartPage() {
                     {/* Quantity controls */}
                     <div className="flex items-center border border-[var(--card-border)] rounded-full bg-[var(--input-bg)]">
                       <button 
-                        onClick={() => updateQuantity(item.id, item.quantity - 1, item.selectedColor, item.selectedSize)} 
+                        onClick={() => updateQty(item.id, item.quantity - 1, item.selectedColor, item.selectedSize)} 
                         className="px-3 py-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm font-semibold"
                       >
                         −
                       </button>
                       <span className="px-2 text-sm font-bold text-[var(--text-primary)]">{item.quantity}</span>
                       <button 
-                        onClick={() => updateQuantity(item.id, item.quantity + 1, item.selectedColor, item.selectedSize)} 
+                        onClick={() => updateQty(item.id, item.quantity + 1, item.selectedColor, item.selectedSize)} 
                         className="px-3 py-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm font-semibold"
                       >
                         +
@@ -290,7 +301,7 @@ export default function CartPage() {
               
               {appliedCoupon && (
                 <p className="text-green-500 text-xs mb-4 bg-green-500/5 border border-green-500/10 px-3 py-2 rounded-lg text-center font-medium">
-                  You're saving {formatPrice(couponDiscount + (shipping === 0 ? 99 : 0))} on this order!
+                  You're saving {formatPrice(couponDiscount + (shipping === 0 ? 9900 : 0))} on this order!
                 </p>
               )}
               

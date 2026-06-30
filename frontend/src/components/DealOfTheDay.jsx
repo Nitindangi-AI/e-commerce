@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
+import { getProductImageUrl } from "../utils/image";
 
 export default function DealOfTheDay() {
   const offers = [
@@ -47,7 +48,17 @@ export default function DealOfTheDay() {
             className="h-full"
           >
             <Link to={`/shop?minDiscount=${offer.discount}`} className="group relative block w-full rounded-3xl overflow-hidden aspect-[4/3] border border-[#e8e4d5]/80 bg-luxe-card hover:border-[#d4af37]/35 hover:scale-[1.03] hover:-translate-y-1 transition-all duration-500 ease-out">
-              <img src={offer.img} alt={offer.title} loading="lazy" width="400" height="300" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000 opacity-60 group-hover:opacity-85" />
+              <img
+                src={getProductImageUrl(offer.img, 'thumbnail')}
+                srcSet={`${getProductImageUrl(offer.img, 'thumbnail')} 400w, ${getProductImageUrl(offer.img, 'detail')} 800w`}
+                sizes="(max-width: 600px) 400px, 800px"
+                loading="lazy"
+                decoding="async"
+                width={400}
+                height={400}
+                alt={offer.title}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000 opacity-60 group-hover:opacity-85"
+              />
               {/* Soft light gradient fade */}
               <div className="absolute inset-0 bg-gradient-to-t from-[#faf8f5]/95 via-[#faf8f5]/45 to-transparent" />
               <div className="absolute inset-0 flex flex-col justify-end p-5">

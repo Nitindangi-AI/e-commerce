@@ -17,7 +17,7 @@ export default function Footer() {
     { name: "Shop All", to: "/shop" },
     { name: "About Us", to: "#" },
     { name: "Careers", to: "#" },
-    { name: "Become a Seller", to: "/register" },
+    { name: "Become a Seller", to: "/vendor-register" },
   ];
 
   const categories = [

@@ -20,7 +20,7 @@ CREATE POLICY "Users can insert own profile" ON profiles FOR INSERT WITH CHECK (
 CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (id = auth.uid());
 
 -- ── Products ──
-CREATE POLICY "Public can read products" ON products FOR SELECT USING (true);
+CREATE POLICY "Public can read products" ON products FOR SELECT USING (deleted_at IS NULL);
 CREATE POLICY "Admin can insert products" ON products FOR INSERT WITH CHECK (
   EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
 );

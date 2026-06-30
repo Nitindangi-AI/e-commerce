@@ -4,6 +4,8 @@ import { motion } from "framer-motion";
 import { useSearchStore } from "../store/useSearchStore";
 import products, { getAllCategories } from "../data/product";
 import { Search, Tag, Building2, Sparkles, X, ChevronRight } from "lucide-react";
+import { formatPrice } from "../utils/price";
+import { getProductImageUrl } from "../utils/image";
 
 const POPULAR_SEARCHES = ["Watches", "Leather", "Silk Shirt", "Sneakers", "Perfume", "Loafers"];
 
@@ -213,18 +215,21 @@ export default function SearchDropdown() {
                           className="flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-[#F8F6F2] border border-transparent hover:border-[#E7E2D8]/40 transition-all group"
                         >
                           <img 
-                            src={p.img} 
-                            alt={p.name} 
+                            src={getProductImageUrl(p.img, 'thumbnail')} 
+                            srcSet={`${getProductImageUrl(p.img, 'thumbnail')} 400w, ${getProductImageUrl(p.img, 'detail')} 800w`}
+                            sizes="(max-width: 600px) 400px, 800px"
                             loading="lazy"
-                            width="48"
-                            height="48"
+                            decoding="async"
+                            width={400}
+                            height={400}
+                            alt={p.name} 
                             className="w-12 h-12 rounded-xl object-cover flex-shrink-0 border border-[#E7E2D8] bg-[#F5F3EE]" 
                           />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm text-[#2B2B28] font-black truncate">{p.name}</p>
                             <p className="text-xs text-[#66635D] font-bold">{p.brand} · {p.category}</p>
                           </div>
-                          <span className="text-[#C6A86B] text-sm font-black whitespace-nowrap">₹{p.price.toLocaleString("en-IN")}</span>
+                          <span className="text-[#C6A86B] text-sm font-black whitespace-nowrap">{formatPrice(p.price)}</span>
                         </Link>
                       ))}
                     </div>
